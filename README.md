@@ -23,7 +23,10 @@ npm run build    # production build in dist/
 
 ## Feature map
 
-- **Top bar** — centered title; hamburger; browse/messages/settings/profile icons opening modals.
+- **Top bar** — centered title; hamburger; browse/messages/settings/profile icons opening modals;
+  theme toggle (moon/sun) on the right.
+- **Dark mode** — toggles between light and dark palettes, follows the OS preference on first
+  visit, and remembers the choice in `localStorage` (`kiosk-theme`).
 - **Drawer** — overlay slide-in, 340px (full-width ≤600px), sessions → chats (2 levels),
   unread badges, caret expansion, all interaction rules (d)–(g) from the spec,
   expansion preserved across open/close cycles.
@@ -33,6 +36,8 @@ npm run build    # production build in dist/
   (Image / YouTube / GPS placeholders), Enter-to-send, in-memory persistence.
 - **Browse modal** — breadcrumbs, categories first with ">" navigation, listings after,
   2-line clamped descriptions, single-select toggle, Buy/Sell with alerts.
-- **Other modals** — Messages / Settings / Profile placeholders; close on X, overlay, ESC.
-- **UX** — light theme, rounded corners, transitions (drawer, modal, chips, caret),
+- **Messages modal** — centered title, scrollable session inbox with unread badges; opening a
+  session slides in its chat screen, with a "<" back arrow to return to the list.
+- **Other modals** — Settings / Profile placeholders; close on X, overlay, ESC.
+- **UX** — light/dark themes, rounded corners, transitions (drawer, modal, chips, caret),
   thin scrollbars, responsive rules, aria-labels and keyboard support.

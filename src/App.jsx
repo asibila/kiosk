@@ -9,11 +9,11 @@ import Drawer from './components/Drawer.jsx'
 import SessionView from './components/SessionView.jsx'
 import ChatView from './components/ChatView.jsx'
 import BrowseModal from './components/BrowseModal.jsx'
+import MessagesModal from './components/MessagesModal.jsx'
 import SimpleModal from './components/SimpleModal.jsx'
 
-const MODAL_TITLES = { messages: 'Messages', settings: 'Settings', profile: 'Profile' }
+const MODAL_TITLES = { settings: 'Settings', profile: 'Profile' }
 const MODAL_BODIES = {
-  messages: 'Your inbox is quiet for now. Updates from your sessions and chats will land here as they arrive.',
   settings: 'Appearance, notifications and privacy controls live here. Nothing is wired up yet — this panel is a placeholder.',
   profile: 'Signed in as demo user. Manage your account details, delivery addresses and payment methods from this panel.',
 }
@@ -119,6 +119,11 @@ export default function App() {
     setChats((prev) => prev.map((c) => (c.id === chatId ? { ...c, messages: [...c.messages, message] } : c)))
   }
 
+  // Opening a conversation from the messages inbox clears its unread badge.
+  function markChatRead(chatId) {
+    setChats((prev) => prev.map((c) => (c.id === chatId && c.unread ? { ...c, unread: 0 } : c)))
+  }
+
   function openModal(name) {
     setModal(name)
     setDrawerOpen(false)
@@ -157,7 +162,16 @@ export default function App() {
       </div>
 
       {modal === 'browse' && <BrowseModal data={BROWSE_DATA} onClose={() => setModal(null)} />}
-      {modal && modal !== 'browse' && (
+      {modal === 'messages' && (
+        <MessagesModal
+          sessions={SESSIONS}
+          chats={chats}
+          onSend={sendMessage}
+          onReadChat={markChatRead}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal && modal !== 'browse' && modal !== 'messages' && (
         <SimpleModal title={MODAL_TITLES[modal]} body={MODAL_BODIES[modal]} onClose={() => setModal(null)} />
       )}
     </div>

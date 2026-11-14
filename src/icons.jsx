@@ -85,6 +85,12 @@ export const XIcon = (p) => (
   </Svg>
 )
 
+export const ChevronLeftIcon = (p) => (
+  <Svg {...p}>
+    <polyline points="15 18 9 12 15 6" />
+  </Svg>
+)
+
 export const ChevronDownIcon = (p) => (
   <Svg {...p}>
     <polyline points="6 9 12 15 18 9" />

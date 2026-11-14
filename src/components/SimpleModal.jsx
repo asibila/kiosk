@@ -1,4 +1,4 @@
-// Simple centered modal card used for Messages / Settings / Profile.
+// Simple centered modal card used for Settings / Profile.
 import { XIcon } from '../icons.jsx'
 
 export default function SimpleModal({ title, body, onClose }) {
