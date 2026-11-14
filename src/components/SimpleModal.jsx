@@ -1,0 +1,18 @@
+// Simple centered modal card used for Messages / Settings / Profile.
+import { XIcon } from '../icons.jsx'
+
+export default function SimpleModal({ title, body, onClose }) {
+  return (
+    <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal-card" role="dialog" aria-modal="true" aria-label={title}>
+        <header className="modal-head">
+          <h2>{title}</h2>
+          <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>
+            <XIcon />
+          </button>
+        </header>
+        <div className="modal-body scrollable">{body}</div>
+      </div>
+    </div>
+  )
+}

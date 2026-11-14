@@ -1,0 +1,74 @@
+// Interview session view: progress bar, question cards with wrapping chips,
+// and an empty decorative bottom bar.
+import { CheckIcon, SessionGlyph } from '../icons.jsx'
+
+export default function SessionView({ session, answers, onAnswer }) {
+  // Sort by priority ascending (Array#sort is stable).
+  const questions = [...session.questions].sort((a, b) => a.priority - b.priority)
+  const answeredCount = questions.filter((q) => answers[q.id] != null).length
+  const pct = questions.length ? (answeredCount / questions.length) * 100 : 0
+
+  return (
+    <section className="session-view" aria-label={`${session.title} interview`}>
+      <header className="session-head">
+        <div className="session-title-row">
+          <span className="drawer-row-icon">
+            <SessionGlyph kind={session.icon} />
+          </span>
+          <h2 className="session-title">{session.title}</h2>
+        </div>
+        <div className="progress-row">
+          <div
+            className="progress-track"
+            role="progressbar"
+            aria-label="Questions answered"
+            aria-valuemin={0}
+            aria-valuemax={questions.length}
+            aria-valuenow={answeredCount}
+          >
+            <div className="progress-fill" style={{ width: `${pct}%` }} />
+          </div>
+          <span className="progress-text">
+            {answeredCount} / {questions.length} answered
+          </span>
+        </div>
+      </header>
+
+      <div className="session-scroll scrollable">
+        {questions.map((q) => {
+          const chosen = answers[q.id]
+          const isAnswered = chosen != null
+          return (
+            <article key={q.id} className={isAnswered ? 'q-card answered' : 'q-card'}>
+              <header className="q-head">
+                <h3 className="q-text">{q.text}</h3>
+                {isAnswered && (
+                  <span className="check-badge" title="Answered">
+                    <CheckIcon size={13} />
+                  </span>
+                )}
+              </header>
+              <p className="q-hint">{q.hint}</p>
+              <div className="chips">
+                {q.options.map((option, index) => (
+                  <button
+                    key={option}
+                    type="button"
+                    className={chosen === index ? 'chip selected' : 'chip'}
+                    aria-pressed={chosen === index}
+                    onClick={() => onAnswer(q.id, index)}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </article>
+          )
+        })}
+      </div>
+
+      {/* Empty decorative bar — intentionally holds nothing */}
+      <footer className="session-footer" aria-hidden="true" />
+    </section>
+  )
+}
