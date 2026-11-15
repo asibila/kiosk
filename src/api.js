@@ -31,6 +31,9 @@ async function request(path, { headers, ...options } = {}) {
 
 const actorHeader = (actorId) => (actorId ? { 'x-actor-id': String(actorId) } : {})
 
+/** Server-Sent Events stream that pushes new chat messages to the UI. */
+export const CHAT_EVENTS_URL = `${API_BASE}/chat-events/stream`
+
 export const api = {
   list: (resource) => request(`/${resource}`),
   create: (resource, body, actorId) =>
@@ -62,7 +65,6 @@ const RESOURCES = [
   'facet-value-selections',
   'chat-threads',
   'chat-messages',
-  'inbox-lists',
   'inbox-items',
   'listing-chat-threads',
 ]

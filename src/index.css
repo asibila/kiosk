@@ -233,6 +233,43 @@ button {
   color: var(--text);
 }
 
+/* Red unread counter pinned to the topbar's message icon. */
+.message-btn {
+  position: relative;
+}
+
+.topbar-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 2px var(--surface);
+  pointer-events: none;
+  animation: badge-pop 0.18s ease-out;
+}
+
+@keyframes badge-pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 /* ── Drawer (overlay) ────────────────────────────────────── */
 .drawer {
   position: absolute;
@@ -402,6 +439,45 @@ button {
 
 .listing-row.selected .drawer-row-icon {
   color: var(--primary);
+}
+
+/* Conversations nested under the selected listing (listing-chat-threads). */
+.drawer-chats {
+  display: flex;
+  flex-direction: column;
+}
+
+.listing-chat-row {
+  align-items: flex-start;
+  padding: 7px 10px 7px 46px;
+}
+
+.listing-chat-row .drawer-row-icon {
+  margin-top: 2px;
+  color: var(--muted-2);
+}
+
+.listing-chat-row .drawer-row-title {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 400;
+  white-space: normal;
+}
+
+.listing-chat-row.selected {
+  background: var(--primary-soft);
+}
+
+.listing-chat-row.selected .drawer-row-icon {
+  color: var(--primary);
+}
+
+.listing-chat-row.selected .drawer-row-title {
+  color: var(--primary-text);
+  font-weight: 600;
 }
 
 /* Delete affordance on each drawer listing row. */
@@ -631,10 +707,8 @@ button {
 }
 
 .session-footer {
-  height: 64px;
+  height: 66px;
   flex-shrink: 0;
-  border-top: 1px solid var(--border);
-  background: var(--surface);
 }
 
 /* ── Chat view ───────────────────────────────────────────── */
@@ -669,6 +743,36 @@ button {
   font-size: 12px;
   color: var(--muted);
   margin-top: 1px;
+}
+
+/* Live-chat connection indicator in the conversation header. */
+.chat-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.chat-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted-3);
+}
+
+.chat-live.live {
+  color: var(--success);
+}
+
+.chat-live.live .chat-live-dot {
+  background: var(--success);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--success) 22%, transparent);
+}
+
+.chat-live.reconnecting .chat-live-dot {
+  background: var(--danger);
 }
 
 .chat-scroll {
@@ -1008,15 +1112,251 @@ button {
 
 .action-row {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
   gap: 10px;
-  padding: 14px 22px;
+  height: 66px;
+  padding: 0 22px;
   border-top: 1px solid var(--border);
   background: var(--surface);
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
-.action-row .btn {
+.action-chips {
+  display: flex;
+  gap: 8px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* ── Listing wizard (edit / preview) ─────────────────────── */
+.wizard-view {
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.wizard-head {
+  padding: 16px 22px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wizard-step {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+}
+
+.wizard-title {
+  margin: 0;
+  font-size: 18px;
+  color: var(--text);
+}
+
+.wizard-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 22px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wizard-footer {
+  height: 66px;
+  flex-shrink: 0;
+}
+
+.field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.field-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.field-hint {
+  font-size: 12.5px;
+  color: var(--muted-2);
+}
+
+.compose-area {
+  width: 100%;
+  min-height: 150px;
+  resize: vertical;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.compose-area:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--input-focus-bg);
+}
+
+.thumb-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.thumb-card {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  margin: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.thumb-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.thumb-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.6);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thumb-remove:hover {
+  background: rgba(15, 23, 42, 0.85);
+}
+
+.thumb-add {
+  width: 96px;
+  height: 96px;
+  border-radius: 10px;
+  border: 1px dashed var(--muted-3);
+  color: var(--muted);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 11.5px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.thumb-add:hover {
+  border-color: var(--primary);
+  color: var(--primary-text);
+  background: var(--primary-soft-bg);
+}
+
+.thumb-add input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.preview-heading {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+}
+
+.facet-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.facet-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.facet-q {
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.facet-row .chip {
+  flex-shrink: 0;
+}
+
+.preview-desc {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.preview-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted-2);
+}
+
+.report-message {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
 }
 
 /* Browse modal */
@@ -1109,6 +1449,18 @@ button {
   min-width: 0;
 }
 
+/* Envelope action in the search-results modal. */
+.listing-contact {
+  flex-shrink: 0;
+  color: var(--primary);
+}
+
+.listing-contact:disabled {
+  color: var(--muted-2);
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .browse-item-title {
   font-weight: 700;
   font-size: 14px;
@@ -1162,6 +1514,22 @@ button {
   text-align: center;
 }
 
+.messages-head-thread {
+  display: flex;
+  justify-content: space-between;
+}
+
+.messages-head-thread h2 {
+  text-align: left;
+}
+
+.messages-head-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
 .messages-panel {
   flex: 1;
   min-height: 0;
@@ -1193,6 +1561,11 @@ button {
   transition: background 0.15s ease;
 }
 
+.messages-row.listing-row {
+  padding: 10px;
+  align-items: flex-start;
+}
+
 .messages-row:hover {
   background: var(--hover);
 }
@@ -1203,6 +1576,15 @@ button {
 
 .messages-row .drawer-row-title {
   font-weight: 500;
+}
+
+/* Unread conversations stand out in the Messages list. */
+.messages-row.has-unread .drawer-row-title > span:first-child {
+  font-weight: 700;
+}
+
+.messages-row .badge {
+  margin-left: auto;
 }
 
 .messages-row-chevron {

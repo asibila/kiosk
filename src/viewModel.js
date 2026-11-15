@@ -38,7 +38,6 @@ export function buildViewModel(raw, { userId } = {}) {
   const facetSelections = raw['facet-value-selections'] ?? []
   const chatThreads = raw['chat-threads'] ?? []
   const chatMessages = raw['chat-messages'] ?? []
-  const inboxLists = raw['inbox-lists'] ?? []
   const inboxItems = raw['inbox-items'] ?? []
   const listingChatThreads = raw['listing-chat-threads'] ?? []
 
@@ -46,6 +45,7 @@ export function buildViewModel(raw, { userId } = {}) {
   const categoriesById = byId(categories)
   const listingsById = byId(listings)
   const optionsById = byId(facetOptions)
+  const usersById = byId(users)
 
   const descriptionText = (descriptionId, fallback = '') =>
     descriptionsById.get(descriptionId)?.text || fallback
@@ -69,38 +69,46 @@ export function buildViewModel(raw, { userId } = {}) {
     return [orientationLabel(listing.orientation), ...selected].join(' · ')
   }
 
-  // Only threads in the current user's inbox appear in Messages/drawer chats.
-  // The logged-in user (from the login response) drives the inbox/chats and the
+  // Only threads in the current user's inbox appear in Messages.
+  // The logged-in user (from the login response) drives the inbox and the
   // sent-vs-received message split. Falls back to the first user when no login
   // has happened yet.
   const currentUser = users.find((u) => u.id === userId) ?? users[0] ?? null
-  const userInboxListIds = new Set(
-    inboxLists.filter((list) => list.userId === currentUser?.id).map((list) => list.id),
+  const userInboxItems = inboxItems.filter(
+    (item) => currentUser && item.userId === currentUser.id,
   )
-  const inboxThreadIds = new Set(
-    inboxItems.filter((item) => userInboxListIds.has(item.listId)).map((item) => item.chatThreadId),
-  )
-  const visibleThreads = inboxThreadIds.size
-    ? chatThreads.filter((thread) => inboxThreadIds.has(thread.id))
-    : chatThreads
 
-  // Chat threads → chats. A thread's session is the category of its listing.
+  // Chat threads -> chats. A thread's session is the category of its listing.
   // The API records who created each message (`ChatMessage.userId`); the current
   // user is the sender, so their messages render as sent and the rest as received.
-  // Messages sent from this UI are appended locally as sent until the backend saves them.
   const linkByThreadId = new Map(listingChatThreads.map((link) => [link.chatThreadId, link]))
-  const chats = visibleThreads
+  const inboxItemByThreadId = new Map(inboxItems.map((item) => [item.chatThreadId, item]))
+  const chats = chatThreads
     .map((thread) => {
       const link = linkByThreadId.get(thread.id)
       const listing = link ? listingsById.get(link.listingId) : null
       if (!listing) return null
 
+      // The thread's two participants: the listing owner and the user whose
+      // inbox the conversation sits in. Show whichever one is not signed in.
+      const inboxItem = inboxItemByThreadId.get(thread.id)
+      const ownerSide = currentUser?.id === listing.userId
+      const partnerId = ownerSide ? inboxItem?.userId : listing.userId
+      const partner = partnerId != null ? usersById.get(partnerId) : null
+
       return {
         id: `thread-${thread.id}`,
         threadId: thread.id,
+        listingId: listing.id,
+        listingChatThreadId: link?.id ?? null,
         sessionId: String(listing.categoryId),
         title: listingTitle(listing),
-        unread: 0,
+        desc: listingDescription(listing),
+        partnerName: partner?.name ?? null,
+        // The badge belongs to the signed-in user's side of the conversation:
+        // the owner sees the listing link's flag, the contact sees their inbox
+        // item's flag.
+        unread: (ownerSide ? link?.hasUnread : inboxItem?.hasUnread) ? 1 : 0,
         messages: chatMessages
           .filter((message) => message.threadId === thread.id)
           .sort((a, b) => a.id - b.id)
@@ -110,6 +118,23 @@ export function buildViewModel(raw, { userId } = {}) {
             text: message.text,
             time: formatTime(message.createdAt),
           })),
+      }
+    })
+    .filter(Boolean)
+
+  const chatsById = new Map(chats.map((chat) => [chat.id, chat]))
+  // Each inbox row corresponds to an InboxItem (chat thread in the user's inbox).
+  const inbox = userInboxItems
+    .map((item) => {
+      const chat = chatsById.get(`thread-${item.chatThreadId}`)
+      if (!chat) return null
+      return {
+        id: `inbox-${item.id}`,
+        inboxItemId: item.id,
+        chatId: chat.id,
+        title: chat.title,
+        desc: chat.desc,
+        hasUnread: item.hasUnread,
       }
     })
     .filter(Boolean)
@@ -189,6 +214,7 @@ export function buildViewModel(raw, { userId } = {}) {
   const listingItem = (listing) => ({
     type: 'listing',
     id: String(listing.id),
+    userId: listing.userId,
     title: listingTitle(listing),
     desc: listingDescription(listing),
     thumb: 'box',
@@ -225,6 +251,7 @@ export function buildViewModel(raw, { userId } = {}) {
     user: currentUser,
     sessions,
     chats,
+    inbox,
     myListings,
     browseData,
     answers,

@@ -9,7 +9,12 @@ import {
   PinIcon,
 } from '../icons.jsx'
 import { newId, nowTime } from '../utils.js'
-import { CHAT_PARTNER } from '../data.js'
+
+const LIVE_LABEL = {
+  live: 'Live',
+  connecting: 'Connecting…',
+  reconnecting: 'Reconnecting…',
+}
 
 const ATTACH_OPTIONS = [
   { kind: 'image', label: 'Image', Icon: ImageIcon },
@@ -19,7 +24,7 @@ const ATTACH_OPTIONS = [
 
 const ATTACH_ICON = { image: ImageIcon, youtube: YoutubeIcon, gps: PinIcon }
 
-export default function ChatView({ chat, onSend }) {
+export default function ChatView({ chat, onSend, liveStatus = 'connecting' }) {
   const [draft, setDraft] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
   const pickerAreaRef = useRef(null) // DOM ref: paperclip + popover wrapper
@@ -74,8 +79,14 @@ export default function ChatView({ chat, onSend }) {
           <UserIcon size={20} />
         </span>
         <div>
-          <div className="chat-head-text">Chatting with {CHAT_PARTNER}</div>
-          <div className="chat-head-sub">{chat.title}</div>
+          <div className="chat-head-text">Chatting with {chat.partnerName || 'the other user'}</div>
+          <div className="chat-head-sub">
+            {chat.title}
+            <span className={`chat-live ${liveStatus}`} role="status">
+              <span className="chat-live-dot" aria-hidden="true" />
+              {LIVE_LABEL[liveStatus] || liveStatus}
+            </span>
+          </div>
         </div>
       </header>
 

@@ -1,5 +1,5 @@
 // Interview session view: progress bar, question cards with wrapping chips,
-// and an action bar (publish / buy / sell) at the bottom.
+// and an action bar (buy/sell chips, search, publish) at the bottom.
 import { CheckIcon, SessionGlyph } from '../icons.jsx'
 
 export default function SessionView({ session, answers, onAnswer, actions }) {
@@ -74,7 +74,7 @@ export default function SessionView({ session, answers, onAnswer, actions }) {
         )}
       </div>
 
-      {/* Action bar (publish / buy / sell) when provided by the parent. */}
+      {/* Action bar (buy/sell chips + search/publish) when provided by the parent. */}
       {actions ? (
         <footer className="session-footer">{actions}</footer>
       ) : (

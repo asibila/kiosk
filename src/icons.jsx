@@ -44,6 +44,13 @@ export const MessageIcon = (p) => (
   </Svg>
 )
 
+export const EnvelopeIcon = (p) => (
+  <Svg {...p}>
+    <rect x="2" y="4" width="20" height="16" rx="2" />
+    <polyline points="22 6 12 13 2 6" />
+  </Svg>
+)
+
 export const GearIcon = (p) => (
   <Svg {...p}>
     <circle cx="12" cy="12" r="3" />

@@ -1,74 +1,100 @@
-// Messages modal: session inbox → chat screen (slides in), with back navigation.
+// Messages modal: inbox items (one per chat thread) -> thread view, with back navigation.
 import { useState } from 'react'
-import { ChevronLeftIcon, ChevronRightIcon, SessionGlyph, XIcon } from '../icons.jsx'
+import { ChevronLeftIcon, TagIcon, XIcon } from '../icons.jsx'
 import ChatView from './ChatView.jsx'
 
-export default function MessagesModal({ sessions, chats, onSend, onClose }) {
+export default function MessagesModal({
+  inbox,
+  chats,
+  onSend,
+  onChatRead,
+  onActiveChatChange,
+  liveStatus,
+  onClose,
+}) {
   const [activeChatId, setActiveChatId] = useState(null)
-  const activeChat = chats.find((c) => c.id === activeChatId) || null
+  const activeChat = (chats ?? []).find((c) => c.id === activeChatId) || null
+  const chatById = new Map((chats ?? []).map((chat) => [chat.id, chat]))
+  const items = inbox ?? []
 
-  // Only sessions that actually have a conversation appear in the inbox.
-  const inboxSessions = sessions.filter((session) => chats.some((chat) => chat.sessionId === session.id))
+  function openChat(chatId) {
+    setActiveChatId(chatId)
+    onChatRead?.(chatId)
+    onActiveChatChange?.(chatId)
+  }
 
-  // A session row opens its first conversation.
-  function openSession(sessionId) {
-    const sessionChats = chats.filter((c) => c.sessionId === sessionId)
-    if (!sessionChats.length) return
-    setActiveChatId(sessionChats[0].id)
+  function backToInbox() {
+    setActiveChatId(null)
+    onActiveChatChange?.(null)
+  }
+
+  function close() {
+    onActiveChatChange?.(null)
+    onClose()
   }
 
   return (
-    <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) close() }}>
       <div className="modal-card messages" role="dialog" aria-modal="true" aria-label="Messages">
-        <header className="modal-head messages-head">
+        <header className={activeChat ? 'modal-head messages-head messages-head-thread' : 'modal-head messages-head'}>
           {activeChat ? (
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label="Back to messages"
-              onClick={() => setActiveChatId(null)}
-            >
-              <ChevronLeftIcon />
-            </button>
+            <div className="messages-head-left">
+              <button type="button" className="icon-btn" aria-label="Back to inbox" onClick={backToInbox}>
+                <ChevronLeftIcon size={22} />
+              </button>
+              <h2>Messages</h2>
+            </div>
           ) : (
-            <span aria-hidden="true" />
+            <>
+              <span aria-hidden="true" />
+              <h2>Messages</h2>
+            </>
           )}
-          <h2>Messages</h2>
-          <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>
+          <button type="button" className="icon-btn" aria-label="Close" onClick={close}>
             <XIcon />
           </button>
         </header>
 
         {activeChat ? (
           <div className="messages-panel slide-in-right" key={`chat-${activeChat.id}`}>
-            <ChatView chat={activeChat} onSend={onSend} />
+            <ChatView chat={activeChat} onSend={onSend} liveStatus={liveStatus} />
           </div>
         ) : (
           <div className="messages-panel slide-in-left" key="list">
-            {inboxSessions.length === 0 ? (
+            {items.length === 0 ? (
               <p className="messages-empty">No conversations yet.</p>
             ) : (
-              <ul className="messages-list scrollable" aria-label="Conversations">
-                {inboxSessions.map((session) => {
-                  const unread = chats
-                    .filter((c) => c.sessionId === session.id)
-                    .reduce((n, c) => n + c.unread, 0)
-
+              <ul className="messages-list scrollable" aria-label="Inbox">
+                {items.map((item) => {
+                  const chat = chatById.get(item.chatId)
+                  const unreadCount = chat ? chat.unread : item.hasUnread ? 1 : 0
                   return (
-                    <li key={session.id}>
-                      <button type="button" className="messages-row" onClick={() => openSession(session.id)}>
-                        <span className="drawer-row-icon">
-                          <SessionGlyph kind={session.icon} />
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        className={
+                          unreadCount > 0
+                            ? 'messages-row listing-row has-unread'
+                            : 'messages-row listing-row'
+                        }
+                        onClick={() => openChat(item.chatId)}
+                      >
+                        <span className="drawer-row-icon" aria-hidden="true">
+                          <TagIcon size={18} />
                         </span>
-                        <span className="drawer-row-title">{session.title}</span>
-                        {unread > 0 && (
-                          <span className="badge" aria-label={`${unread} unread messages`}>
-                            {unread}
+                        <span className="drawer-row-title">
+                          <span>{item.title}</span>
+                          {item.desc ? <span className="listing-row-desc">{item.desc}</span> : null}
+                        </span>
+                        {unreadCount > 0 && (
+                          <span
+                            className="badge"
+                            aria-label={`${unreadCount} unread`}
+                            aria-live="polite"
+                          >
+                            {unreadCount > 99 ? '99+' : unreadCount}
                           </span>
                         )}
-                        <span className="messages-row-chevron" aria-hidden="true">
-                          <ChevronRightIcon size={18} />
-                        </span>
                       </button>
                     </li>
                   )
