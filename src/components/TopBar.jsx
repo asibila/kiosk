@@ -1,7 +1,7 @@
 // Top bar: hamburger (left), centered "Kiosk" title, action icons (right).
-import { MenuIcon, SearchIcon, MessageIcon, GearIcon, UserIcon, MoonIcon, SunIcon } from '../icons.jsx'
+import { MenuIcon, PlusIcon, SearchIcon, MessageIcon, GearIcon, UserIcon, MoonIcon, SunIcon } from '../icons.jsx'
 
-export default function TopBar({ onMenu, onOpenModal, theme = 'light', onToggleTheme }) {
+export default function TopBar({ onMenu, onOpenModal, onCreateNew, theme = 'light', onToggleTheme }) {
   const dark = theme === 'dark'
 
   return (
@@ -15,6 +15,15 @@ export default function TopBar({ onMenu, onOpenModal, theme = 'light', onToggleT
       <h1 className="topbar-title">Kiosk</h1>
 
       <nav className="topbar-side right" aria-label="Top bar actions">
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label="Create new listing"
+          title="Create new listing"
+          onClick={onCreateNew}
+        >
+          <PlusIcon />
+        </button>
         <button type="button" className="icon-btn" aria-label="Browse marketplace" onClick={() => onOpenModal('browse')}>
           <SearchIcon />
         </button>

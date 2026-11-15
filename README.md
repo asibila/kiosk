@@ -58,8 +58,11 @@ VITE_API_BASE_URL=/backend npm run dev
 - **Home screen** — `/` (the only route for now) renders the log-in entry: a single
   **Log in** button (`src/components/Home.jsx`, wired through React Router in
   `src/App.jsx` and `src/main.jsx`).
-- **Top bar** — centered title; hamburger; browse/messages/settings/profile icons opening modals;
-  theme toggle (moon/sun) on the right.
+- **Top bar** — centered title; hamburger; create-new-listing, browse, messages, settings and
+  profile icons; theme toggle (moon/sun) on the right.
+- **New listing** — the plus button clears the selected category/listing and interview answers
+  locally (no API call) and returns to “No category selected”, so the next Publish creates a
+  fresh listing.
 - **Dark mode** — toggles between light and dark palettes, follows the OS preference on first
   visit, and remembers the choice in `localStorage` (`kiosk-theme`).
 - **Drawer** — overlay slide-in, 340px (full-width ≤600px), a flat list of the signed-in

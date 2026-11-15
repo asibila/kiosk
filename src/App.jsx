@@ -156,6 +156,22 @@ function KioskApp() {
     setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
   }
 
+  // Start a fresh listing: clear the current category, listing and interview
+  // answers locally. This deliberately makes no API calls; the next Publish
+  // creates a new listing instead of updating the previously selected one.
+  function startNewListing() {
+    setDrawerOpen(false)
+    setModal(null)
+    setListingsModal(null)
+    setPendingDelete(null)
+    setSelectedListingId(null)
+    setSelectedChatId(null)
+    setSelectedSessionId(null)
+    setCategoryDirty(false)
+    setAnswers({})
+    setNotice('')
+  }
+
   // (g) Browse modal: OK adopts the browsed category as the current one; Cancel just closes.
   // Sessions are categories, so adopting a category means selecting the matching session,
   // whose questions are that category's facet schemas.
@@ -571,7 +587,13 @@ function KioskApp() {
 
   return (
     <div className="app">
-      <TopBar onMenu={toggleDrawer} onOpenModal={openModal} theme={theme} onToggleTheme={toggleTheme} />
+      <TopBar
+        onMenu={toggleDrawer}
+        onOpenModal={openModal}
+        onCreateNew={startNewListing}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+      />
 
       {notice && (
         <div className="app-notice" role="status">
