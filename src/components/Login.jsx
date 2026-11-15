@@ -40,7 +40,7 @@ export default function Login() {
       } catch {
         // Ignore storage failures; the id still drives this session via navigation state.
       }
-      navigate('/app', { state: { userId: data.userId } })
+      navigate('/search', { state: { userId: data.userId } })
     } catch (err) {
       setError(err.message || 'Sign in failed.')
     } finally {

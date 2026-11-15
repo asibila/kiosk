@@ -2,8 +2,8 @@
 import { useMemo, useState } from 'react'
 import { ChevronRightIcon, XIcon, ThumbGlyph } from '../icons.jsx'
 
-export default function BrowseModal({ data, onClose, onPick }) {
-  const [currentId, setCurrentId] = useState('root')
+export default function BrowseModal({ data, onClose, onPick, startId = 'root' }) {
+  const [currentId, setCurrentId] = useState(data[startId] ? startId : 'root')
 
   const node = data[currentId]
   const categories = node.items.filter((i) => i.type === 'category') // categories only

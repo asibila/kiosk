@@ -56,14 +56,29 @@ VITE_API_BASE_URL=/backend npm run dev
 
 ## Feature map
 
-- **Home screen** — `/` (the only route for now) renders the log-in entry: a single
-  **Log in** button (`src/components/Home.jsx`, wired through React Router in
-  `src/App.jsx` and `src/main.jsx`).
-- **Top bar** — centered title; hamburger; create-new-listing, browse, messages, settings and
-  profile icons; theme toggle (moon/sun) on the right.
-- **New listing** — the plus button clears the selected category/listing and interview answers
-  locally (no API call) and returns to “No category selected”, so the next Publish creates a
-  fresh listing.
+- **Screen shell** - routes: `/` (home / log-in entry), `/login`, `/app` (kiosk
+  listings + wizard + chat) and `/search` (standalone search). `/app` and `/search`
+  share the same shell (`KioskApp`) with the usual topbar, drawer and modals; only
+  the main area differs.
+- **Home** - `/` redirects straight to `/search`; `/login` renders the log-in form
+  (`src/components/Login.jsx`) and, after a successful sign-in, returns to `/search`.
+- **Top bar** - centered title; hamburger; profile icon and theme toggle (moon/sun)
+  on the right. Create-new-listing, Messages and Settings live at the bottom of the
+  drawer.
+- **Search screen** (`/search`) - three centred rows: "Search kiosk", a search box
+  with listing-title autocomplete (filtered by the selected category, direction and
+  facets), and a row with mutually exclusive Buy/Sell chips, a category button and
+  a **Filter** button. The category button opens the shared **Browse** modal
+  to pick a category (it reopens at the current one); choosing "Home" and OK resets
+  it to "All categories". **Filter** opens a modal with the interview questions
+  for the selected category (all categories when none is selected); chosen options
+  refine the suggestions and the button shows the active facet count. Picking a
+  suggestion fills the box; the topbar's usual actions keep working, and choosing a
+  listing from the drawer navigates back to `/app`.
+- **New listing** - the drawer's **New listing** action opens the Browse modal to
+  choose a category; OK clears the selected category/listing and interview answers
+  locally (no API call) and opens that category's interview, so the next Publish
+  creates a fresh listing. Cancel keeps the current screen unchanged.
 - **Dark mode** — toggles between light and dark palettes, follows the OS preference on first
   visit, and remembers the choice in `localStorage` (`kiosk-theme`).
 - **Drawer** - overlay slide-in, 340px (full-width ≤600px), a flat list of the signed-in
@@ -71,7 +86,10 @@ VITE_API_BASE_URL=/backend npm run dev
   Selecting a listing expands its chat threads from `listing-chat-threads` underneath it
   (thread id plus last-message preview); clicking one opens that conversation on the main
   screen. Each row has a delete button that asks "Are you sure?" before calling
-  `DELETE /listings/:id`.
+  `DELETE /listings/:id`. The bottom of the drawer holds three full-width actions —
+  **New listing** (+), **Messages** (envelope/message icon, with the unread badge) and
+  **Settings** (gear). When nobody is signed in, the drawer shows a **Sign in**
+  button (linking to `/login`) instead of the listings and these actions.
 - **Session view** — per-session progress bar, priority-sorted product questions,
   wrapping chips (replace-only answers), green answered accents, and an action bar with
   left-aligned, mutually exclusive Buy/Sell chips plus right-aligned Search and a

@@ -1,14 +1,8 @@
-// Top bar: hamburger (left), centered "Kiosk" title, action icons (right).
-import { MenuIcon, PlusIcon, MessageIcon, GearIcon, UserIcon, MoonIcon, SunIcon } from '../icons.jsx'
+// Top bar: hamburger (left), centered "Kiosk" title, profile + theme (right).
+// Create-new-listing, Messages and Settings live at the bottom of the drawer.
+import { MenuIcon, UserIcon, MoonIcon, SunIcon } from '../icons.jsx'
 
-export default function TopBar({
-  onMenu,
-  onOpenModal,
-  onCreateNew,
-  theme = 'light',
-  onToggleTheme,
-  unreadCount = 0,
-}) {
+export default function TopBar({ onMenu, onOpenModal, theme = 'light', onToggleTheme }) {
   const dark = theme === 'dark'
 
   return (
@@ -22,33 +16,6 @@ export default function TopBar({
       <h1 className="topbar-title">Kiosk</h1>
 
       <nav className="topbar-side right" aria-label="Top bar actions">
-        <button
-          type="button"
-          className="icon-btn"
-          aria-label="Create new listing"
-          title="Create new listing"
-          onClick={onCreateNew}
-        >
-          <PlusIcon />
-        </button>
-
-        <button
-          type="button"
-          className="icon-btn message-btn"
-          aria-label={unreadCount > 0 ? `Open messages (${unreadCount} unread)` : 'Open messages'}
-          title="Messages"
-          onClick={() => onOpenModal('messages')}
-        >
-          <MessageIcon />
-          {unreadCount > 0 && (
-            <span className="topbar-badge" aria-hidden="true">
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
-          )}
-        </button>
-        <button type="button" className="icon-btn" aria-label="Open settings" onClick={() => onOpenModal('settings')}>
-          <GearIcon />
-        </button>
         <button type="button" className="icon-btn" aria-label="Open profile" onClick={() => onOpenModal('profile')}>
           <UserIcon />
         </button>

@@ -3,7 +3,7 @@
 // Data comes from the NestJS CRUD API (see ../backend/API_ROUTES.md).
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react'
-import { Navigate, Route, Routes, useLocation } from 'react-router'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { api, CHAT_EVENTS_URL, fetchKioskData, mediaUrl } from './api.js'
 import { buildViewModel, formatTime } from './viewModel.js'
 import { AlertIcon, LayersIcon, XIcon } from './icons.jsx'
@@ -14,12 +14,12 @@ import ChatView from './components/ChatView.jsx'
 import BrowseModal from './components/BrowseModal.jsx'
 import MessagesModal from './components/MessagesModal.jsx'
 import SimpleModal from './components/SimpleModal.jsx'
-import Home from './components/Home.jsx'
 import Login from './components/Login.jsx'
 import ListingsModal from './components/ListingsModal.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
 import EditListingView from './components/EditListingView.jsx'
 import PreviewListingView from './components/PreviewListingView.jsx'
+import SearchView from './components/SearchView.jsx'
 
 const MODAL_TITLES = { settings: 'Settings', profile: 'Profile' }
 const SETTINGS_BODY =
@@ -62,10 +62,17 @@ function getLoggedInUserId() {
 }
 
 function KioskApp() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  // The same shell (topbar, drawer, modals) hosts both the listings screen and
+  // the standalone /search screen; only the main area differs.
+  const isSearchRoute = location.pathname === '/search'
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedSessionId, setSelectedSessionId] = useState(null)
   const [selectedChatId, setSelectedChatId] = useState(null)
   const [modal, setModal] = useState(null) // 'browse' | 'messages' | 'settings' | 'profile' | null
+  const [browseFor, setBrowseFor] = useState('listing') // 'listing' | 'search' | 'new'
+  const [searchCategoryId, setSearchCategoryId] = useState('') // /search category filter
   const [theme, setTheme] = useState(getInitialTheme)
 
   // Backend data.
@@ -120,6 +127,7 @@ function KioskApp() {
   // The user who signed in at the kiosk; drives inbox/chats, sent-vs-received
   // messages, and the actor id used for writes.
   const loggedInUserId = getLoggedInUserId()
+  const isLoggedIn = loggedInUserId != null
 
   // Load every resource the UI needs, then map it onto the session/chat model.
   useEffect(() => {
@@ -274,10 +282,19 @@ function KioskApp() {
     setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
   }
 
+  // Drawer "New listing": pick a category in the Browse modal first; OK leaves
+  // this on the interview screen, Cancel just closes the modal.
+  function browseNewListing() {
+    setDrawerOpen(false)
+    setBrowseFor('new')
+    setModal('browse')
+  }
+
   // Start a fresh listing: clear the current category, listing, interview
   // answers and wizard draft locally. This deliberately makes no API calls; the
   // next Publish creates a new listing instead of updating the selected one.
   function startNewListing() {
+    navigate('/app')
     setDrawerOpen(false)
     setModal(null)
     setListingsModal(null)
@@ -464,10 +481,24 @@ function KioskApp() {
   // whose questions are that category's facet schemas. Start with unanswered questions.
   function handleBrowsePick(categoryId) {
     setModal(null)
+    // Opened from the /search screen: the pick only sets its category filter.
+    if (browseFor === 'search') {
+      setSearchCategoryId(categoryId === 'root' ? '' : String(categoryId))
+      return
+    }
     const node = browseData[categoryId]
     if (!node || node.path.length < 2) return // root path is not a category
     const targetSession = sessions.find((s) => String(s.categoryId) === String(categoryId))
     if (!targetSession) return
+
+    // Opened from the drawer's "New listing": start a fresh wizard in the
+    // chosen category (no listing is written until Publish).
+    if (browseFor === 'new') {
+      startNewListing()
+      setCategoryDirty(true)
+      setSelectedSessionId(String(targetSession.id))
+      return
+    }
     const alreadyCurrent = selectedSessionId === String(targetSession.id)
 
     setSelectedListingId(null)
@@ -724,6 +755,7 @@ function KioskApp() {
   // Drawer listing row: open its category session and recall the listing's facets.
   function openListing(listing) {
     // Keep the drawer open so its nested chat threads stay visible.
+    navigate('/app')
     selectSession(listing.sessionId, { keepDrawerOpen: true })
     setSelectedListingId(listing.id)
     setListingDirection(listing.orientation ?? null)
@@ -809,6 +841,7 @@ function KioskApp() {
   function selectChat(chatId) {
     const chat = chats.find((c) => c.id === chatId)
     if (!chat) return
+    navigate('/app')
     setSelectedSessionId(chat.sessionId) // parent session is highlighted too
     setSelectedChatId(chatId)
     markChatRead(chatId)
@@ -986,6 +1019,20 @@ function KioskApp() {
     })),
   ]
 
+  // Flat, de-duplicated listing list for the /search suggestions.
+  const searchListings = (() => {
+    const seen = new Set()
+    const rows = []
+    for (const node of Object.values(browseData)) {
+      for (const item of node?.items ?? []) {
+        if (item.type !== 'listing' || seen.has(item.id)) continue
+        seen.add(item.id)
+        rows.push(item)
+      }
+    }
+    return rows
+  })()
+
   // Aggregate unread count for the topbar's message icon. Count conversations
   // the signed-in user can actually see: their own listings' chat threads and
   // the threads sitting in their inbox.
@@ -1124,10 +1171,8 @@ function KioskApp() {
       <TopBar
         onMenu={toggleDrawer}
         onOpenModal={openModal}
-        onCreateNew={startNewListing}
         theme={theme}
         onToggleTheme={toggleTheme}
-        unreadCount={unreadTotal}
       />
 
       {notice && (
@@ -1155,6 +1200,12 @@ function KioskApp() {
           onListingClick={openListing}
           onChatClick={selectChat}
           onDeleteListing={askDeleteListing}
+          onCreateNew={browseNewListing}
+          onOpenMessages={() => openModal('messages')}
+          onOpenSettings={() => openModal('settings')}
+          unreadCount={unreadTotal}
+          signedIn={isLoggedIn}
+          onSignIn={() => navigate('/login')}
         />
 
         {/* Clicking the main content (outside the drawer) closes it. */}
@@ -1163,6 +1214,17 @@ function KioskApp() {
             <LoadingPlaceholder />
           ) : dataStatus === 'error' ? (
             <ErrorPlaceholder message={loadError} onRetry={() => setReloadToken((n) => n + 1)} />
+          ) : isSearchRoute ? (
+            <SearchView
+              listings={searchListings}
+              categories={sessions}
+              selections={selections}
+              categoryId={searchCategoryId}
+              onOpenBrowse={() => {
+                setBrowseFor('search')
+                setModal('browse')
+              }}
+            />
           ) : selectedChat ? (
             <ChatView chat={selectedChat} onSend={sendMessage} liveStatus={liveStatus} />
           ) : selectedSession && wizardStage === 'edit' ? (
@@ -1185,13 +1247,24 @@ function KioskApp() {
           ) : selectedSession ? (
             <SessionView session={selectedSession} answers={answers} onAnswer={(questionId, optionId) => answerQuestion(selectedSession, questionId, optionId)} actions={interviewActions} />
           ) : (
-            <EmptyPlaceholder hasSessions={sessions.length > 0} onBrowse={() => openModal('browse')} />
+            <EmptyPlaceholder
+              hasSessions={sessions.length > 0}
+              onBrowse={() => {
+                setBrowseFor('listing')
+                setModal('browse')
+              }}
+            />
           )}
         </main>
       </div>
 
       {modal === 'browse' && (
-        <BrowseModal data={browseData} onClose={() => setModal(null)} onPick={handleBrowsePick} />
+        <BrowseModal
+          data={browseData}
+          startId={browseFor === 'search' && searchCategoryId ? searchCategoryId : 'root'}
+          onClose={() => setModal(null)}
+          onPick={handleBrowsePick}
+        />
       )}
       {modal === 'messages' && (
         <MessagesModal
@@ -1306,10 +1379,11 @@ export default function App() {
   return (
     <div className="app">
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Navigate to="/search" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/app" element={<KioskApp />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/search" element={<KioskApp />} />
+        <Route path="*" element={<Navigate to="/search" replace />} />
       </Routes>
     </div>
   )

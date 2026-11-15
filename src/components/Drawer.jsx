@@ -3,7 +3,7 @@
 // The selected listing expands to show its chat threads (via listing-chat-threads);
 // clicking one opens that conversation on the main screen.
 import { Fragment } from 'react'
-import { ChatIcon, TagIcon, TrashIcon } from '../icons.jsx'
+import { ChatIcon, GearIcon, MessageIcon, PlusIcon, TagIcon, TrashIcon } from '../icons.jsx'
 
 export default function Drawer({
   open,
@@ -14,6 +14,12 @@ export default function Drawer({
   onListingClick,
   onChatClick,
   onDeleteListing,
+  onCreateNew,
+  onOpenMessages,
+  onOpenSettings,
+  unreadCount = 0,
+  signedIn = true,
+  onSignIn,
 }) {
   return (
     <aside
@@ -26,7 +32,9 @@ export default function Drawer({
         <span className="drawer-title">My listings</span>
       </div>
 
-      <div className="drawer-list scrollable">
+      {signedIn ? (
+        <>
+          <div className="drawer-list scrollable">
         {listings.length === 0 && <p className="drawer-empty">No listings yet</p>}
         {listings.map((listing) => {
           const isSelected = selectedListingId === listing.id
@@ -114,7 +122,44 @@ export default function Drawer({
             </Fragment>
           )
         })}
-      </div>
+          </div>
+
+          <div className="drawer-actions">
+            <button type="button" className="drawer-action" onClick={onCreateNew}>
+              <span className="drawer-row-icon" aria-hidden="true">
+                <PlusIcon size={18} />
+              </span>
+              <span className="drawer-row-title">New listing</span>
+            </button>
+
+            <button type="button" className="drawer-action" onClick={onOpenMessages}>
+              <span className="drawer-row-icon" aria-hidden="true">
+                <MessageIcon size={18} />
+              </span>
+              <span className="drawer-row-title">Messages</span>
+              {unreadCount > 0 && (
+                <span className="badge" aria-label={`${unreadCount} unread`}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            <button type="button" className="drawer-action" onClick={onOpenSettings}>
+              <span className="drawer-row-icon" aria-hidden="true">
+                <GearIcon size={18} />
+              </span>
+              <span className="drawer-row-title">Settings</span>
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="drawer-guest">
+          <p className="drawer-guest-text">Sign in to see your listings and messages.</p>
+          <button type="button" className="btn primary drawer-signin" onClick={onSignIn}>
+            Sign in
+          </button>
+        </div>
+      )}
     </aside>
   )
 }
