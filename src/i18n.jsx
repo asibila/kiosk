@@ -55,6 +55,7 @@ const STRINGS = {
     'drawer.settings': 'Settings',
     'drawer.guest': 'Sign in to see your listings and messages.',
     'drawer.signIn': 'Sign in',
+    'drawer.signOut': 'Sign out',
 
     'search.aria': 'Search kiosk',
     'search.title': 'Search kiosk',
@@ -63,6 +64,30 @@ const STRINGS = {
     'search.categoryAria': 'Category: {category}. Choose a category',
     'search.allCategories': 'All categories',
     'search.filter': 'Filter',
+    'search.commitText':
+      'Only facet filters can be searched. Choose a suggestion for “{text}”.',
+    'search.resultCount.one': '{count} matching ad',
+    'search.resultCount.many': '{count} matching ads',
+
+    'facet.placeholder': 'Search by model, fuel, year…',
+    'facet.inputLabel': 'Search filters',
+    'facet.suggestions': 'Filter suggestions',
+    'facet.loading': 'Loading suggestions…',
+    'facet.error': 'Couldn’t load suggestions',
+    'facet.noMatch': 'No matching filter for “{text}”',
+    'facet.remove': 'Remove {facetLabel} {label}',
+    'facet.resultCount.one': '{count} suggestion',
+    'facet.resultCount.many': '{count} suggestions',
+    'facet.rangeMin': 'Min',
+    'facet.rangeMax': 'Max',
+    'facet.rangeApply': 'Add',
+    'facet.rangeUpdate': 'Update',
+    'facet.rangeClear': 'Clear',
+    'facet.rangeFrom': 'from {value}',
+    'facet.rangeUpTo': 'up to {value}',
+    'facet.rangeAny': 'any',
+    'facet.price': 'Price',
+    'facet.year': 'Year',
 
     'session.aria': '{title} interview',
     'session.questionsAnswered': 'Questions answered',
@@ -131,6 +156,7 @@ const STRINGS = {
 
     'facets.aria': 'Filter',
     'facets.title': 'Filter',
+    'facets.all': 'All',
     'facets.empty': 'No facets for this category.',
     'facets.done': 'Done',
 
@@ -243,6 +269,7 @@ const STRINGS = {
     'drawer.settings': 'Postavke',
     'drawer.guest': 'Prijavite se da vidite svoje oglase i poruke.',
     'drawer.signIn': 'Prijavi se',
+    'drawer.signOut': 'Odjavi se',
 
     'search.aria': 'Pretraži kiosk',
     'search.title': 'Pretraži kiosk',
@@ -251,6 +278,30 @@ const STRINGS = {
     'search.categoryAria': 'Kategorija: {category}. Odaberi kategoriju',
     'search.allCategories': 'Sve kategorije',
     'search.filter': 'Filtriraj',
+    'search.commitText':
+      'Pretraživati se može samo po filtrima. Odaberi prijedlog za „{text}”.',
+    'search.resultCount.one': '{count} odgovarajući oglas',
+    'search.resultCount.many': '{count} odgovarajućih oglasa',
+
+    'facet.placeholder': 'Pretraži po modelu, gorivu, godini…',
+    'facet.inputLabel': 'Pretraži filtre',
+    'facet.suggestions': 'Prijedlozi filtara',
+    'facet.loading': 'Učitavanje prijedloga…',
+    'facet.error': 'Prijedlozi se nisu mogli učitati',
+    'facet.noMatch': 'Nema filtra koji odgovara „{text}”',
+    'facet.remove': 'Ukloni {facetLabel} {label}',
+    'facet.resultCount.one': '{count} prijedlog',
+    'facet.resultCount.many': '{count} prijedloga',
+    'facet.rangeMin': 'Najmanje',
+    'facet.rangeMax': 'Najviše',
+    'facet.rangeApply': 'Dodaj',
+    'facet.rangeUpdate': 'Ažuriraj',
+    'facet.rangeClear': 'Očisti',
+    'facet.rangeFrom': 'od {value}',
+    'facet.rangeUpTo': 'do {value}',
+    'facet.rangeAny': 'bilo koje',
+    'facet.price': 'Cijena',
+    'facet.year': 'Godina',
 
     'session.aria': '{title} intervju',
     'session.questionsAnswered': 'Odgovorena pitanja',
@@ -319,6 +370,7 @@ const STRINGS = {
 
     'facets.aria': 'Filtriraj',
     'facets.title': 'Filtriraj',
+    'facets.all': 'Sve',
     'facets.empty': 'Nema značajki za ovu kategoriju.',
     'facets.done': 'Gotovo',
 

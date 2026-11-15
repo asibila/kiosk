@@ -167,21 +167,41 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
     })
     .filter(Boolean)
 
-  // Categories → interview sessions; their facet schemas become questions.
+  // Categories → interview sessions. A session includes the facets defined on
+  // the category and on its ancestors, so parent-category facets apply to every
+  // subcategory (for example Electronics/brand on Mobile phones), plus generic
+  // facets such as condition, which apply to products in every category.
   const sessions = categories.map((category) => {
     const title = categoryTitle(category.id)
+    const ancestorIds = new Set()
+    let current = category
+    while (current) {
+      ancestorIds.add(current.id)
+      current =
+        current.parentCategoryId != null
+          ? categoriesById.get(current.parentCategoryId)
+          : undefined
+    }
+
     return {
       id: String(category.id),
       categoryId: category.id,
+      parentCategoryId: category.parentCategoryId ?? null,
       title,
       icon: iconForCategory(title),
       listingId: listingsByCategory.get(category.id)?.id ?? null,
       questions: facetSchemas
-        .filter((schema) => schema.categoryId === category.id)
+        .filter(
+          (schema) => schema.isGeneric === true || ancestorIds.has(schema.categoryId),
+        )
         .map((schema, index) => {
           const text = descriptionText(schema.descriptionId, schema.name)
           return {
             id: String(schema.id),
+            facet: schema.name,
+            categoryId: schema.categoryId,
+            categoryTitle: categoryTitle(schema.categoryId),
+            isGeneric: schema.isGeneric === true,
             priority: index + 1,
             text,
             hint: t('interview.choose'),

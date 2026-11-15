@@ -531,9 +531,14 @@ function KioskApp() {
   // each listing's own category. No direction means every orientation.
   function openListings(direction) {
     const wanted = direction ? (direction === 'buy' ? 'sell' : 'buy') : null
-    const schemaCategory = {}
+    // A question applies to a listing when it is generic or when it is defined
+    // on the listing's category or one of its ancestors.
+    const questionById = {}
+    const sessionByCategoryId = new Map(
+      sessions.map((session) => [String(session.categoryId), session]),
+    )
     for (const session of sessions) {
-      for (const question of session.questions) schemaCategory[question.id] = String(session.categoryId)
+      for (const question of session.questions) questionById[question.id] = question
     }
     const found = []
     for (const node of Object.values(browseData)) {
@@ -542,9 +547,21 @@ function KioskApp() {
       }
     }
     const listings = found.filter((listing) => {
-      const relevant = Object.keys(answers ?? {}).filter(
-        (qid) => schemaCategory[qid] === listing.categoryId,
-      )
+      const categoryChain = new Set()
+      let current = sessionByCategoryId.get(String(listing.categoryId))
+      while (current) {
+        categoryChain.add(String(current.categoryId))
+        current =
+          current.parentCategoryId != null
+            ? sessionByCategoryId.get(String(current.parentCategoryId))
+            : undefined
+      }
+
+      const relevant = Object.keys(answers ?? {}).filter((qid) => {
+        const question = questionById[qid]
+        if (!question) return false
+        return question.isGeneric || categoryChain.has(String(question.categoryId))
+      })
       return relevant.every((qid) => {
         const optionId = Number(answers[qid])
         if (!Number.isFinite(optionId)) return true
@@ -1011,9 +1028,43 @@ function KioskApp() {
     }
   }
 
+  // Search text that was committed without picking a facet value. The parent
+  // keeps it visible to the user instead of silently dropping it.
+  function handleCommitSearchText(text) {
+    setNotice(t('search.commitText', { text }))
+  }
+
+  // Unmatched search tokens are logged for taxonomy improvement. They are never
+  // written to a listing or treated as free-text search.
+  function handleUnmatchedSearchToken(token) {
+    try {
+      const key = 'kiosk-unmatched-search-tokens'
+      const stored = JSON.parse(localStorage.getItem(key) ?? '[]')
+      const rows = Array.isArray(stored) ? stored : []
+      rows.push({ token, lang: language, categoryId: searchCategoryId || null, at: new Date().toISOString() })
+      localStorage.setItem(key, JSON.stringify(rows.slice(-50)))
+    } catch {
+      // Logging is best-effort; the input stays usable.
+    }
+  }
+
   function openModal(name) {
     setModal(name)
     setDrawerOpen(false)
+  }
+
+  // Sign out: drop the stored kiosk user id and return to the login screen.
+  // KioskApp unmounts on /login, so user-scoped state and live streams are
+  // discarded; the language and theme preferences stay on the device.
+  function signOut() {
+    try {
+      localStorage.removeItem(LOGGED_IN_USER_ID_KEY)
+    } catch {
+      // Ignore storage failures; navigating away still ends the signed-in view.
+    }
+    setDrawerOpen(false)
+    setModal(null)
+    navigate('/login', { replace: true })
   }
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId) || null
@@ -1224,6 +1275,7 @@ function KioskApp() {
           onCreateNew={browseNewListing}
           onOpenMessages={() => openModal('messages')}
           onOpenSettings={() => openModal('settings')}
+          onSignOut={signOut}
           unreadCount={unreadTotal}
           signedIn={isLoggedIn}
           onSignIn={() => navigate('/login')}
@@ -1241,6 +1293,8 @@ function KioskApp() {
               categories={sessions}
               selections={selections}
               categoryId={searchCategoryId}
+              onCommitText={handleCommitSearchText}
+              onUnmatchedToken={handleUnmatchedSearchToken}
               onOpenBrowse={() => {
                 setBrowseFor('search')
                 setModal('browse')
@@ -1305,6 +1359,13 @@ function KioskApp() {
         <SimpleModal
           title={t(MODAL_TITLES[modal])}
           body={modal === 'profile' ? profileBody : t('settings.body')}
+          footer={
+            modal === 'profile' && isLoggedIn ? (
+              <button type="button" className="btn secondary" onClick={signOut}>
+                {t('drawer.signOut')}
+              </button>
+            ) : undefined
+          }
           onClose={() => setModal(null)}
         />
       )}

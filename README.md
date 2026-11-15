@@ -9,6 +9,7 @@ single-file vanilla JS spec into a **React + Vite** application.
 npm install
 npm run dev      # http://localhost:5173
 npm run build    # production build in dist/
+npm test         # Vitest + Testing Library
 ```
 
 The UI reads live data from the NestJS backend. Start it first on
@@ -35,6 +36,9 @@ VITE_API_BASE_URL=/backend npm run dev
 | API client + resource loader | `src/api.js` |
 | Backend rows → sessions / chats / browse tree | `src/viewModel.js` |
 | UI translations + language provider | `src/i18n.jsx` |
+| Structured search input | `src/components/FacetChipInput.jsx` |
+| Suggestion fetch (debounce/abort/stale discard) | `src/useFacetSuggestions.js` |
+| Chip/suggestion JSDoc types + range formatting | `src/facetTypes.js` |
 | STATE (drawer, selection, answers, messages, modals) | `src/App.jsx` |
 | ICONS (inline SVG string → components) | `src/icons.jsx` |
 | RENDER functions (components) | `src/components/*.jsx` |
@@ -50,11 +54,42 @@ VITE_API_BASE_URL=/backend npm run dev
 | `languages` | Codes/names for the topbar EN/HR switcher |
 | `facet-schemas` + `facet-value-options` | Interview questions and answer chips |
 | `facet-value-selections` | Saved answers (on the category's first listing) |
+| `/suggest` (`GET /api/suggest`) | Facet-value autocomplete + counts for the search chip input |
 | `chat-threads` + `chat-messages` | Chat view and the Messages modal |
 | `inbox-items` | Which chat threads appear in the signed-in user's Messages |
 | `listing-chat-threads` | Maps each chat thread to its listing/category |
 | `listing-images` | Listing images metadata; the primary image is the search thumbnail |
 | `listings` | Browse listings; drawer child rows are the signed-in user's listings |
+
+## Facet chip input
+
+`FacetChipInput` is a controlled component: `chips` + `onChange(chips)` is the
+single source of truth. Each chip is one of:
+
+```js
+{ kind: 'value', facet: 'fuel', facetLabel: 'Fuel', valueId: '13', label: 'Diesel' }
+{ kind: 'range', facet: 'price', facetLabel: 'Price', min: 5000, max: 10000, unit: '€' }
+```
+
+Internal state also tracks the typed token, suggestions, highlighted row and
+loading/error. Suggestions come from:
+
+```text
+GET /api/suggest?q=<text>&lang=<en|hr>&category=<id>&orientation=<buy|sell>&chips=<JSON>
+-> { suggestions: [{ facet, facetLabel, valueId, label, count }] }
+```
+
+The request is debounced 250 ms, aborted when a newer token starts, and stale
+responses are discarded. The backend computes counts from `FacetValueSelection`
+rows, never from ad free text, and omits values with a zero count. Range chips are
+carried in the query but ignored by the backend until numeric facets exist; they
+are created from the **Filter** modal's ALL section.
+
+Accessibility: the input is a `combobox` with `aria-expanded`,
+`aria-controls`, `aria-autocomplete="list"` and `aria-activedescendant`; the
+dropdown is a `listbox` with `option` rows and presentation group headers. Chip
+removal is a real button with an aria-label, and result counts are announced via
+`aria-live="polite"`. Focus rings appear on the field, chips and options.
 
 ## Feature map
 
@@ -73,16 +108,29 @@ VITE_API_BASE_URL=/backend npm run dev
   (`kiosk-language`) and applied to `<html lang>`. Descriptions are fetched with
   both translations (`{ en, hr }`) from `/descriptions`, so switching does not
   lose the interview answers currently being edited.
-- **Search screen** (`/search`) - three centred rows: "Search kiosk", a search box
-  with listing-title autocomplete (filtered by the selected category, direction and
-  facets), and a row with mutually exclusive Buy/Sell chips, a category button and
-  a **Filter** button. The category button opens the shared **Browse** modal
-  to pick a category (it reopens at the current one); choosing "Home" and OK resets
-  it to "All categories". **Filter** opens a modal with the interview questions
-  for the selected category (all categories when none is selected); chosen options
-  refine the suggestions and the button shows the active facet count. Picking a
-  suggestion fills the box; the topbar's usual actions keep working, and choosing a
-  listing from the drawer navigates back to `/app`.
+- **Search screen** (`/search`) - the input is a structured **facet chip** field,
+  not a free-text ad search. Committed chips are facet values (`valueId`) or
+  numeric ranges; typing opens a grouped suggestion list from
+  `GET /api/suggest` (scoped to language, category, direction and existing chips).
+  Keyboard: arrows move the highlight, Enter selects/chips the token, Escape
+  closes, Tab selects the first suggestion, Backspace on empty removes the last
+  chip. Each chip has a 32px ✕ target; the same chip set is edited by the
+  **Filter** modal. The modal starts with an **ALL** section holding the generic
+  **Price** and **Year** ranges plus generic value facets (condition). Facets are
+  then grouped by the selected category's ancestor chain, root first: selecting
+  **Mobile phones** shows **ALL** (price/year/condition), **ELECTRONICS**
+  (brand) and **MOBILE PHONES** (screen size). With **All categories** selected,
+  the modal shows only the generic Price and Year ranges. A parent category's
+  facets therefore apply to all of its subcategories. Suggestion counts
+  update politely via an `aria-live` region; unmatched tokens are reported to the
+  parent once (and logged under `kiosk-unmatched-search-tokens`). The field wraps
+  chips up to ~120px, then scrolls vertically; the dropdown is anchored to the
+  field's bottom edge. The category button opens the shared **Browse** modal
+  (reopening at the current category); choosing "Home" and OK resets it to
+  "All categories". Buy/Sell chips remain beside the field, and the
+  **Filter** button shows the active chip count (values and ranges). The topbar's
+  usual actions keep working, and choosing a listing from the drawer navigates
+  back to `/app`.
 - **New listing** - the drawer's **New listing** action opens the Browse modal to
   choose a category; OK clears the selected category/listing and interview answers
   locally (no API call) and opens that category's interview, so the next Publish
@@ -94,14 +142,20 @@ VITE_API_BASE_URL=/backend npm run dev
   Selecting a listing expands its chat threads from `listing-chat-threads` underneath it
   (thread id plus last-message preview); clicking one opens that conversation on the main
   screen. Each row has a delete button that asks "Are you sure?" before calling
-  `DELETE /listings/:id`. The bottom of the drawer holds three full-width actions —
-  **New listing** (+), **Messages** (envelope/message icon, with the unread badge) and
-  **Settings** (gear). When nobody is signed in, the drawer shows a **Sign in**
+  `DELETE /listings/:id`. The bottom of the drawer holds four full-width actions —
+  **New listing** (+), **Messages** (envelope/message icon, with the unread badge),
+  **Settings** (gear) and **Sign out** (exit icon). Sign out removes
+  `localStorage['kiosk-user-id']`, closes the drawer/modal and returns to `/login`;
+  the language and theme preferences are kept. The **Profile** modal also has a
+  **Sign out** footer button. When nobody is signed in, the drawer shows a **Sign in**
   button (linking to `/login`) instead of the listings and these actions.
 - **Session view** — per-session progress bar, priority-sorted product questions,
   wrapping chips (replace-only answers), green answered accents, and an action bar with
   left-aligned, mutually exclusive Buy/Sell chips plus right-aligned Search and a
-  "Next >" button into the listing wizard. The Buy/Sell chips write
+  "Next >" button into the listing wizard. A category's questions are its own facets,
+  the facets of its ancestors and the generic facets (such as condition), so every
+  category asks the generic questions and parent facets apply to subcategories.
+  The Buy/Sell chips write
   `Listing.orientation` (`buy` / `sell`) on the same listing that receives the answers,
   opening a drawer listing preselects its stored orientation, and both Search and
   "Next >" stay disabled until Buy or Sell is chosen. Answers are saved to

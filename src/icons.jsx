@@ -65,6 +65,14 @@ export const UserIcon = (p) => (
   </Svg>
 )
 
+export const LogOutIcon = (p) => (
+  <Svg {...p}>
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" y1="12" x2="9" y2="12" />
+  </Svg>
+)
+
 export const MoonIcon = (p) => (
   <Svg {...p}>
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />

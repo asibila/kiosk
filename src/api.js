@@ -2,6 +2,8 @@
 // In dev, Vite proxies /api → http://localhost:3000 (see vite.config.js).
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/+$/, '')
 
+export { API_BASE }
+
 async function request(path, { headers, ...options } = {}) {
   // FormData requests must let the browser set the multipart boundary.
   const isFormData =

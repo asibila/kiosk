@@ -3,7 +3,7 @@
 // The selected listing expands to show its chat threads (via listing-chat-threads);
 // clicking one opens that conversation on the main screen.
 import { Fragment } from 'react'
-import { ChatIcon, GearIcon, MessageIcon, PlusIcon, TagIcon, TrashIcon } from '../icons.jsx'
+import { ChatIcon, GearIcon, LogOutIcon, MessageIcon, PlusIcon, TagIcon, TrashIcon } from '../icons.jsx'
 import { useI18n } from '../i18n.jsx'
 
 export default function Drawer({
@@ -18,6 +18,7 @@ export default function Drawer({
   onCreateNew,
   onOpenMessages,
   onOpenSettings,
+  onSignOut,
   unreadCount = 0,
   signedIn = true,
   onSignIn,
@@ -151,6 +152,17 @@ export default function Drawer({
                 <GearIcon size={18} />
               </span>
               <span className="drawer-row-title">{t('drawer.settings')}</span>
+            </button>
+
+            <button
+              type="button"
+              className="drawer-action drawer-signout"
+              onClick={onSignOut}
+            >
+              <span className="drawer-row-icon" aria-hidden="true">
+                <LogOutIcon size={18} />
+              </span>
+              <span className="drawer-row-title">{t('drawer.signOut')}</span>
             </button>
           </div>
         </>
