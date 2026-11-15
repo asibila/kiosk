@@ -270,6 +270,7 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
     type: 'listing',
     id: String(listing.id),
     userId: listing.userId,
+    createdAt: listing.createdAt ?? null,
     title: listingTitle(listing),
     desc: listingDescription(listing),
     thumb: 'box',
@@ -305,6 +306,7 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
 
   return {
     user: currentUser,
+    users: raw.users ?? [],
     languages: raw.languages ?? [],
     language,
     sessions,

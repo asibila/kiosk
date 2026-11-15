@@ -39,6 +39,8 @@ VITE_API_BASE_URL=/backend npm run dev
 | Structured search input | `src/components/FacetChipInput.jsx` |
 | Suggestion fetch (debounce/abort/stale discard) | `src/useFacetSuggestions.js` |
 | Chip/suggestion JSDoc types + range formatting | `src/facetTypes.js` |
+| Search URL encoding/parsing + result filtering | `src/searchQuery.js` |
+| Listing detail page | `src/components/ListingPage.jsx` |
 | STATE (drawer, selection, answers, messages, modals) | `src/App.jsx` |
 | ICONS (inline SVG string → components) | `src/icons.jsx` |
 | RENDER functions (components) | `src/components/*.jsx` |
@@ -99,6 +101,8 @@ removal is a real button with an aria-label, and result counts are announced via
   the main area differs.
 - **Home** - `/` redirects straight to `/search`; `/login` renders the log-in form
   (`src/components/Login.jsx`) and, after a successful sign-in, returns to `/search`.
+  `/results?...` renders the bookmarkable results page described below and
+  `/listing/:id` renders one listing.
 - **Top bar** - centered title (a link back to `/search`); hamburger; **EN / HR** language switch; profile icon
   and theme toggle (moon/sun) on the right. Create-new-listing, Messages and
   Settings live at the bottom of the drawer.
@@ -130,7 +134,28 @@ removal is a real button with an aria-label, and result counts are announced via
   "All categories". Buy/Sell chips remain beside the field, and the
   **Filter** button shows the active chip count (values and ranges). The topbar's
   usual actions keep working, and choosing a listing from the drawer navigates
-  back to `/app`.
+  back to `/app`. The form also mirrors its query into `/search`'s URL
+  (`?category=&direction=&facet=&range=`) with `replace`, so the address bar is
+  bookmarkable and Back from the results page restores the same form.
+- **Search results** (`/results`) - pressing **Search** opens a GET-style results
+  URL that serializes the whole query as `category`, `direction`,
+  `facet=<name>:<valueId>` and `range=<facet>:<min>-<max>` parameters. Reloading,
+  bookmarking or sharing that URL reproduces the search; only ids are encoded, so
+  labels are resolved again from the catalog in the active language. The page
+  shows the active filters, a result count and responsive cards (primary image,
+  title, matched facet summary, orientation badge). Clicking a card opens its
+  listing page; cards also offer the same envelope action as the listings modal
+  (disabled for the signed-in user's own listings). A category filter includes
+  its subcategories. **Edit search** carries the same query back to `/search`.
+  Range chips are preserved in the URL but not applied until numeric facet values
+  exist in the catalog.
+- **Listing page** (`/listing/:id`) - bookmarkable detail page for one listing:
+  primary image with a thumbnail gallery, orientation/category badges, the
+  listing's facet values, category, seller, listed date and the contact action.
+  Own listings show an owner note instead of contact; guests get a sign-in link
+  that returns to the same listing after login. Opened from results, the back
+  link restores that exact `/results?…` query; a direct or bookmarked visit falls
+  back to "Back to search". A deleted or unknown id shows a not-found state.
 - **New listing** - the drawer's **New listing** action opens the Browse modal to
   choose a category; OK clears the selected category/listing and interview answers
   locally (no API call) and opens that category's interview, so the next Publish

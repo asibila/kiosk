@@ -3,7 +3,7 @@
 // Data comes from the NestJS CRUD API (see ../backend/API_ROUTES.md).
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react'
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
+import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router'
 import { api, CHAT_EVENTS_URL, fetchKioskData, mediaUrl } from './api.js'
 import { buildViewModel, formatTime } from './viewModel.js'
 import { LANGUAGES, LanguageProvider, useI18n } from './i18n.jsx'
@@ -21,6 +21,9 @@ import ConfirmModal from './components/ConfirmModal.jsx'
 import EditListingView from './components/EditListingView.jsx'
 import PreviewListingView from './components/PreviewListingView.jsx'
 import SearchView from './components/SearchView.jsx'
+import ResultsView from './components/ResultsView.jsx'
+import ListingPage from './components/ListingPage.jsx'
+import { getCategoryIdFromSearch } from './searchQuery.js'
 
 const MODAL_TITLES = { settings: 'settings.title', profile: 'profile.title' }
 
@@ -59,23 +62,30 @@ function getLoggedInUserId() {
 function KioskApp() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { id: listingRouteId } = useParams()
   const { language, t } = useI18n()
-  // The same shell (topbar, drawer, modals) hosts both the listings screen and
-  // the standalone /search screen; only the main area differs.
+  // The same shell (topbar, drawer, modals) hosts the listings screen, the
+  // standalone /search form and the /results page; only the main area differs.
   const isSearchRoute = location.pathname === '/search'
+  const isResultsRoute = location.pathname === '/results'
+  const isListingRoute = listingRouteId != null
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedSessionId, setSelectedSessionId] = useState(null)
   const [selectedChatId, setSelectedChatId] = useState(null)
   const [modal, setModal] = useState(null) // 'browse' | 'messages' | 'settings' | 'profile' | null
   const [browseFor, setBrowseFor] = useState('listing') // 'listing' | 'search' | 'new'
-  const [searchCategoryId, setSearchCategoryId] = useState('') // /search category filter
   const [theme, setTheme] = useState(getInitialTheme)
+
+  // /search keeps its structured query in the URL (category, direction, chips),
+  // so the category picker reads and writes the URL instead of local state.
+  const searchCategoryId = isSearchRoute ? getCategoryIdFromSearch(location.search) : ''
 
   // Backend data.
   const [dataStatus, setDataStatus] = useState('loading') // 'loading' | 'ready' | 'error'
   const [loadError, setLoadError] = useState('')
   const [reloadToken, setReloadToken] = useState(0)
   const [user, setUser] = useState(null)
+  const [users, setUsers] = useState([])
   const [languages, setLanguages] = useState(LANGUAGES)
   const [sessions, setSessions] = useState([])
   const [chats, setChats] = useState([])
@@ -149,6 +159,7 @@ function KioskApp() {
         if (cancelled) return
         const view = buildViewModel(raw, { userId: loggedInUserId, language })
         setUser(view.user)
+        setUsers(view.users ?? [])
         setLanguages(view.languages?.length ? view.languages : LANGUAGES)
         setSessions(view.sessions)
         setChats(view.chats)
@@ -494,9 +505,14 @@ function KioskApp() {
   // whose questions are that category's facet schemas. Start with unanswered questions.
   function handleBrowsePick(categoryId) {
     setModal(null)
-    // Opened from the /search screen: the pick only sets its category filter.
+    // Opened from the /search screen: the pick only changes its category
+    // filter, which lives in the URL alongside the rest of the query.
     if (browseFor === 'search') {
-      setSearchCategoryId(categoryId === 'root' ? '' : String(categoryId))
+      const nextId = categoryId === 'root' ? '' : String(categoryId)
+      const params = new URLSearchParams()
+      if (nextId) params.set('category', nextId)
+      const search = params.toString()
+      navigate({ pathname: '/search', search: search ? `?${search}` : '' }, { replace: true })
       return
     }
     const node = browseData[categoryId]
@@ -584,19 +600,20 @@ function KioskApp() {
   // Search results: start a conversation about a listing. A new chat thread is
   // linked to the listing and to the current user's inbox item.
   async function contactListing(listing) {
-    if (!user || contactingListingId) return
+    const actorId = getLoggedInUserId()
+    if (!actorId || contactingListingId) return
     setContactingListingId(listing.id)
     try {
-      const thread = await api.create('chat-threads', {}, user.id)
+      const thread = await api.create('chat-threads', {}, actorId)
       await api.create(
         'listing-chat-threads',
         { listingId: Number(listing.id), chatThreadId: thread.id },
-        user.id,
+        actorId,
       )
       await api.create(
         'inbox-items',
-        { userId: user.id, chatThreadId: thread.id },
-        user.id,
+        { userId: actorId, chatThreadId: thread.id },
+        actorId,
       )
 
       setNotice(t('notice.conversationStarted', { title: listing.title }))
@@ -1104,6 +1121,12 @@ function KioskApp() {
     return rows
   })()
 
+  // Listing detail page (/listing/:id) reads from the same flat list the search
+  // results use, so a bookmarked URL works after a full reload.
+  const listingPageItem = isListingRoute
+    ? (searchListings.find((item) => String(item.id) === String(listingRouteId)) ?? null)
+    : null
+
   // Aggregate unread count for the topbar's message icon. Count conversations
   // the signed-in user can actually see: their own listings' chat threads and
   // the threads sitting in their inbox.
@@ -1278,7 +1301,11 @@ function KioskApp() {
           onSignOut={signOut}
           unreadCount={unreadTotal}
           signedIn={isLoggedIn}
-          onSignIn={() => navigate('/login')}
+          onSignIn={() =>
+            navigate('/login', {
+              state: { from: `${location.pathname}${location.search}` },
+            })
+          }
         />
 
         {/* Clicking the main content (outside the drawer) closes it. */}
@@ -1287,6 +1314,27 @@ function KioskApp() {
             <LoadingPlaceholder />
           ) : dataStatus === 'error' ? (
             <ErrorPlaceholder message={loadError} onRetry={() => setReloadToken((n) => n + 1)} />
+          ) : isResultsRoute ? (
+            <ResultsView
+              listings={searchListings}
+              categories={sessions}
+              selections={selections}
+              currentUserId={isLoggedIn ? user?.id : null}
+              onContact={isLoggedIn ? contactListing : null}
+              contactingId={contactingListingId}
+            />
+          ) : isListingRoute ? (
+            <ListingPage
+              listing={listingPageItem}
+              categories={sessions}
+              selections={selections}
+              images={listingImages}
+              users={users}
+              currentUserId={isLoggedIn ? user?.id : null}
+              isLoggedIn={isLoggedIn}
+              onContact={isLoggedIn ? contactListing : null}
+              contactingId={contactingListingId}
+            />
           ) : isSearchRoute ? (
             <SearchView
               listings={searchListings}
@@ -1402,9 +1450,9 @@ function KioskApp() {
         <ListingsModal
           title={listingsModal.title}
           listings={listingsModal.listings}
-          onContact={contactListing}
+          onContact={isLoggedIn ? contactListing : null}
           contactingId={contactingListingId}
-          currentUserId={user?.id}
+          currentUserId={isLoggedIn ? user?.id : null}
           onClose={() => setListingsModal(null)}
         />
       )}
@@ -1469,6 +1517,8 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/app" element={<KioskApp />} />
           <Route path="/search" element={<KioskApp />} />
+          <Route path="/results" element={<KioskApp />} />
+          <Route path="/listing/:id" element={<KioskApp />} />
           <Route path="*" element={<Navigate to="/search" replace />} />
         </Routes>
       </div>

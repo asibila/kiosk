@@ -1,9 +1,17 @@
 // Standalone search screen: title, structured facet chip input, direction
 // chips, a category picker (the Browse modal) and a "Filter" modal on one row.
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router'
 import { ChevronDownIcon, LayersIcon } from '../icons.jsx'
 import { pluralKey, useI18n } from '../i18n.jsx'
 import { isRangeChip, isValueChip } from '../facetTypes.js'
+import {
+  buildOptionIndex,
+  buildSearchParams,
+  filterListings,
+  parseSearchQuery,
+  resolveChips,
+} from '../searchQuery.js'
 import FacetChipInput from './FacetChipInput.jsx'
 import FacetsModal from './FacetsModal.jsx'
 
@@ -17,10 +25,15 @@ export default function SearchView({
   onUnmatchedToken,
 }) {
   const { language, t } = useI18n()
-  const [chips, setChips] = useState([])
-  const [direction, setDirection] = useState(null) // 'buy' | 'sell' | null
+  const location = useLocation()
+  const navigate = useNavigate()
+  // The query the form was opened with (Edit search / bookmarked /search URL).
+  // It only seeds state; chips and direction then live in this view.
+  const [initialQuery] = useState(() => parseSearchQuery(location.search))
+  const [direction, setDirection] = useState(initialQuery.direction) // 'buy' | 'sell' | null
   const [facetsOpen, setFacetsOpen] = useState(false)
   const [suggestionCount, setSuggestionCount] = useState(null)
+  const previousCategoryRef = useRef(categoryId)
 
   // A buy search shows listings on sale; a sell search shows wanted listings,
   // mirroring the interview screen's Search action.
@@ -37,6 +50,19 @@ export default function SearchView({
       { facet: 'year', label: t('facet.year') },
     ],
     [t],
+  )
+
+  // Which question/option each suggestion belongs to, used by the Filter modal.
+  const optionIndex = useMemo(() => buildOptionIndex(categories), [categories])
+
+  // Seed committed chips from the URL (Edit search / bookmark). Labels are
+  // resolved from the catalog, so the URL only has to carry ids.
+  const [chips, setChips] = useState(() =>
+    resolveChips(
+      initialQuery.chips,
+      optionIndex,
+      Object.fromEntries(rangeFacets.map((facet) => [facet.facet, facet.label])),
+    ),
   )
 
   // Facets from the selected category's ancestors apply to it. The generic
@@ -91,19 +117,6 @@ export default function SearchView({
     return groups
   }, [categories, categoryId, rangeFacets, t])
 
-  // Which question/option each suggestion belongs to, used by the Filter modal.
-  const optionIndex = useMemo(() => {
-    const map = new Map()
-    for (const session of categories) {
-      for (const question of session.questions ?? []) {
-        for (const option of question.options ?? []) {
-          map.set(String(option.id), { question, option })
-        }
-      }
-    }
-    return map
-  }, [categories])
-
   // The Filter modal is a second view over the same chips: only value chips
   // appear there, mapped back to their question/option ids.
   const facetAnswers = useMemo(() => {
@@ -117,7 +130,10 @@ export default function SearchView({
   }, [chips, optionIndex])
 
   // A different category means a different facet set: drop incompatible chips.
+  // The first render is skipped so chips hydrated from the URL survive.
   useEffect(() => {
+    if (previousCategoryRef.current === categoryId) return
+    previousCategoryRef.current = categoryId
     setChips([])
   }, [categoryId])
 
@@ -155,8 +171,26 @@ export default function SearchView({
     })
   }, [optionIndex, rangeFacets])
 
+  // Mirror the form into /search's URL with replace, so the address bar is a
+  // bookmarkable query and Back from /results restores the same form state.
+  useEffect(() => {
+    const params = buildSearchParams({ categoryId, direction, chips })
+    const next = params.toString()
+    const current = location.search.replace(/^\?/, '')
+    if (next === current) return
+    navigate({ pathname: '/search', search: next ? `?${next}` : '' }, { replace: true })
+  }, [categoryId, direction, chips, location.search, navigate])
+
   function toggleDirection(value) {
     setDirection((prev) => (prev === value ? null : value))
+  }
+
+  // The explicit submit: a GET-style /results URL that can be bookmarked,
+  // shared or reloaded. The form URL stays in history as the entry before it.
+  function submitSearch() {
+    const params = buildSearchParams({ categoryId, direction, chips })
+    const search = params.toString()
+    navigate({ pathname: '/results', search: search ? `?${search}` : '' })
   }
 
   function toggleFacet(questionId, optionId) {
@@ -193,22 +227,23 @@ export default function SearchView({
     ])
   }
 
-  // Parent-side ad count for the current structured query. Range chips are
-  // carried in the query but this dataset has no numeric facet values yet.
-  const resultCount = useMemo(() => {
-    const valueChips = chips.filter(isValueChip)
-    if (valueChips.length === 0 && !categoryId && !wantedOrientation) return null
-    return listings.filter((listing) => {
-      if (categoryId && listing.categoryId !== categoryId) return false
-      if (wantedOrientation && listing.orientation !== wantedOrientation) return false
-      const owned = new Set(
-        selections
-          .filter((selection) => selection.listingId === Number(listing.id))
-          .map((selection) => String(selection.facetValueOptionId)),
-      )
-      return valueChips.every((chip) => owned.has(chip.valueId))
-    }).length
-  }, [categoryId, chips, listings, selections, wantedOrientation])
+  // Live count for the current structured query. It uses the same filter as
+  // /results, so the number here and the results page agree.
+  const hasQuery = chips.length > 0 || !!categoryId || !!direction
+  const resultCount = useMemo(
+    () =>
+      hasQuery
+        ? filterListings({
+            listings,
+            selections,
+            categories,
+            categoryId,
+            direction,
+            chips,
+          }).length
+        : null,
+    [categories, categoryId, chips, direction, hasQuery, listings, selections],
+  )
 
   const facetCount = chips.length
   const liveCount =
@@ -276,9 +311,13 @@ export default function SearchView({
               {facetCount > 0 ? ` (${facetCount})` : ''}
             </span>
           </button>
+
+          <button type="button" className="btn primary search-submit" onClick={submitSearch}>
+            {t('search.submit')}
+          </button>
         </div>
 
-        {resultCount != null && chips.length > 0 && (
+        {resultCount != null && (
           <p className="search-result-summary">
             {t(pluralKey(resultCount, 'search.resultCount'), { count: resultCount })}
           </p>

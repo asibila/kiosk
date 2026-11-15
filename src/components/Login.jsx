@@ -1,6 +1,6 @@
 // Login screen: email + password sign-in (full screen).
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { useI18n } from '../i18n.jsx'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/+$/, '')
@@ -11,6 +11,7 @@ export default function Login() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
   const { t } = useI18n()
 
   async function onSubmit(event) {
@@ -42,7 +43,12 @@ export default function Login() {
       } catch {
         // Ignore storage failures; the id still drives this session via navigation state.
       }
-      navigate('/search', { state: { userId: data.userId } })
+      // Return to the page that asked for sign-in (for example a listing detail
+      // page), but never follow an external URL.
+      const requested = location.state?.from
+      const target =
+        typeof requested === 'string' && requested.startsWith('/') ? requested : '/search'
+      navigate(target, { state: { userId: data.userId } })
     } catch (err) {
       setError(err.message || t('login.failed'))
     } finally {
