@@ -45,6 +45,11 @@ export const api = {
       body: JSON.stringify(body),
       headers: actorHeader(actorId),
     }),
+  remove: (resource, id, actorId) =>
+    request(`/${resource}/${id}`, {
+      method: 'DELETE',
+      headers: actorHeader(actorId),
+    }),
 }
 
 const RESOURCES = [

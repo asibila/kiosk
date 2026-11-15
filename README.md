@@ -48,10 +48,10 @@ VITE_API_BASE_URL=/backend npm run dev
 | `categories` + `descriptions` | Drawer sessions, browse tree |
 | `facet-schemas` + `facet-value-options` | Interview questions and answer chips |
 | `facet-value-selections` | Saved answers (on the category's first listing) |
-| `chat-threads` + `chat-messages` | Drawer chats and the Messages modal |
+| `chat-threads` + `chat-messages` | Chat view and the Messages modal |
 | `inbox-lists` + `inbox-items` | Which chat threads appear in Messages |
 | `listing-chat-threads` | Maps each chat thread to its listing/category |
-| `listings` | Browse listings; titles are `<Category> #<id>` |
+| `listings` | Browse listings; drawer child rows are the signed-in user's listings |
 
 ## Feature map
 
@@ -62,12 +62,15 @@ VITE_API_BASE_URL=/backend npm run dev
   theme toggle (moon/sun) on the right.
 - **Dark mode** — toggles between light and dark palettes, follows the OS preference on first
   visit, and remembers the choice in `localStorage` (`kiosk-theme`).
-- **Drawer** — overlay slide-in, 340px (full-width ≤600px), sessions → chats (2 levels),
-  unread badges, caret expansion, all interaction rules (d)–(g) from the spec,
-  expansion preserved across open/close cycles.
+- **Drawer** — overlay slide-in, 340px (full-width ≤600px), a flat list of the signed-in
+  user's listings (from `GET /listings` filtered by `userId`), empty state when none.
+  Each row has a delete button that asks “Are you sure?” before calling
+  `DELETE /listings/:id`.
 - **Session view** — per-session progress bar, priority-sorted product questions,
-  wrapping chips (replace-only answers), green answered accents, empty bottom bar.
-  Answers are saved to `facet-value-selections` on the category's first listing.
+  wrapping chips (replace-only answers), green answered accents, and a
+  Publish / Buy / Sell action bar. Answers are saved to `facet-value-selections` on the
+  selected drawer listing (or the category's first listing when none is selected);
+  Publish updates the selected listing, otherwise creates one, with the answered facets.
 - **Chat view** — WhatsApp-style bubbles with timestamps, paperclip popover
   (Image / YouTube / GPS placeholders), Enter-to-send. Text messages are POSTed
   to `chat-messages`; attachment placeholders stay local.

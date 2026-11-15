@@ -7,7 +7,7 @@ export default function TopBar({ onMenu, onOpenModal, theme = 'light', onToggleT
   return (
     <header className="topbar">
       <div className="topbar-side left">
-        <button type="button" className="icon-btn" aria-label="Toggle sessions drawer" onClick={onMenu}>
+        <button type="button" className="icon-btn" aria-label="Toggle my listings drawer" onClick={onMenu}>
           <MenuIcon />
         </button>
       </div>

@@ -1,8 +1,8 @@
 // Interview session view: progress bar, question cards with wrapping chips,
-// and an empty decorative bottom bar.
+// and an action bar (publish / buy / sell) at the bottom.
 import { CheckIcon, SessionGlyph } from '../icons.jsx'
 
-export default function SessionView({ session, answers, onAnswer }) {
+export default function SessionView({ session, answers, onAnswer, actions }) {
   // Sort by priority ascending (Array#sort is stable).
   const questions = [...session.questions].sort((a, b) => a.priority - b.priority)
   const answeredCount = questions.filter((q) => answers[q.id] != null).length
@@ -74,8 +74,12 @@ export default function SessionView({ session, answers, onAnswer }) {
         )}
       </div>
 
-      {/* Empty decorative bar — intentionally holds nothing */}
-      <footer className="session-footer" aria-hidden="true" />
+      {/* Action bar (publish / buy / sell) when provided by the parent. */}
+      {actions ? (
+        <footer className="session-footer">{actions}</footer>
+      ) : (
+        <footer className="session-footer" aria-hidden="true" />
+      )}
     </section>
   )
 }

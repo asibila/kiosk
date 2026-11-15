@@ -149,6 +149,27 @@ export function buildViewModel(raw, { userId } = {}) {
     }
   }
 
+  // The signed-in user's listings — the drawer shows GET /listings filtered by userId.
+  const myListings = listings
+    .filter((listing) => currentUser && listing.userId === currentUser.id)
+    .map((listing) => {
+      const listingAnswers = {}
+      for (const selection of facetSelections.filter((row) => row.listingId === listing.id)) {
+        const option = optionsById.get(selection.facetValueOptionId)
+        if (option) listingAnswers[String(option.schemaId)] = String(option.id)
+      }
+      return {
+        id: String(listing.id),
+        listingId: listing.id,
+        sessionId: String(listing.categoryId),
+        categoryId: listing.categoryId,
+        orientation: listing.orientation,
+        title: listingTitle(listing),
+        desc: listingDescription(listing),
+        answers: listingAnswers,
+      }
+    })
+
   // Category tree for the browse modal.
   const categoryItem = (category) => {
     const childCount = categories.filter((child) => child.parentCategoryId === category.id).length
@@ -172,6 +193,7 @@ export function buildViewModel(raw, { userId } = {}) {
     desc: listingDescription(listing),
     thumb: 'box',
     categoryId: String(listing.categoryId),
+    orientation: listing.orientation,
   })
 
   const pathForCategory = (category) => {
@@ -203,6 +225,7 @@ export function buildViewModel(raw, { userId } = {}) {
     user: currentUser,
     sessions,
     chats,
+    myListings,
     browseData,
     answers,
     selections: facetSelections,

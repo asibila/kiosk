@@ -1,14 +1,12 @@
-// Filesystem-like browse modal: breadcrumbs, category/listing list, Buy/Sell footer.
+// Category browser modal: breadcrumbs + category list, footer with OK/Cancel.
 import { useMemo, useState } from 'react'
 import { ChevronRightIcon, XIcon, ThumbGlyph } from '../icons.jsx'
 
-export default function BrowseModal({ data, onClose }) {
+export default function BrowseModal({ data, onClose, onPick }) {
   const [currentId, setCurrentId] = useState('root')
-  const [selectedId, setSelectedId] = useState(null)
 
   const node = data[currentId]
-  const categories = node.items.filter((i) => i.type === 'category') // categories first
-  const listings = node.items.filter((i) => i.type === 'listing') // listings after
+  const categories = node.items.filter((i) => i.type === 'category') // categories only
 
   // Map "Home/Bikes" → category id, for breadcrumb navigation.
   const pathToId = useMemo(() => {
@@ -19,7 +17,6 @@ export default function BrowseModal({ data, onClose }) {
 
   function navigate(id) {
     setCurrentId(id)
-    setSelectedId(null)
   }
 
   function crumbClick(index) {
@@ -28,31 +25,22 @@ export default function BrowseModal({ data, onClose }) {
     if (id) navigate(id)
   }
 
-  // Single-select: clicking toggles; only one item selected at a time.
-  function toggleSelect(id) {
-    setSelectedId((prev) => (prev === id ? null : id))
-  }
-
-  function act(action) {
-    if (!selectedId) {
-      window.alert(`Please select an item before choosing "${action}".`)
-      return
-    }
-    window.alert(`${action} complete — item id: ${selectedId}`)
+  function pick() {
+    onPick(currentId)
   }
 
   const renderItem = (item) => (
     <li key={item.id}>
       <div
-        className={selectedId === item.id ? 'browse-item selected' : 'browse-item'}
+        className="browse-item"
         role="button"
         tabIndex={0}
-        aria-pressed={selectedId === item.id}
-        onClick={() => toggleSelect(item.id)}
+        aria-current="page"
+        onClick={() => navigate(item.id)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
-            toggleSelect(item.id)
+            navigate(item.id)
           }
         }}
       >
@@ -63,19 +51,17 @@ export default function BrowseModal({ data, onClose }) {
           <span className="browse-item-title">{item.title}</span>
           <p className="browse-item-desc">{item.desc}</p>
         </div>
-        {item.type === 'category' && (
-          <button
-            type="button"
-            className="nav-btn"
-            aria-label={`Open ${item.title}`}
-            onClick={(e) => {
-              e.stopPropagation()
-              navigate(item.id)
-            }}
-          >
-            <ChevronRightIcon size={16} />
-          </button>
-        )}
+        <button
+          type="button"
+          className="nav-btn"
+          aria-label={`Open ${item.title}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            navigate(item.id)
+          }}
+        >
+          <ChevronRightIcon size={16} />
+        </button>
       </div>
     </li>
   )
@@ -115,15 +101,14 @@ export default function BrowseModal({ data, onClose }) {
 
         <ul className="browse-list scrollable">
           {categories.map(renderItem)}
-          {listings.map(renderItem)}
         </ul>
 
         <footer className="modal-footer">
-          <button type="button" className="btn secondary" onClick={() => act('Buy')}>
-            Buy
+          <button type="button" className="btn secondary" onClick={onClose}>
+            Cancel
           </button>
-          <button type="button" className="btn primary" onClick={() => act('Sell')}>
-            Sell
+          <button type="button" className="btn primary" onClick={pick}>
+            OK
           </button>
         </footer>
       </div>

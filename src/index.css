@@ -371,6 +371,64 @@ button {
   color: var(--primary);
 }
 
+/* My listings (drawer child rows) */
+.listing-row {
+  align-items: flex-start;
+  padding: 8px 10px 8px 26px;
+}
+
+.listing-row .drawer-row-icon {
+  margin-top: 2px;
+  color: var(--muted-2);
+}
+
+.listing-row .drawer-row-title {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 400;
+  white-space: normal;
+}
+
+.listing-row-desc {
+  font-size: 11.5px;
+  color: var(--muted-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.listing-row.selected .drawer-row-icon {
+  color: var(--primary);
+}
+
+/* Delete affordance on each drawer listing row. */
+.listing-delete {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  color: var(--muted-2);
+}
+
+.listing-delete:hover {
+  background: var(--hover-strong);
+  color: var(--danger);
+}
+
+.listing-delete:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.drawer-empty {
+  margin: 0 10px 8px 36px;
+  font-size: 12.5px;
+  color: var(--muted-2);
+}
+
 /* ── Empty placeholder ───────────────────────────────────── */
 .placeholder {
   flex: 1;
@@ -831,6 +889,27 @@ button {
   line-height: 1.6;
 }
 
+.confirm-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.confirm-message svg {
+  color: var(--danger);
+  flex-shrink: 0;
+}
+
+.confirm-detail {
+  margin: 8px 0 0 26px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
 /* Profile modal: label/value rows from the backend user row. */
 .profile-details dl {
   margin: 0;
@@ -911,6 +990,33 @@ button {
 
 .btn.secondary:hover {
   background: var(--hover);
+}
+
+.btn.danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn.danger:hover {
+  background: #dc2626;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.action-row {
+  display: flex;
+  gap: 10px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.action-row .btn {
+  flex: 1;
 }
 
 /* Browse modal */
