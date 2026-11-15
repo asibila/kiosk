@@ -3,17 +3,18 @@ import { useState } from 'react'
 import { ChevronLeftIcon, ChevronRightIcon, SessionGlyph, XIcon } from '../icons.jsx'
 import ChatView from './ChatView.jsx'
 
-export default function MessagesModal({ sessions, chats, onSend, onReadChat, onClose }) {
+export default function MessagesModal({ sessions, chats, onSend, onClose }) {
   const [activeChatId, setActiveChatId] = useState(null)
   const activeChat = chats.find((c) => c.id === activeChatId) || null
 
-  // A session row opens its conversation with unread messages (or the first one).
+  // Only sessions that actually have a conversation appear in the inbox.
+  const inboxSessions = sessions.filter((session) => chats.some((chat) => chat.sessionId === session.id))
+
+  // A session row opens its first conversation.
   function openSession(sessionId) {
     const sessionChats = chats.filter((c) => c.sessionId === sessionId)
     if (!sessionChats.length) return
-    const chat = sessionChats.find((c) => c.unread > 0) || sessionChats[0]
-    setActiveChatId(chat.id)
-    onReadChat(chat.id)
+    setActiveChatId(sessionChats[0].id)
   }
 
   return (
@@ -44,11 +45,11 @@ export default function MessagesModal({ sessions, chats, onSend, onReadChat, onC
           </div>
         ) : (
           <div className="messages-panel slide-in-left" key="list">
-            {sessions.length === 0 ? (
+            {inboxSessions.length === 0 ? (
               <p className="messages-empty">No conversations yet.</p>
             ) : (
               <ul className="messages-list scrollable" aria-label="Conversations">
-                {sessions.map((session) => {
+                {inboxSessions.map((session) => {
                   const unread = chats
                     .filter((c) => c.sessionId === session.id)
                     .reduce((n, c) => n + c.unread, 0)

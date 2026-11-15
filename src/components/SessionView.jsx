@@ -35,36 +35,43 @@ export default function SessionView({ session, answers, onAnswer }) {
       </header>
 
       <div className="session-scroll scrollable">
-        {questions.map((q) => {
-          const chosen = answers[q.id]
-          const isAnswered = chosen != null
-          return (
-            <article key={q.id} className={isAnswered ? 'q-card answered' : 'q-card'}>
-              <header className="q-head">
-                <h3 className="q-text">{q.text}</h3>
-                {isAnswered && (
-                  <span className="check-badge" title="Answered">
-                    <CheckIcon size={13} />
-                  </span>
-                )}
-              </header>
-              <p className="q-hint">{q.hint}</p>
-              <div className="chips">
-                {q.options.map((option, index) => (
-                  <button
-                    key={option}
-                    type="button"
-                    className={chosen === index ? 'chip selected' : 'chip'}
-                    aria-pressed={chosen === index}
-                    onClick={() => onAnswer(q.id, index)}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            </article>
-          )
-        })}
+        {questions.length === 0 ? (
+          <p className="session-empty">
+            This category has no interview questions yet. Facet schemas added to it in the backend will
+            appear here.
+          </p>
+        ) : (
+          questions.map((q) => {
+            const chosen = answers[q.id]
+            const isAnswered = chosen != null
+            return (
+              <article key={q.id} className={isAnswered ? 'q-card answered' : 'q-card'}>
+                <header className="q-head">
+                  <h3 className="q-text">{q.text}</h3>
+                  {isAnswered && (
+                    <span className="check-badge" title="Answered">
+                      <CheckIcon size={13} />
+                    </span>
+                  )}
+                </header>
+                <p className="q-hint">{q.hint}</p>
+                <div className="chips">
+                  {q.options.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={chosen === option.id ? 'chip selected' : 'chip'}
+                      aria-pressed={chosen === option.id}
+                      onClick={() => onAnswer(q.id, option.id)}
+                    >
+                      {option.text}
+                    </button>
+                  ))}
+                </div>
+              </article>
+            )
+          })
+        )}
       </div>
 
       {/* Empty decorative bar — intentionally holds nothing */}

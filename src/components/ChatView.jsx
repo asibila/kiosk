@@ -112,6 +112,7 @@ export default function ChatView({ chat, onSend }) {
           className="chat-input"
           type="text"
           placeholder="Type a message…"
+          maxLength={225}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {

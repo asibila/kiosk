@@ -112,6 +112,33 @@ button {
   overflow: hidden;
 }
 
+/* Transient banner for save failures / unsaved answers. */
+.app-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  background: var(--primary-soft-bg);
+  border-bottom: 1px solid var(--primary-soft-border);
+  color: var(--primary-text);
+  font-size: 13px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.app-notice svg {
+  flex-shrink: 0;
+}
+
+.app-notice span {
+  flex: 1;
+}
+
+.notice-close {
+  color: var(--primary-text);
+  flex-shrink: 0;
+}
+
 .main {
   flex: 1;
   min-width: 0;
@@ -119,6 +146,42 @@ button {
   flex-direction: column;
   overflow: hidden;
   background: var(--bg);
+}
+
+/* Home screen — log in entry point. */
+.home-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+}
+
+.home-screen h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.home-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 340px;
+}
+
+.home-form label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.home-error {
+  margin: 0;
+  font-size: 13px;
+  color: #e5484d;
 }
 
 /* ── Top bar ─────────────────────────────────────────────── */
@@ -326,6 +389,10 @@ button {
   color: var(--muted-3);
 }
 
+.placeholder-icon.error {
+  color: var(--danger);
+}
+
 .placeholder h2 {
   margin: 0;
   font-size: 18px;
@@ -335,6 +402,10 @@ button {
 .placeholder p {
   margin: 0;
   font-size: 13.5px;
+}
+
+.placeholder .btn {
+  margin-top: 10px;
 }
 
 /* ── Session (interview) view ────────────────────────────── */
@@ -402,6 +473,18 @@ button {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.session-empty {
+  margin: 0;
+  padding: 22px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.6;
+  text-align: center;
 }
 
 .q-card {
@@ -746,6 +829,48 @@ button {
   font-size: 14px;
   color: var(--muted);
   line-height: 1.6;
+}
+
+/* Profile modal: label/value rows from the backend user row. */
+.profile-details dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-details dl > div {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-details dl > div:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.profile-details dt {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.profile-details dd {
+  margin: 0;
+  color: var(--text);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.profile-note {
+  margin: 16px 0 0;
+  font-size: 12.5px;
+  color: var(--muted-2);
 }
 
 .modal-footer {
