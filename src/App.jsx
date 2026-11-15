@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router'
-import { api, CHAT_EVENTS_URL, fetchKioskData } from './api.js'
+import { api, CHAT_EVENTS_URL, fetchKioskData, mediaUrl } from './api.js'
 import { buildViewModel, formatTime } from './viewModel.js'
 import { AlertIcon, LayersIcon, XIcon } from './icons.jsx'
 import TopBar from './components/TopBar.jsx'
@@ -27,6 +27,17 @@ const SETTINGS_BODY =
 
 const THEME_KEY = 'kiosk-theme'
 const LOGGED_IN_USER_ID_KEY = 'kiosk-user-id'
+
+const DIRECTION_LABEL = { buy: 'Wanted', sell: 'For sale' }
+
+/** Replace the leading direction segment of a drawer listing description. */
+function withOrientationLabel(desc, orientation) {
+  const label = DIRECTION_LABEL[orientation] ?? DIRECTION_LABEL.sell
+  const parts = String(desc ?? '').split(' · ')
+  if (parts.length === 1 && parts[0] === '') return label
+  parts[0] = label
+  return parts.join(' · ')
+}
 
 const EMPTY_BROWSE_DATA = { root: { path: ['Home'], items: [] } }
 
@@ -82,10 +93,11 @@ function KioskApp() {
   const [deleting, setDeleting] = useState(false)
   const [listingDirection, setListingDirection] = useState(null) // 'buy' | 'sell' | null
 
-  // Listing wizard: interview → edit (description + images) → preview → report.
+  // Listing wizard: interview → edit (images) → preview → report.
   const [wizardStage, setWizardStage] = useState('interview') // 'interview' | 'edit' | 'preview'
-  const [draftDescription, setDraftDescription] = useState('')
-  const [draftImages, setDraftImages] = useState([]) // { id, name, url } (browser-local previews)
+  const [draftImages, setDraftImages] = useState([]) // { id, name, url, file, isPrimary } (new listings)
+  const [listingImages, setListingImages] = useState([]) // backend ListingImage rows
+  const [uploadingImages, setUploadingImages] = useState(false)
 
   // Live-chat connection + latest values looked up by the SSE handler without
   // re-subscribing on every render.
@@ -125,6 +137,7 @@ function KioskApp() {
         setInbox(view.inbox ?? [])
         setMyListings(view.myListings)
         setBrowseData(view.browseData)
+        setListingImages(view.listingImages ?? [])
         setAnswers(view.answers)
         setSelections(view.selections)
         setOptionSchema(view.optionSchema)
@@ -282,7 +295,6 @@ function KioskApp() {
 
   // Wizard draft lives in the browser only; object URLs are released on reset.
   function resetDraft() {
-    setDraftDescription('')
     setDraftImages((prev) => {
       for (const image of prev) {
         try {
@@ -295,31 +307,156 @@ function KioskApp() {
     })
   }
 
-  function addImages(fileList) {
-    const files = Array.from(fileList ?? []).filter((file) => file.type.startsWith('image/'))
-    if (files.length === 0) return
-    setDraftImages((prev) => [
-      ...prev,
-      ...files.map((file) => ({
-        id: crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        name: file.name,
-        url: URL.createObjectURL(file),
-      })),
-    ])
+  // The drawer listing the wizard is editing, if one of the open category is
+  // selected. New listings have no id until Publish.
+  function wizardTargetListing() {
+    if (!selectedListingId) return null
+    return (
+      myListings.find(
+        (listing) =>
+          String(listing.listingId) === String(selectedListingId) &&
+          String(listing.sessionId) === String(selectedSessionId),
+      ) ?? null
+    )
   }
 
-  function removeImage(imageId) {
-    setDraftImages((prev) => {
-      const image = prev.find((item) => item.id === imageId)
-      if (image?.url) {
-        try {
-          URL.revokeObjectURL(image.url)
-        } catch {
-          // Ignore invalid URLs.
-        }
+  // Upload straight away when editing a saved listing; otherwise keep local
+  // object URLs so Publish can upload them once the listing exists.
+  async function addImages(fileList) {
+    const files = Array.from(fileList ?? []).filter((file) => file.type.startsWith('image/'))
+    if (files.length === 0) return
+
+    const target = wizardTargetListing()
+    if (!target) {
+      setDraftImages((prev) => [
+        ...prev,
+        ...files.map((file, index) => ({
+          id: crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          name: file.name,
+          url: URL.createObjectURL(file),
+          file,
+          // The first image is primary unless another one already is.
+          isPrimary: prev.length === 0 && index === 0,
+        })),
+      ])
+      return
+    }
+
+    setUploadingImages(true)
+    try {
+      const uploaded = []
+      for (const file of files) {
+        const form = new FormData()
+        form.append('file', file)
+        form.append('listingId', String(target.listingId))
+        uploaded.push(await api.upload('listing-images', form, user?.id))
       }
-      return prev.filter((item) => item.id !== imageId)
-    })
+      setListingImages((prev) => [...prev, ...uploaded])
+    } catch (err) {
+      setNotice(`Image upload failed: ${err.message}`)
+    } finally {
+      setUploadingImages(false)
+    }
+  }
+
+  async function removeImage(imageId) {
+    const serverImage = listingImages.find((image) => image.id === imageId)
+    if (!serverImage) {
+      setDraftImages((prev) => {
+        const image = prev.find((item) => item.id === imageId)
+        if (image?.url) {
+          try {
+            URL.revokeObjectURL(image.url)
+          } catch {
+            // Ignore invalid URLs.
+          }
+        }
+        return prev.filter((item) => item.id !== imageId)
+      })
+      return
+    }
+
+    try {
+      await api.remove('listing-images', imageId, user?.id)
+    } catch (err) {
+      setNotice(`Could not delete image: ${err.message}`)
+      return
+    }
+
+    const siblings = listingImages.filter(
+      (image) => image.listingId === serverImage.listingId && image.id !== imageId,
+    )
+    setListingImages((prev) => prev.filter((image) => image.id !== imageId))
+
+    // Deleting the primary image promotes the next one so a thumbnail remains.
+    if (serverImage.primaryImage && siblings.length > 0) {
+      try {
+        const updated = await api.update(
+          'listing-images',
+          siblings[0].id,
+          { primaryImage: true },
+          user?.id,
+        )
+        setListingImages((prev) =>
+          prev.map((image) => (image.id === updated.id ? updated : image)),
+        )
+      } catch {
+        // Non-fatal: the listing simply has no primary image for now.
+      }
+    }
+  }
+
+  async function setPrimaryImage(imageId) {
+    const serverImage = listingImages.find((image) => image.id === imageId)
+    if (!serverImage) {
+      setDraftImages((prev) =>
+        prev.map((image) => ({ ...image, isPrimary: image.id === imageId })),
+      )
+      return
+    }
+
+    try {
+      const updated = await api.update(
+        'listing-images',
+        imageId,
+        { primaryImage: true },
+        user?.id,
+      )
+      setListingImages((prev) =>
+        prev.map((image) =>
+          image.listingId === updated.listingId
+            ? { ...image, primaryImage: image.id === updated.id }
+            : image,
+        ),
+      )
+    } catch (err) {
+      setNotice(`Could not set primary image: ${err.message}`)
+    }
+  }
+
+  // Upload images picked before the listing existed (Publish path).
+  async function uploadDraftImages(listingId) {
+    if (draftImages.length === 0) return
+
+    const uploaded = []
+    for (const draft of draftImages) {
+      const form = new FormData()
+      form.append('file', draft.file)
+      form.append('listingId', String(listingId))
+      uploaded.push(await api.upload('listing-images', form, user?.id))
+    }
+
+    const primaryIndex = draftImages.findIndex((draft) => draft.isPrimary)
+    if (primaryIndex >= 0 && uploaded[primaryIndex]) {
+      uploaded[primaryIndex] = await api.update(
+        'listing-images',
+        uploaded[primaryIndex].id,
+        { primaryImage: true },
+        user?.id,
+      )
+    }
+
+    setListingImages((prev) => [...prev, ...uploaded])
   }
 
   // (g) Browse modal: OK adopts the browsed category as the current one; Cancel just closes.
@@ -408,8 +545,54 @@ function KioskApp() {
   }
 
   // Buy/Sell chips are mutually exclusive: choosing one clears the other.
-  function toggleListingDirection(direction) {
-    setListingDirection((prev) => (prev === direction ? null : direction))
+  // Buy/Sell chips write Listing.orientation. The choice is persisted at once on
+  // the listing the interview targets (same target as the facet answers); a
+  // brand-new listing keeps it locally and Publish writes it.
+  async function selectListingDirection(direction) {
+    if (!selectedSession || listingDirection === direction) return
+
+    const previous = listingDirection
+    setListingDirection(direction)
+
+    const listingId = interviewTargetListingId(selectedSession)
+    if (!listingId) return
+
+    try {
+      const updated = await api.update(
+        'listings',
+        listingId,
+        { orientation: direction },
+        user?.id,
+      )
+      setMyListings((prev) =>
+        prev.map((listing) =>
+          String(listing.listingId) === String(listingId)
+            ? {
+                ...listing,
+                orientation: updated.orientation,
+                desc: withOrientationLabel(listing.desc, updated.orientation),
+              }
+            : listing,
+        ),
+      )
+      setBrowseData((prev) => {
+        const next = {}
+        for (const [key, node] of Object.entries(prev)) {
+          next[key] = {
+            ...node,
+            items: node.items.map((item) =>
+              item.type === 'listing' && item.id === String(listingId)
+                ? { ...item, orientation: updated.orientation }
+                : item,
+            ),
+          }
+        }
+        return next
+      })
+    } catch (err) {
+      setListingDirection(previous)
+      setNotice(`Direction not saved: ${err.message}`)
+    }
   }
 
   // Publish: when a drawer listing of the open category is selected, update that
@@ -433,10 +616,10 @@ function KioskApp() {
     setPublishing(true)
     try {
       let listingId
-      let orientation = 'sell'
+      let orientation = listingDirection ?? 'sell'
       if (target) {
-        // Keep the listing's category, orientation and owner; just refresh it.
-        orientation = target.orientation
+        // Keep the listing's category and owner; apply the chosen direction.
+        orientation = listingDirection ?? target.orientation
         const updated = await api.update(
           'listings',
           target.listingId,
@@ -517,6 +700,16 @@ function KioskApp() {
         setMyListings((prev) => [...prev, nextListing])
       }
 
+      // Images picked before the listing existed are uploaded now that it has
+      // an id; a failed upload should not hide the successful publish.
+      if (draftImages.length > 0) {
+        try {
+          await uploadDraftImages(listingId)
+        } catch (err) {
+          setNotice(`Listing saved, but image upload failed: ${err.message}`)
+        }
+      }
+
       // The wizard's last step: clear the interview and show the report dialog
       // over the "No category selected" screen.
       startNewListing()
@@ -533,6 +726,7 @@ function KioskApp() {
     // Keep the drawer open so its nested chat threads stay visible.
     selectSession(listing.sessionId, { keepDrawerOpen: true })
     setSelectedListingId(listing.id)
+    setListingDirection(listing.orientation ?? null)
     // Show exactly this listing's answers: clear answers for the session's
     // questions that this listing has no selection for.
     const session = sessions.find((s) => s.id === listing.sessionId)
@@ -561,6 +755,9 @@ function KioskApp() {
 
       setMyListings((prev) =>
         prev.filter((item) => String(item.listingId) !== String(listing.listingId)),
+      )
+      setListingImages((prev) =>
+        prev.filter((image) => image.listingId !== listing.listingId),
       )
       setSelections((prev) => prev.filter((selection) => selection.listingId !== listing.listingId))
       setBrowseData((prev) => {
@@ -649,6 +846,18 @@ function KioskApp() {
     }
   }
 
+  // The listing that receives interview answers and the buy/sell orientation:
+  // the selected drawer listing of this category, otherwise the category's
+  // first listing. Null when the category has no listing yet.
+  function interviewTargetListingId(session) {
+    const selectedListing = selectedListingId
+      ? myListings.find((listing) => String(listing.listingId) === String(selectedListingId))
+      : null
+    return selectedListing && String(selectedListing.sessionId) === String(session.id)
+      ? selectedListing.listingId
+      : categoryListing[session.id] ?? null
+  }
+
   // Replace the answer and persist it as a facet-value-selection. When a drawer
   // listing of this category is selected, its own selection is patched/created;
   // otherwise the category's first listing keeps the interview answers.
@@ -656,13 +865,7 @@ function KioskApp() {
     if (answers[questionId] === optionId || savingQuestionId === questionId) return
 
     const previous = answers[questionId]
-    const selectedListing = selectedListingId
-      ? myListings.find((listing) => String(listing.listingId) === String(selectedListingId))
-      : null
-    const listingId =
-      selectedListing && String(selectedListing.sessionId) === String(session.id)
-        ? selectedListing.listingId
-        : categoryListing[session.id] ?? null
+    const listingId = interviewTargetListingId(session)
     setAnswers((prev) => ({ ...prev, [questionId]: optionId }))
 
     if (!listingId) {
@@ -763,6 +966,26 @@ function KioskApp() {
   const selectedSession = sessions.find((s) => s.id === selectedSessionId) || null
   const selectedChat = chats.find((c) => c.id === selectedChatId) || null
 
+  // Images shown by the wizard: saved rows for the edited listing plus the
+  // browser-local picks for a listing that has not been published yet.
+  const wizardTarget = wizardTargetListing()
+  const wizardImages = [
+    ...listingImages
+      .filter((image) => wizardTarget && image.listingId === wizardTarget.listingId)
+      .map((image) => ({
+        id: image.id,
+        name: `Listing image ${image.id}`,
+        url: mediaUrl(image.url),
+        isPrimary: image.primaryImage,
+      })),
+    ...draftImages.map((image) => ({
+      id: image.id,
+      name: image.name,
+      url: image.url,
+      isPrimary: image.isPrimary,
+    })),
+  ]
+
   // Aggregate unread count for the topbar's message icon. Count conversations
   // the signed-in user can actually see: their own listings' chat threads and
   // the threads sitting in their inbox.
@@ -779,7 +1002,11 @@ function KioskApp() {
   const answeredCount = selectedSession
     ? selectedSession.questions.filter((q) => answers[q.id] != null).length
     : 0
-  const canPublish = !!user && !!selectedSession && (categoryDirty || answeredCount > 0)
+  const canPublish =
+    !!user &&
+    !!selectedSession &&
+    listingDirection != null &&
+    (categoryDirty || answeredCount > 0)
 
   // Interview step actions: Buy/Sell chips + Search on the right; "Next >"
   // continues to the wizard's edit step.
@@ -790,7 +1017,7 @@ function KioskApp() {
           type="button"
           className={listingDirection === 'buy' ? 'chip selected' : 'chip'}
           aria-pressed={listingDirection === 'buy'}
-          onClick={() => toggleListingDirection('buy')}
+          onClick={() => selectListingDirection('buy')}
         >
           Buy
         </button>
@@ -798,13 +1025,19 @@ function KioskApp() {
           type="button"
           className={listingDirection === 'sell' ? 'chip selected' : 'chip'}
           aria-pressed={listingDirection === 'sell'}
-          onClick={() => toggleListingDirection('sell')}
+          onClick={() => selectListingDirection('sell')}
         >
           Sell
         </button>
       </div>
       <div className="action-buttons">
-        <button type="button" className="btn secondary" onClick={() => openListings(listingDirection)}>
+        <button
+          type="button"
+          className="btn secondary"
+          onClick={() => openListings(listingDirection)}
+          disabled={listingDirection == null}
+          title={listingDirection == null ? 'Choose Buy or Sell first' : undefined}
+        >
           Search
         </button>
         <button
@@ -841,7 +1074,12 @@ function KioskApp() {
         &lt; Previous
       </button>
       <div className="action-buttons">
-        <button type="button" className="btn primary" onClick={publish} disabled={publishing}>
+        <button
+          type="button"
+          className="btn primary"
+          onClick={publish}
+          disabled={publishing || listingDirection == null}
+        >
           {publishing ? 'Publishing…' : 'Publish'}
         </button>
       </div>
@@ -930,19 +1168,18 @@ function KioskApp() {
           ) : selectedSession && wizardStage === 'edit' ? (
             <EditListingView
               session={selectedSession}
-              description={draftDescription}
-              onDescriptionChange={setDraftDescription}
-              images={draftImages}
+              images={wizardImages}
               onAddImages={addImages}
               onRemoveImage={removeImage}
+              onSetPrimary={setPrimaryImage}
+              uploading={uploadingImages}
               actions={editActions}
             />
           ) : selectedSession && wizardStage === 'preview' ? (
             <PreviewListingView
               session={selectedSession}
               answers={answers}
-              description={draftDescription}
-              images={draftImages}
+              images={wizardImages}
               actions={previewActions}
             />
           ) : selectedSession ? (

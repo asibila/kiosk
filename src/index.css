@@ -1246,6 +1246,44 @@ button {
   display: block;
 }
 
+.thumb-card.is-primary {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-soft);
+}
+
+/* Star action for promoting an image to the listing's thumbnail. */
+.thumb-primary,
+.thumb-primary-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+}
+
+.thumb-primary {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.6);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thumb-primary:hover {
+  background: var(--primary);
+}
+
+.thumb-primary-badge {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
 .thumb-remove {
   position: absolute;
   top: 4px;
@@ -1442,6 +1480,14 @@ button {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .browse-item-main {

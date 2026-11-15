@@ -1,14 +1,15 @@
-// Wizard edit screen: description compose area and image uploads.
-// Images stay in the browser (object URLs); the backend has no image resource.
-import { ImageIcon, TrashIcon } from '../icons.jsx'
+// Wizard edit screen: upload, preview, remove and prioritise listing images.
+// Existing listings upload immediately; a brand-new listing keeps the picks
+// locally (object URLs) and uploads them when Publish creates the listing.
+import { ImageIcon, StarIcon, TrashIcon } from '../icons.jsx'
 
 export default function EditListingView({
   session,
-  description,
-  onDescriptionChange,
   images,
   onAddImages,
   onRemoveImage,
+  onSetPrimary,
+  uploading = false,
   actions,
 }) {
   function handleFiles(event) {
@@ -25,29 +26,39 @@ export default function EditListingView({
       </header>
 
       <div className="wizard-scroll scrollable">
-        <label className="field-label" htmlFor="listing-description">
-          Description
-        </label>
-        <textarea
-          id="listing-description"
-          className="compose-area"
-          value={description}
-          onChange={(e) => onDescriptionChange(e.target.value)}
-          placeholder="Describe your item — condition, extras, price…"
-        />
-
         <div className="field-label-row">
           <span className="field-label" id="listing-images-label">
             Images
           </span>
           <span className="field-hint">
-            {images.length === 0 ? 'None uploaded yet' : `${images.length} uploaded`}
+            {images.length === 0
+              ? 'No images yet'
+              : `${images.length} image${images.length === 1 ? '' : 's'}`}
           </span>
         </div>
+
         <div className="thumb-grid" aria-labelledby="listing-images-label">
           {images.map((image) => (
-            <figure className="thumb-card" key={image.id}>
+            <figure
+              className={image.isPrimary ? 'thumb-card is-primary' : 'thumb-card'}
+              key={image.id}
+            >
               <img src={image.url} alt={image.name} />
+
+              {image.isPrimary ? (
+                <span className="thumb-primary-badge">Primary</span>
+              ) : (
+                <button
+                  type="button"
+                  className="thumb-primary"
+                  aria-label="Make primary image"
+                  title="Make primary image"
+                  onClick={() => onSetPrimary(image.id)}
+                >
+                  <StarIcon size={12} />
+                </button>
+              )}
+
               <button
                 type="button"
                 className="thumb-remove"
@@ -59,18 +70,24 @@ export default function EditListingView({
               </button>
             </figure>
           ))}
+
           <label className="thumb-add" htmlFor="listing-images">
             <ImageIcon size={20} />
-            <span>Add images</span>
+            <span>{uploading ? 'Uploading…' : 'Add images'}</span>
             <input
               id="listing-images"
               type="file"
               accept="image/*"
               multiple
               onChange={handleFiles}
+              disabled={uploading}
             />
           </label>
         </div>
+
+        <p className="field-hint">
+          The primary image is the thumbnail shown in search results.
+        </p>
       </div>
 
       {actions ? (

@@ -1,5 +1,5 @@
-// Wizard preview screen: answered facets, description and uploaded images.
-export default function PreviewListingView({ session, answers, description, images, actions }) {
+// Wizard preview screen: answered facets and uploaded images.
+export default function PreviewListingView({ session, answers, images, actions }) {
   const answered = session.questions.filter((q) => answers[q.id] != null)
 
   return (
@@ -27,21 +27,20 @@ export default function PreviewListingView({ session, answers, description, imag
           </ul>
         )}
 
-        <h3 className="preview-heading">Description</h3>
-        {description.trim() ? (
-          <p className="preview-desc">{description}</p>
-        ) : (
-          <p className="preview-empty">No description added.</p>
-        )}
-
         <h3 className="preview-heading">Images</h3>
         {images.length === 0 ? (
           <p className="preview-empty">No images uploaded.</p>
         ) : (
           <div className="thumb-grid">
             {images.map((image) => (
-              <figure className="thumb-card" key={image.id}>
+              <figure
+                className={image.isPrimary ? 'thumb-card is-primary' : 'thumb-card'}
+                key={image.id}
+              >
                 <img src={image.url} alt={image.name} />
+                {image.isPrimary ? (
+                  <span className="thumb-primary-badge">Primary</span>
+                ) : null}
               </figure>
             ))}
           </div>

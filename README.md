@@ -51,6 +51,7 @@ VITE_API_BASE_URL=/backend npm run dev
 | `chat-threads` + `chat-messages` | Chat view and the Messages modal |
 | `inbox-items` | Which chat threads appear in the signed-in user's Messages |
 | `listing-chat-threads` | Maps each chat thread to its listing/category |
+| `listing-images` | Listing images metadata; the primary image is the search thumbnail |
 | `listings` | Browse listings; drawer child rows are the signed-in user's listings |
 
 ## Feature map
@@ -74,15 +75,22 @@ VITE_API_BASE_URL=/backend npm run dev
 - **Session view** — per-session progress bar, priority-sorted product questions,
   wrapping chips (replace-only answers), green answered accents, and an action bar with
   left-aligned, mutually exclusive Buy/Sell chips plus right-aligned Search and a
-  "Next >" button into the listing wizard. Answers are saved to `facet-value-selections`
-  on the selected drawer listing (or the category's first listing when none is selected).
+  "Next >" button into the listing wizard. The Buy/Sell chips write
+  `Listing.orientation` (`buy` / `sell`) on the same listing that receives the answers,
+  opening a drawer listing preselects its stored orientation, and both Search and
+  "Next >" stay disabled until Buy or Sell is chosen. Answers are saved to
+  `facet-value-selections` on the selected drawer listing (or the category's first
+  listing when none is selected).
   Search results show an envelope action per listing; clicking it creates a new
   `chat-threads` row linked through `listing-chat-threads` and an `inbox-items` row in the
   signed-in user's inbox. The envelope is grayed out and disabled on the user's own listings.
-- **Listing wizard** — after the interview: **Edit** (description compose area, any number
-  of image uploads, browser-local previews), **Preview** (answered facets, description,
-  images) with **Publish**, then a report dialog ("Listing created, thank you for using
-  kiosk.") over the starting screen. "< Previous" moves back a step at every stage.
+- **Listing wizard** - after the interview: **Edit** (image grid with upload,
+  remove and "make primary"; editing a saved listing uploads immediately, a new
+  listing keeps its picks locally until Publish), **Preview** (answered facets,
+  images) with **Publish**, then a report dialog ("Listing created, thank you
+  for using kiosk.") over the starting screen. "< Previous" moves back a step
+  at every stage. Search results show the listing's primary image as a small
+  thumbnail (the glyph remains when a listing has no image).
 - **Chat view** - WhatsApp-style bubbles with timestamps, paperclip popover
   (Image / YouTube / GPS placeholders), Enter-to-send. Text messages are POSTed
   to `chat-messages`; attachment placeholders stay local. The conversation header

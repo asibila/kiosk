@@ -2,6 +2,7 @@
 // Each row has an envelope action that starts an inbox conversation; the action
 // is disabled for the signed-in user's own listings.
 import { EnvelopeIcon, XIcon, ThumbGlyph } from '../icons.jsx'
+import { mediaUrl } from '../api.js'
 
 export default function ListingsModal({
   title,
@@ -33,7 +34,11 @@ export default function ListingsModal({
                 <li key={listing.id}>
                   <div className="browse-item">
                     <span className="thumb">
-                      <ThumbGlyph kind={listing.thumb || 'tag'} />
+                      {listing.imageUrl ? (
+                        <img src={mediaUrl(listing.imageUrl)} alt="" loading="lazy" />
+                      ) : (
+                        <ThumbGlyph kind={listing.thumb || 'tag'} />
+                      )}
                     </span>
                     <div className="browse-item-main">
                       <span className="browse-item-title">{listing.title}</span>

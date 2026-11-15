@@ -154,6 +154,12 @@ export const CheckIcon = (p) => (
   </Svg>
 )
 
+export const StarIcon = (p) => (
+  <Svg {...p}>
+    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+  </Svg>
+)
+
 export const PaperclipIcon = (p) => (
   <Svg {...p}>
     <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 17.5 8.5l-7.79 7.79a2 2 0 0 1-2.83-2.83l6.98-6.98" />

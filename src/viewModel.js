@@ -40,12 +40,24 @@ export function buildViewModel(raw, { userId } = {}) {
   const chatMessages = raw['chat-messages'] ?? []
   const inboxItems = raw['inbox-items'] ?? []
   const listingChatThreads = raw['listing-chat-threads'] ?? []
+  const listingImages = raw['listing-images'] ?? []
 
   const descriptionsById = byId(descriptions)
   const categoriesById = byId(categories)
   const listingsById = byId(listings)
   const optionsById = byId(facetOptions)
   const usersById = byId(users)
+
+  // Primary image per listing (falls back to the first image if none is marked).
+  const primaryImageByListing = new Map()
+  for (const image of listingImages) {
+    if (image.primaryImage) primaryImageByListing.set(image.listingId, image)
+  }
+  for (const image of listingImages) {
+    if (!primaryImageByListing.has(image.listingId)) {
+      primaryImageByListing.set(image.listingId, image)
+    }
+  }
 
   const descriptionText = (descriptionId, fallback = '') =>
     descriptionsById.get(descriptionId)?.text || fallback
@@ -218,6 +230,7 @@ export function buildViewModel(raw, { userId } = {}) {
     title: listingTitle(listing),
     desc: listingDescription(listing),
     thumb: 'box',
+    imageUrl: primaryImageByListing.get(listing.id)?.url ?? null,
     categoryId: String(listing.categoryId),
     orientation: listing.orientation,
   })
@@ -254,6 +267,7 @@ export function buildViewModel(raw, { userId } = {}) {
     inbox,
     myListings,
     browseData,
+    listingImages,
     answers,
     selections: facetSelections,
     optionSchema: Object.fromEntries(facetOptions.map((option) => [option.id, option.schemaId])),
