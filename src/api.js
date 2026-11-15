@@ -77,6 +77,7 @@ export const api = {
 
 const RESOURCES = [
   'users',
+  'languages',
   'descriptions',
   'categories',
   'listings',

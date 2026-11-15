@@ -1,18 +1,21 @@
 // Wizard preview screen: answered facets and uploaded images.
+import { useI18n } from '../i18n.jsx'
+
 export default function PreviewListingView({ session, answers, images, actions }) {
+  const { t } = useI18n()
   const answered = session.questions.filter((q) => answers[q.id] != null)
 
   return (
-    <section className="wizard-view" aria-label="Preview listing">
+    <section className="wizard-view" aria-label={t('wizard.previewAria')}>
       <header className="wizard-head">
-        <span className="wizard-step">Step 3 of 3 · Preview</span>
+        <span className="wizard-step">{t('wizard.step3')}</span>
         <h2 className="wizard-title">{session.title}</h2>
       </header>
 
       <div className="wizard-scroll scrollable">
-        <h3 className="preview-heading">Facets</h3>
+        <h3 className="preview-heading">{t('wizard.facets')}</h3>
         {answered.length === 0 ? (
-          <p className="preview-empty">No questions answered.</p>
+          <p className="preview-empty">{t('wizard.noAnswers')}</p>
         ) : (
           <ul className="facet-list">
             {answered.map((question) => {
@@ -27,9 +30,9 @@ export default function PreviewListingView({ session, answers, images, actions }
           </ul>
         )}
 
-        <h3 className="preview-heading">Images</h3>
+        <h3 className="preview-heading">{t('wizard.images')}</h3>
         {images.length === 0 ? (
-          <p className="preview-empty">No images uploaded.</p>
+          <p className="preview-empty">{t('wizard.noUploads')}</p>
         ) : (
           <div className="thumb-grid">
             {images.map((image) => (
@@ -39,7 +42,7 @@ export default function PreviewListingView({ session, answers, images, actions }
               >
                 <img src={image.url} alt={image.name} />
                 {image.isPrimary ? (
-                  <span className="thumb-primary-badge">Primary</span>
+                  <span className="thumb-primary-badge">{t('wizard.primary')}</span>
                 ) : null}
               </figure>
             ))}

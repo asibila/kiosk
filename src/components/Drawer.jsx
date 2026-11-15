@@ -4,6 +4,7 @@
 // clicking one opens that conversation on the main screen.
 import { Fragment } from 'react'
 import { ChatIcon, GearIcon, MessageIcon, PlusIcon, TagIcon, TrashIcon } from '../icons.jsx'
+import { useI18n } from '../i18n.jsx'
 
 export default function Drawer({
   open,
@@ -21,21 +22,22 @@ export default function Drawer({
   signedIn = true,
   onSignIn,
 }) {
+  const { t } = useI18n()
   return (
     <aside
       className={open ? 'drawer open' : 'drawer'}
-      aria-label="My listings"
+      aria-label={t('drawer.aria')}
       aria-hidden={open ? undefined : true}
       inert={open ? undefined : true}
     >
       <div className="drawer-head">
-        <span className="drawer-title">My listings</span>
+        <span className="drawer-title">{t('drawer.title')}</span>
       </div>
 
       {signedIn ? (
         <>
           <div className="drawer-list scrollable">
-        {listings.length === 0 && <p className="drawer-empty">No listings yet</p>}
+        {listings.length === 0 && <p className="drawer-empty">{t('drawer.empty')}</p>}
         {listings.map((listing) => {
           const isSelected = selectedListingId === listing.id
           const listingChats = isSelected
@@ -65,8 +67,8 @@ export default function Drawer({
                 <button
                   type="button"
                   className="icon-btn listing-delete"
-                  aria-label={`Delete ${listing.title}`}
-                  title="Delete listing"
+                  aria-label={t('drawer.deleteAria', { title: listing.title })}
+                  title={t('drawer.delete')}
                   onClick={(e) => {
                     e.stopPropagation()
                     onDeleteListing(listing)
@@ -78,7 +80,7 @@ export default function Drawer({
               </div>
 
               {isSelected && listingChats.length > 0 && (
-                <div className="drawer-chats" aria-label={`Conversations for ${listing.title}`}>
+                <div className="drawer-chats" aria-label={t('drawer.conversations', { title: listing.title })}>
                   {listingChats.map((chat) => {
                     const isChatSelected = selectedChatId === chat.id
                     const lastMessage = chat.messages[chat.messages.length - 1]
@@ -104,13 +106,13 @@ export default function Drawer({
                           <ChatIcon size={15} />
                         </span>
                         <span className="drawer-row-title">
-                          <span className="listing-row-name">Chat #{chat.threadId}</span>
+                          <span className="listing-row-name">{t('drawer.chat', { id: chat.threadId })}</span>
                           <span className="listing-row-desc">
-                            {lastMessage ? lastMessage.text : 'No messages yet'}
+                            {lastMessage ? lastMessage.text : t('drawer.noMessages')}
                           </span>
                         </span>
                         {chat.unread > 0 && (
-                          <span className="badge" aria-label={`${chat.unread} unread`}>
+                          <span className="badge" aria-label={t('drawer.unread', { count: chat.unread })}>
                             {chat.unread}
                           </span>
                         )}
@@ -129,16 +131,16 @@ export default function Drawer({
               <span className="drawer-row-icon" aria-hidden="true">
                 <PlusIcon size={18} />
               </span>
-              <span className="drawer-row-title">New listing</span>
+              <span className="drawer-row-title">{t('drawer.newListing')}</span>
             </button>
 
             <button type="button" className="drawer-action" onClick={onOpenMessages}>
               <span className="drawer-row-icon" aria-hidden="true">
                 <MessageIcon size={18} />
               </span>
-              <span className="drawer-row-title">Messages</span>
+              <span className="drawer-row-title">{t('drawer.messages')}</span>
               {unreadCount > 0 && (
-                <span className="badge" aria-label={`${unreadCount} unread`}>
+                <span className="badge" aria-label={t('drawer.unread', { count: unreadCount })}>
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
@@ -148,15 +150,15 @@ export default function Drawer({
               <span className="drawer-row-icon" aria-hidden="true">
                 <GearIcon size={18} />
               </span>
-              <span className="drawer-row-title">Settings</span>
+              <span className="drawer-row-title">{t('drawer.settings')}</span>
             </button>
           </div>
         </>
       ) : (
         <div className="drawer-guest">
-          <p className="drawer-guest-text">Sign in to see your listings and messages.</p>
+          <p className="drawer-guest-text">{t('drawer.guest')}</p>
           <button type="button" className="btn primary drawer-signin" onClick={onSignIn}>
-            Sign in
+            {t('drawer.signIn')}
           </button>
         </div>
       )}

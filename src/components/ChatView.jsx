@@ -8,23 +8,25 @@ import {
   YoutubeIcon,
   PinIcon,
 } from '../icons.jsx'
+import { useI18n } from '../i18n.jsx'
 import { newId, nowTime } from '../utils.js'
 
 const LIVE_LABEL = {
-  live: 'Live',
-  connecting: 'Connecting…',
-  reconnecting: 'Reconnecting…',
+  live: 'chat.live',
+  connecting: 'chat.connecting',
+  reconnecting: 'chat.reconnecting',
 }
 
 const ATTACH_OPTIONS = [
-  { kind: 'image', label: 'Image', Icon: ImageIcon },
-  { kind: 'youtube', label: 'YouTube video', Icon: YoutubeIcon },
-  { kind: 'gps', label: 'GPS location', Icon: PinIcon },
+  { kind: 'image', labelKey: 'chat.image', Icon: ImageIcon },
+  { kind: 'youtube', labelKey: 'chat.youtube', Icon: YoutubeIcon },
+  { kind: 'gps', labelKey: 'chat.gps', Icon: PinIcon },
 ]
 
 const ATTACH_ICON = { image: ImageIcon, youtube: YoutubeIcon, gps: PinIcon }
 
 export default function ChatView({ chat, onSend, liveStatus = 'connecting' }) {
+  const { t } = useI18n()
   const [draft, setDraft] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
   const pickerAreaRef = useRef(null) // DOM ref: paperclip + popover wrapper
@@ -66,53 +68,61 @@ export default function ChatView({ chat, onSend, liveStatus = 'connecting' }) {
     onSend(chat.id, {
       id: newId('msg'),
       from: 'sent',
-      attachment: { kind: option.kind, label: option.label },
+      attachment: { kind: option.kind, labelKey: option.labelKey },
       time: nowTime(),
     })
     setPickerOpen(false)
   }
 
   return (
-    <section className="chat-view" aria-label={`Chat: ${chat.title}`}>
+    <section className="chat-view" aria-label={t('chat.aria', { title: chat.title })}>
       <header className="chat-head">
         <span className="avatar" aria-hidden="true">
           <UserIcon size={20} />
         </span>
         <div>
-          <div className="chat-head-text">Chatting with {chat.partnerName || 'the other user'}</div>
+          <div className="chat-head-text">
+            {t('chat.with', { name: chat.partnerName || t('chat.otherUser') })}
+          </div>
           <div className="chat-head-sub">
             {chat.title}
             <span className={`chat-live ${liveStatus}`} role="status">
               <span className="chat-live-dot" aria-hidden="true" />
-              {LIVE_LABEL[liveStatus] || liveStatus}
+              {LIVE_LABEL[liveStatus] ? t(LIVE_LABEL[liveStatus]) : liveStatus}
             </span>
           </div>
         </div>
       </header>
 
-      <div className="chat-scroll scrollable" role="log" aria-label="Messages" ref={scrollRef}>
+      <div className="chat-scroll scrollable" role="log" aria-label={t('chat.messagesAria')} ref={scrollRef}>
         {chat.messages.map((m) => (
           <MessageBubble key={m.id} message={m} />
         ))}
       </div>
 
       <footer className="chat-input-row">
-        <div className="attach-wrap" role="group" aria-label="Attach" ref={pickerAreaRef}>
+        <div className="attach-wrap" role="group" aria-label={t('chat.attach')} ref={pickerAreaRef}>
           <button
             type="button"
             className="icon-btn"
-            aria-label="Attach file"
+            aria-label={t('chat.attachFile')}
             aria-expanded={pickerOpen}
             onClick={() => setPickerOpen((o) => !o)}
           >
             <PaperclipIcon />
           </button>
           {pickerOpen && (
-            <div className="picker" role="menu" aria-label="Attachment type">
-              {ATTACH_OPTIONS.map(({ kind, label, Icon }) => (
-                <button key={kind} type="button" className="picker-item" role="menuitem" onClick={() => attach({ kind, label })}>
+            <div className="picker" role="menu" aria-label={t('chat.attachmentType')}>
+              {ATTACH_OPTIONS.map(({ kind, labelKey, Icon }) => (
+                <button
+                  key={kind}
+                  type="button"
+                  className="picker-item"
+                  role="menuitem"
+                  onClick={() => attach({ kind, labelKey })}
+                >
                   <Icon size={18} />
-                  <span>{label}</span>
+                  <span>{t(labelKey)}</span>
                 </button>
               ))}
             </div>
@@ -122,7 +132,7 @@ export default function ChatView({ chat, onSend, liveStatus = 'connecting' }) {
         <input
           className="chat-input"
           type="text"
-          placeholder="Type a message…"
+          placeholder={t('chat.placeholder')}
           maxLength={225}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -132,10 +142,16 @@ export default function ChatView({ chat, onSend, liveStatus = 'connecting' }) {
               sendText()
             }
           }}
-          aria-label="Message text"
+          aria-label={t('chat.messageText')}
         />
 
-        <button type="button" className="send-btn" aria-label="Send message" onClick={sendText} disabled={!draft.trim()}>
+        <button
+          type="button"
+          className="send-btn"
+          aria-label={t('chat.send')}
+          onClick={sendText}
+          disabled={!draft.trim()}
+        >
           <SendIcon size={18} />
         </button>
       </footer>
@@ -156,11 +172,13 @@ function MessageBubble({ message }) {
 }
 
 function AttachmentBubble({ attachment }) {
+  const { t } = useI18n()
   const Icon = ATTACH_ICON[attachment.kind] || ImageIcon
+  const label = attachment.labelKey ? t(attachment.labelKey) : attachment.label
   return (
     <span className="attachment">
       <Icon size={16} />
-      <span>{attachment.label} — placeholder</span>
+      <span>{t('chat.attachmentPlaceholder', { label })}</span>
     </span>
   )
 }

@@ -1,6 +1,7 @@
 // Messages modal: inbox items (one per chat thread) -> thread view, with back navigation.
 import { useState } from 'react'
 import { ChevronLeftIcon, TagIcon, XIcon } from '../icons.jsx'
+import { useI18n } from '../i18n.jsx'
 import ChatView from './ChatView.jsx'
 
 export default function MessagesModal({
@@ -12,6 +13,7 @@ export default function MessagesModal({
   liveStatus,
   onClose,
 }) {
+  const { t } = useI18n()
   const [activeChatId, setActiveChatId] = useState(null)
   const activeChat = (chats ?? []).find((c) => c.id === activeChatId) || null
   const chatById = new Map((chats ?? []).map((chat) => [chat.id, chat]))
@@ -35,22 +37,22 @@ export default function MessagesModal({
 
   return (
     <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) close() }}>
-      <div className="modal-card messages" role="dialog" aria-modal="true" aria-label="Messages">
+      <div className="modal-card messages" role="dialog" aria-modal="true" aria-label={t('messages.aria')}>
         <header className={activeChat ? 'modal-head messages-head messages-head-thread' : 'modal-head messages-head'}>
           {activeChat ? (
             <div className="messages-head-left">
-              <button type="button" className="icon-btn" aria-label="Back to inbox" onClick={backToInbox}>
+              <button type="button" className="icon-btn" aria-label={t('messages.back')} onClick={backToInbox}>
                 <ChevronLeftIcon size={22} />
               </button>
-              <h2>Messages</h2>
+              <h2>{t('messages.title')}</h2>
             </div>
           ) : (
             <>
               <span aria-hidden="true" />
-              <h2>Messages</h2>
+              <h2>{t('messages.title')}</h2>
             </>
           )}
-          <button type="button" className="icon-btn" aria-label="Close" onClick={close}>
+          <button type="button" className="icon-btn" aria-label={t('common.close')} onClick={close}>
             <XIcon />
           </button>
         </header>
@@ -62,9 +64,9 @@ export default function MessagesModal({
         ) : (
           <div className="messages-panel slide-in-left" key="list">
             {items.length === 0 ? (
-              <p className="messages-empty">No conversations yet.</p>
+              <p className="messages-empty">{t('messages.empty')}</p>
             ) : (
-              <ul className="messages-list scrollable" aria-label="Inbox">
+              <ul className="messages-list scrollable" aria-label={t('messages.inbox')}>
                 {items.map((item) => {
                   const chat = chatById.get(item.chatId)
                   const unreadCount = chat ? chat.unread : item.hasUnread ? 1 : 0
@@ -89,7 +91,7 @@ export default function MessagesModal({
                         {unreadCount > 0 && (
                           <span
                             className="badge"
-                            aria-label={`${unreadCount} unread`}
+                            aria-label={t('drawer.unread', { count: unreadCount })}
                             aria-live="polite"
                           >
                             {unreadCount > 99 ? '99+' : unreadCount}

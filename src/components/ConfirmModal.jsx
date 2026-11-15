@@ -1,16 +1,18 @@
 // Confirmation dialog for destructive actions (for example deleting a listing).
 import { AlertIcon, XIcon } from '../icons.jsx'
+import { useI18n } from '../i18n.jsx'
 
 export default function ConfirmModal({
   title,
   message,
   detail,
-  confirmLabel = 'Yes',
-  busyLabel = 'Working…',
+  confirmLabel,
+  busyLabel,
   busy = false,
   onConfirm,
   onClose,
 }) {
+  const { t } = useI18n()
   return (
     <div
       className="modal-overlay"
@@ -21,7 +23,7 @@ export default function ConfirmModal({
       <div className="modal-card" role="dialog" aria-modal="true" aria-label={title}>
         <header className="modal-head">
           <h2>{title}</h2>
-          <button type="button" className="icon-btn" aria-label="Close" onClick={onClose} disabled={busy}>
+          <button type="button" className="icon-btn" aria-label={t('common.close')} onClick={onClose} disabled={busy}>
             <XIcon />
           </button>
         </header>
@@ -36,7 +38,7 @@ export default function ConfirmModal({
 
         <footer className="modal-footer">
           <button type="button" className="btn secondary" onClick={onClose} disabled={busy}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button type="button" className="btn danger" onClick={onConfirm} disabled={busy}>
             {busy ? busyLabel : confirmLabel}

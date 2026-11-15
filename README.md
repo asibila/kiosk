@@ -34,6 +34,7 @@ VITE_API_BASE_URL=/backend npm run dev
 | --- | --- |
 | API client + resource loader | `src/api.js` |
 | Backend rows → sessions / chats / browse tree | `src/viewModel.js` |
+| UI translations + language provider | `src/i18n.jsx` |
 | STATE (drawer, selection, answers, messages, modals) | `src/App.jsx` |
 | ICONS (inline SVG string → components) | `src/icons.jsx` |
 | RENDER functions (components) | `src/components/*.jsx` |
@@ -45,7 +46,8 @@ VITE_API_BASE_URL=/backend npm run dev
 | Backend resource | UI use |
 | --- | --- |
 | `users` | Profile modal (first user is the signed-in user) |
-| `categories` + `descriptions` | Drawer sessions, browse tree |
+| `categories` + `descriptions` | Drawer sessions, browse tree (translated per selected language) |
+| `languages` | Codes/names for the topbar EN/HR switcher |
 | `facet-schemas` + `facet-value-options` | Interview questions and answer chips |
 | `facet-value-selections` | Saved answers (on the category's first listing) |
 | `chat-threads` + `chat-messages` | Chat view and the Messages modal |
@@ -62,9 +64,15 @@ VITE_API_BASE_URL=/backend npm run dev
   the main area differs.
 - **Home** - `/` redirects straight to `/search`; `/login` renders the log-in form
   (`src/components/Login.jsx`) and, after a successful sign-in, returns to `/search`.
-- **Top bar** - centered title; hamburger; profile icon and theme toggle (moon/sun)
-  on the right. Create-new-listing, Messages and Settings live at the bottom of the
-  drawer.
+- **Top bar** - centered title (a link back to `/search`); hamburger; **EN / HR** language switch; profile icon
+  and theme toggle (moon/sun) on the right. Create-new-listing, Messages and
+  Settings live at the bottom of the drawer.
+- **Language** - the topbar switch changes the interface and every backend
+  description (categories, facet questions and options) between English and
+  Croatian. English is the default; the choice is remembered in `localStorage`
+  (`kiosk-language`) and applied to `<html lang>`. Descriptions are fetched with
+  both translations (`{ en, hr }`) from `/descriptions`, so switching does not
+  lose the interview answers currently being edited.
 - **Search screen** (`/search`) - three centred rows: "Search kiosk", a search box
   with listing-title autocomplete (filtered by the selected category, direction and
   facets), and a row with mutually exclusive Buy/Sell chips, a category button and

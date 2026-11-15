@@ -1,5 +1,6 @@
 // Map the backend's normalized CRUD rows onto the UI's session/chat/browse model.
 // Backend reference: ../backend/API_ROUTES.md
+import { pluralKey, translate } from './i18n.jsx'
 
 const byId = (rows) => new Map(rows.map((row) => [row.id, row]))
 
@@ -26,9 +27,24 @@ function thumbForCategory(title) {
   return 'tag'
 }
 
-const orientationLabel = (orientation) => (orientation === 'buy' ? 'Wanted' : 'For sale')
+const orientationLabel = (orientation, t) =>
+  t(orientation === 'buy' ? 'direction.buy' : 'direction.sell')
 
-export function buildViewModel(raw, { userId } = {}) {
+function descriptionTextFor(description, language) {
+  if (!description) return ''
+  if (description.translations) {
+    return (
+      description.translations[language] ??
+      description.translations.en ??
+      Object.values(description.translations)[0] ??
+      ''
+    )
+  }
+  return description.text ?? ''
+}
+
+export function buildViewModel(raw, { userId, language = 'en' } = {}) {
+  const t = (key, vars) => translate(language, key, vars)
   const users = raw.users ?? []
   const descriptions = raw.descriptions ?? []
   const categories = raw.categories ?? []
@@ -60,7 +76,7 @@ export function buildViewModel(raw, { userId } = {}) {
   }
 
   const descriptionText = (descriptionId, fallback = '') =>
-    descriptionsById.get(descriptionId)?.text || fallback
+    descriptionTextFor(descriptionsById.get(descriptionId), language) || fallback
   const categoryTitle = (categoryId) => {
     const category = categoriesById.get(categoryId)
     return category ? descriptionText(category.descriptionId, `Category ${category.id}`) : `Category ${categoryId}`
@@ -78,7 +94,7 @@ export function buildViewModel(raw, { userId } = {}) {
       .filter((selection) => selection.listingId === listing.id)
       .map((selection) => optionText(optionsById.get(selection.facetValueOptionId)))
       .filter(Boolean)
-    return [orientationLabel(listing.orientation), ...selected].join(' · ')
+    return [orientationLabel(listing.orientation, t), ...selected].join(' · ')
   }
 
   // Only threads in the current user's inbox appear in Messages.
@@ -162,15 +178,18 @@ export function buildViewModel(raw, { userId } = {}) {
       listingId: listingsByCategory.get(category.id)?.id ?? null,
       questions: facetSchemas
         .filter((schema) => schema.categoryId === category.id)
-        .map((schema, index) => ({
-          id: String(schema.id),
-          priority: index + 1,
-          text: descriptionText(schema.descriptionId, schema.name),
-          hint: `Choose ${schema.name}.`,
-          options: facetOptions
-            .filter((option) => option.schemaId === schema.id)
-            .map((option) => ({ id: String(option.id), text: optionText(option) })),
-        })),
+        .map((schema, index) => {
+          const text = descriptionText(schema.descriptionId, schema.name)
+          return {
+            id: String(schema.id),
+            priority: index + 1,
+            text,
+            hint: t('interview.choose'),
+            options: facetOptions
+              .filter((option) => option.schemaId === schema.id)
+              .map((option) => ({ id: String(option.id), text: optionText(option) })),
+          }
+        }),
     }
   })
 
@@ -212,13 +231,17 @@ export function buildViewModel(raw, { userId } = {}) {
     const childCount = categories.filter((child) => child.parentCategoryId === category.id).length
     const listingCount = listings.filter((listing) => listing.categoryId === category.id).length
     const parts = []
-    if (childCount) parts.push(`${childCount} subcategor${childCount === 1 ? 'y' : 'ies'}`)
-    if (listingCount) parts.push(`${listingCount} listing${listingCount === 1 ? '' : 's'}`)
+    if (childCount) {
+      parts.push(t(pluralKey(childCount, 'browse.subcategory'), { count: childCount }))
+    }
+    if (listingCount) {
+      parts.push(t(pluralKey(listingCount, 'browse.listing'), { count: listingCount }))
+    }
     return {
       type: 'category',
       id: String(category.id),
       title: categoryTitle(category.id),
-      desc: parts.join(' · ') || 'Category',
+      desc: parts.join(' · ') || t('browse.category'),
       thumb: thumbForCategory(categoryTitle(category.id)),
     }
   }
@@ -242,7 +265,7 @@ export function buildViewModel(raw, { userId } = {}) {
       chain.unshift(categoryTitle(current.id))
       current = current.parentCategoryId != null ? categoriesById.get(current.parentCategoryId) : null
     }
-    return ['Home', ...chain]
+    return [t('browse.home'), ...chain]
   }
 
   const browseData = {}
@@ -256,12 +279,14 @@ export function buildViewModel(raw, { userId } = {}) {
     }
   }
   browseData.root = {
-    path: ['Home'],
+    path: [t('browse.home')],
     items: categories.filter((category) => category.parentCategoryId == null).map(categoryItem),
   }
 
   return {
     user: currentUser,
+    languages: raw.languages ?? [],
+    language,
     sessions,
     chats,
     inbox,

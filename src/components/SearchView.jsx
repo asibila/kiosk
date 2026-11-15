@@ -2,6 +2,7 @@
 // a category picker (the Browse modal) and an "All facets" modal on one row.
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronDownIcon, LayersIcon, SearchIcon } from '../icons.jsx'
+import { useI18n } from '../i18n.jsx'
 import FacetsModal from './FacetsModal.jsx'
 
 export default function SearchView({
@@ -11,6 +12,7 @@ export default function SearchView({
   categoryId = '',
   onOpenBrowse,
 }) {
+  const { t } = useI18n()
   const [query, setQuery] = useState('')
   const [direction, setDirection] = useState(null) // 'buy' | 'sell' | null
   const [open, setOpen] = useState(false)
@@ -24,7 +26,7 @@ export default function SearchView({
 
   const categoryLabel =
     categories.find((category) => String(category.categoryId) === String(categoryId))?.title ??
-    'All categories'
+    t('search.allCategories')
 
   // Facets belong to the selected category; with no category selected the modal
   // shows every category's interview questions.
@@ -82,9 +84,9 @@ export default function SearchView({
   const facetCount = Object.keys(facetAnswers).length
 
   return (
-    <section className="search-page" aria-label="Search kiosk">
+    <section className="search-page" aria-label={t('search.aria')}>
       <div className="search-block">
-        <h2 className="search-title">Search kiosk</h2>
+        <h2 className="search-title">{t('search.title')}</h2>
 
         <div className="search-box-wrap">
           <div className="search-box">
@@ -92,8 +94,8 @@ export default function SearchView({
             <input
               type="text"
               className="search-input"
-              placeholder="Search listings…"
-              aria-label="Search listings"
+              placeholder={t('search.placeholder')}
+              aria-label={t('search.listingsAria')}
               role="combobox"
               aria-autocomplete="list"
               aria-expanded={open && suggestions.length > 0}
@@ -139,14 +141,14 @@ export default function SearchView({
         </div>
 
         <div className="search-controls">
-          <div className="action-chips" role="group" aria-label="Listing direction">
+          <div className="action-chips" role="group" aria-label={t('interview.directionAria')}>
             <button
               type="button"
               className={direction === 'buy' ? 'chip selected' : 'chip'}
               aria-pressed={direction === 'buy'}
               onClick={() => toggleDirection('buy')}
             >
-              Buy
+              {t('direction.buyAction')}
             </button>
             <button
               type="button"
@@ -154,7 +156,7 @@ export default function SearchView({
               aria-pressed={direction === 'sell'}
               onClick={() => toggleDirection('sell')}
             >
-              Sell
+              {t('direction.sellAction')}
             </button>
           </div>
 
@@ -162,7 +164,7 @@ export default function SearchView({
             type="button"
             className="search-category"
             aria-haspopup="dialog"
-            aria-label={`Category: ${categoryLabel}. Choose a category`}
+            aria-label={t('search.categoryAria', { category: categoryLabel })}
             onClick={onOpenBrowse}
           >
             <span>{categoryLabel}</span>
@@ -176,7 +178,10 @@ export default function SearchView({
             onClick={() => setFacetsOpen(true)}
           >
             <LayersIcon size={14} />
-            <span>Filter{facetCount > 0 ? ` (${facetCount})` : ''}</span>
+            <span>
+              {t('search.filter')}
+              {facetCount > 0 ? ` (${facetCount})` : ''}
+            </span>
           </button>
         </div>
       </div>

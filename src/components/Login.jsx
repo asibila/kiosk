@@ -1,6 +1,7 @@
 // Login screen: email + password sign-in (full screen).
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
+import { useI18n } from '../i18n.jsx'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/+$/, '')
 
@@ -10,6 +11,7 @@ export default function Login() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const navigate = useNavigate()
+  const { t } = useI18n()
 
   async function onSubmit(event) {
     event.preventDefault()
@@ -24,7 +26,7 @@ export default function Login() {
       })
 
       if (!res.ok) {
-        let message = 'Invalid email or password.'
+        let message = t('login.invalid')
         try {
           const body = await res.json()
           if (body?.message) message = Array.isArray(body.message) ? body.message[0] : body.message
@@ -42,41 +44,41 @@ export default function Login() {
       }
       navigate('/search', { state: { userId: data.userId } })
     } catch (err) {
-      setError(err.message || 'Sign in failed.')
+      setError(err.message || t('login.failed'))
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <section className="home-screen" aria-label="Log in">
-      <h1>Kiosk</h1>
+    <section className="home-screen" aria-label={t('login.aria')}>
+      <h1>{t('login.title')}</h1>
       <form className="home-form" onSubmit={onSubmit}>
-        <label htmlFor="login-email">Email</label>
+        <label htmlFor="login-email">{t('login.email')}</label>
         <input
           id="login-email"
           className="chat-input"
           type="email"
           autoComplete="email"
-          placeholder="Email"
+          placeholder={t('login.email')}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
         />
-        <label htmlFor="login-password">Password</label>
+        <label htmlFor="login-password">{t('login.password')}</label>
         <input
           id="login-password"
           className="chat-input"
           type="password"
           autoComplete="current-password"
-          placeholder="Password"
+          placeholder={t('login.password')}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
         />
         {error ? <p className="login-error">{error}</p> : null}
         <button type="submit" className="btn primary" disabled={busy}>
-          {busy ? 'Signing in…' : 'Log in'}
+          {busy ? t('login.signingIn') : t('login.signin')}
         </button>
       </form>
     </section>

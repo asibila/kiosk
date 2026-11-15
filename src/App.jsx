@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { api, CHAT_EVENTS_URL, fetchKioskData, mediaUrl } from './api.js'
 import { buildViewModel, formatTime } from './viewModel.js'
+import { LANGUAGES, LanguageProvider, useI18n } from './i18n.jsx'
 import { AlertIcon, LayersIcon, XIcon } from './icons.jsx'
 import TopBar from './components/TopBar.jsx'
 import Drawer from './components/Drawer.jsx'
@@ -21,25 +22,19 @@ import EditListingView from './components/EditListingView.jsx'
 import PreviewListingView from './components/PreviewListingView.jsx'
 import SearchView from './components/SearchView.jsx'
 
-const MODAL_TITLES = { settings: 'Settings', profile: 'Profile' }
-const SETTINGS_BODY =
-  'Appearance, notifications and privacy controls live here. Nothing is wired up yet — this panel is a placeholder.'
+const MODAL_TITLES = { settings: 'settings.title', profile: 'profile.title' }
 
 const THEME_KEY = 'kiosk-theme'
 const LOGGED_IN_USER_ID_KEY = 'kiosk-user-id'
 
-const DIRECTION_LABEL = { buy: 'Wanted', sell: 'For sale' }
-
 /** Replace the leading direction segment of a drawer listing description. */
-function withOrientationLabel(desc, orientation) {
-  const label = DIRECTION_LABEL[orientation] ?? DIRECTION_LABEL.sell
+function withOrientationLabel(desc, orientation, t) {
+  const label = t(orientation === 'buy' ? 'direction.buy' : 'direction.sell')
   const parts = String(desc ?? '').split(' · ')
   if (parts.length === 1 && parts[0] === '') return label
   parts[0] = label
   return parts.join(' · ')
 }
-
-const EMPTY_BROWSE_DATA = { root: { path: ['Home'], items: [] } }
 
 function getInitialTheme() {
   try {
@@ -64,6 +59,7 @@ function getLoggedInUserId() {
 function KioskApp() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { language, t } = useI18n()
   // The same shell (topbar, drawer, modals) hosts both the listings screen and
   // the standalone /search screen; only the main area differs.
   const isSearchRoute = location.pathname === '/search'
@@ -80,10 +76,13 @@ function KioskApp() {
   const [loadError, setLoadError] = useState('')
   const [reloadToken, setReloadToken] = useState(0)
   const [user, setUser] = useState(null)
+  const [languages, setLanguages] = useState(LANGUAGES)
   const [sessions, setSessions] = useState([])
   const [chats, setChats] = useState([])
   const [inbox, setInbox] = useState([])
-  const [browseData, setBrowseData] = useState(EMPTY_BROWSE_DATA)
+  const [browseData, setBrowseData] = useState(() => ({
+    root: { path: [t('browse.home')], items: [] },
+  }))
   const [answers, setAnswers] = useState({}) // facet schema id -> facet value option id
   const [selections, setSelections] = useState([]) // raw facet-value-selections rows
   const [optionSchema, setOptionSchema] = useState({}) // option id -> schema id
@@ -113,6 +112,10 @@ function KioskApp() {
   const chatsRef = useRef([])
   const inboxRef = useRef([])
   const myListingsRef = useRef([])
+  // Distinguishes a real data reload from a language-only rebuild, so switching
+  // language does not discard the interview answers being edited.
+  const loadKeyRef = useRef(null)
+  const initializedRef = useRef(false)
   selectedChatIdRef.current = selectedChatId
   chatsRef.current = chats
   inboxRef.current = inbox
@@ -132,24 +135,34 @@ function KioskApp() {
   // Load every resource the UI needs, then map it onto the session/chat model.
   useEffect(() => {
     let cancelled = false
-    setDataStatus('loading')
-    setLoadError('')
+    const loadKey = `${reloadToken}|${loggedInUserId}`
+    const dataChanged = !initializedRef.current || loadKeyRef.current !== loadKey
+    loadKeyRef.current = loadKey
+
+    if (dataChanged) {
+      setDataStatus('loading')
+      setLoadError('')
+    }
 
     fetchKioskData()
       .then((raw) => {
         if (cancelled) return
-        const view = buildViewModel(raw, { userId: loggedInUserId })
+        const view = buildViewModel(raw, { userId: loggedInUserId, language })
         setUser(view.user)
+        setLanguages(view.languages?.length ? view.languages : LANGUAGES)
         setSessions(view.sessions)
         setChats(view.chats)
         setInbox(view.inbox ?? [])
         setMyListings(view.myListings)
         setBrowseData(view.browseData)
         setListingImages(view.listingImages ?? [])
-        setAnswers(view.answers)
-        setSelections(view.selections)
-        setOptionSchema(view.optionSchema)
-        setCategoryListing(view.categoryListing)
+        if (dataChanged) {
+          setAnswers(view.answers)
+          setSelections(view.selections)
+          setOptionSchema(view.optionSchema)
+          setCategoryListing(view.categoryListing)
+          initializedRef.current = true
+        }
         setDataStatus('ready')
       })
       .catch((err) => {
@@ -161,7 +174,7 @@ function KioskApp() {
     return () => {
       cancelled = true
     }
-  }, [reloadToken, loggedInUserId])
+  }, [reloadToken, loggedInUserId, language])
 
   // Live chat: consume the backend's SSE stream. New messages for a known
   // thread are appended in place; messages for an unseen thread trigger a full
@@ -370,7 +383,7 @@ function KioskApp() {
       }
       setListingImages((prev) => [...prev, ...uploaded])
     } catch (err) {
-      setNotice(`Image upload failed: ${err.message}`)
+      setNotice(t('notice.imageUploadFailed', { message: err.message }))
     } finally {
       setUploadingImages(false)
     }
@@ -396,7 +409,7 @@ function KioskApp() {
     try {
       await api.remove('listing-images', imageId, user?.id)
     } catch (err) {
-      setNotice(`Could not delete image: ${err.message}`)
+      setNotice(t('notice.imageDeleteFailed', { message: err.message }))
       return
     }
 
@@ -447,7 +460,7 @@ function KioskApp() {
         ),
       )
     } catch (err) {
-      setNotice(`Could not set primary image: ${err.message}`)
+      setNotice(t('notice.primaryFailed', { message: err.message }))
     }
   }
 
@@ -543,7 +556,11 @@ function KioskApp() {
       })
     })
     const title =
-      direction === 'buy' ? 'Buy listings' : direction === 'sell' ? 'Sell listings' : 'Search listings'
+      direction === 'buy'
+        ? t('listings.sellTitle')
+        : direction === 'sell'
+          ? t('listings.buyTitle')
+          : t('listings.searchTitle')
     setListingsModal({ title, listings })
   }
 
@@ -565,11 +582,11 @@ function KioskApp() {
         user.id,
       )
 
-      setNotice(`Conversation started for ${listing.title}.`)
+      setNotice(t('notice.conversationStarted', { title: listing.title }))
       setListingsModal(null)
       setReloadToken((n) => n + 1)
     } catch (err) {
-      setNotice(`Could not start conversation: ${err.message}`)
+      setNotice(t('notice.conversationFailed', { message: err.message }))
     } finally {
       setContactingListingId(null)
     }
@@ -601,7 +618,7 @@ function KioskApp() {
             ? {
                 ...listing,
                 orientation: updated.orientation,
-                desc: withOrientationLabel(listing.desc, updated.orientation),
+                desc: withOrientationLabel(listing.desc, updated.orientation, t),
               }
             : listing,
         ),
@@ -622,7 +639,7 @@ function KioskApp() {
       })
     } catch (err) {
       setListingDirection(previous)
-      setNotice(`Direction not saved: ${err.message}`)
+      setNotice(t('notice.directionFailed', { message: err.message }))
     }
   }
 
@@ -716,7 +733,10 @@ function KioskApp() {
         categoryId: selectedSession.categoryId,
         orientation,
         title: `${selectedSession.title} #${listingId}`,
-        desc: [orientation === 'buy' ? 'Wanted' : 'For sale', ...answerTexts].join(' · '),
+        desc: [
+          t(orientation === 'buy' ? 'direction.buy' : 'direction.sell'),
+          ...answerTexts,
+        ].join(' · '),
         answers: listingAnswers,
       }
 
@@ -737,7 +757,7 @@ function KioskApp() {
         try {
           await uploadDraftImages(listingId)
         } catch (err) {
-          setNotice(`Listing saved, but image upload failed: ${err.message}`)
+          setNotice(t('notice.publishImageFailed', { message: err.message }))
         }
       }
 
@@ -746,7 +766,7 @@ function KioskApp() {
       startNewListing()
       setModal('report')
     } catch (err) {
-      setNotice(`Publish failed: ${err.message}`)
+      setNotice(t('notice.publishFailed', { message: err.message }))
     } finally {
       setPublishing(false)
     }
@@ -817,9 +837,9 @@ function KioskApp() {
         setSelectedListingId(null)
       }
       setPendingDelete(null)
-      setNotice(`Deleted ${listing.title}.`)
+      setNotice(t('notice.deleted', { title: listing.title }))
     } catch (err) {
-      setNotice(`Delete failed: ${err.message}`)
+      setNotice(t('notice.deleteFailed', { message: err.message }))
     } finally {
       setDeleting(false)
     }
@@ -902,7 +922,7 @@ function KioskApp() {
     setAnswers((prev) => ({ ...prev, [questionId]: optionId }))
 
     if (!listingId) {
-      setNotice('This category has no listing yet, so the answer is only kept in this browser.')
+      setNotice(t('notice.noListing'))
       return
     }
 
@@ -938,7 +958,7 @@ function KioskApp() {
         else next[questionId] = previous
         return next
       })
-      setNotice(`Answer not saved: ${err.message}`)
+      setNotice(t('notice.answerFailed', { message: err.message }))
     } finally {
       setSavingQuestionId(null)
     }
@@ -987,7 +1007,7 @@ function KioskApp() {
         }),
       )
     } catch (err) {
-      setNotice(`Message not saved to the backend: ${err.message}`)
+      setNotice(t('notice.messageFailed', { message: err.message }))
     }
   }
 
@@ -1059,14 +1079,14 @@ function KioskApp() {
   // continues to the wizard's edit step.
   const interviewActions = (
     <div className="action-row">
-      <div className="action-chips" role="group" aria-label="Listing direction">
+      <div className="action-chips" role="group" aria-label={t('interview.directionAria')}>
         <button
           type="button"
           className={listingDirection === 'buy' ? 'chip selected' : 'chip'}
           aria-pressed={listingDirection === 'buy'}
           onClick={() => selectListingDirection('buy')}
         >
-          Buy
+          {t('direction.buyAction')}
         </button>
         <button
           type="button"
@@ -1074,7 +1094,7 @@ function KioskApp() {
           aria-pressed={listingDirection === 'sell'}
           onClick={() => selectListingDirection('sell')}
         >
-          Sell
+          {t('direction.sellAction')}
         </button>
       </div>
       <div className="action-buttons">
@@ -1083,9 +1103,9 @@ function KioskApp() {
           className="btn secondary"
           onClick={() => openListings(listingDirection)}
           disabled={listingDirection == null}
-          title={listingDirection == null ? 'Choose Buy or Sell first' : undefined}
+          title={listingDirection == null ? t('interview.chooseDirection') : undefined}
         >
-          Search
+          {t('interview.search')}
         </button>
         <button
           type="button"
@@ -1093,7 +1113,7 @@ function KioskApp() {
           onClick={() => setWizardStage('edit')}
           disabled={!canPublish || publishing || savingQuestionId != null}
         >
-          Next &gt;
+          {t('interview.next')}
         </button>
       </div>
     </div>
@@ -1103,11 +1123,11 @@ function KioskApp() {
   const editActions = (
     <div className="action-row">
       <button type="button" className="btn secondary" onClick={() => setWizardStage('interview')}>
-        &lt; Previous
+        {t('interview.previous')}
       </button>
       <div className="action-buttons">
         <button type="button" className="btn primary" onClick={() => setWizardStage('preview')}>
-          Next &gt;
+          {t('interview.next')}
         </button>
       </div>
     </div>
@@ -1118,7 +1138,7 @@ function KioskApp() {
   const previewActions = (
     <div className="action-row">
       <button type="button" className="btn secondary" onClick={() => setWizardStage('edit')}>
-        &lt; Previous
+        {t('interview.previous')}
       </button>
       <div className="action-buttons">
         <button
@@ -1127,7 +1147,7 @@ function KioskApp() {
           onClick={publish}
           disabled={publishing || listingDirection == null}
         >
-          {publishing ? 'Publishing…' : 'Publish'}
+          {publishing ? t('interview.publishing') : t('interview.publish')}
         </button>
       </div>
     </div>
@@ -1135,35 +1155,35 @@ function KioskApp() {
 
   const profileBody =
     dataStatus === 'loading' ? (
-      <p>Loading profile…</p>
+      <p>{t('profile.loading')}</p>
     ) : user ? (
       <div className="profile-details">
         <dl>
           <div>
-            <dt>Name</dt>
+            <dt>{t('profile.name')}</dt>
             <dd>{user.name}</dd>
           </div>
           <div>
-            <dt>Email</dt>
+            <dt>{t('profile.email')}</dt>
             <dd>{user.email}</dd>
           </div>
           <div>
-            <dt>Role</dt>
+            <dt>{t('profile.role')}</dt>
             <dd>{user.role}</dd>
           </div>
           <div>
-            <dt>Status</dt>
-            <dd>{user.isActive ? 'Active' : 'Inactive'}</dd>
+            <dt>{t('profile.status')}</dt>
+            <dd>{user.isActive ? t('profile.active') : t('profile.inactive')}</dd>
           </div>
           <div>
-            <dt>User ID</dt>
+            <dt>{t('profile.userId')}</dt>
             <dd>{user.id}</dd>
           </div>
         </dl>
-        <p className="profile-note">Loaded from the backend users table.</p>
+        <p className="profile-note">{t('profile.note')}</p>
       </div>
     ) : (
-      <p>The backend has no users yet.</p>
+      <p>{t('profile.noUsers')}</p>
     )
 
   return (
@@ -1173,6 +1193,7 @@ function KioskApp() {
         onOpenModal={openModal}
         theme={theme}
         onToggleTheme={toggleTheme}
+        languages={languages}
       />
 
       {notice && (
@@ -1182,7 +1203,7 @@ function KioskApp() {
           <button
             type="button"
             className="icon-btn notice-close"
-            aria-label="Dismiss notification"
+            aria-label={t('common.close')}
             onClick={() => setNotice('')}
           >
             <XIcon size={16} />
@@ -1282,19 +1303,19 @@ function KioskApp() {
       )}
       {modal && modal !== 'browse' && modal !== 'messages' && modal !== 'report' && (
         <SimpleModal
-          title={MODAL_TITLES[modal]}
-          body={modal === 'profile' ? profileBody : SETTINGS_BODY}
+          title={t(MODAL_TITLES[modal])}
+          body={modal === 'profile' ? profileBody : t('settings.body')}
           onClose={() => setModal(null)}
         />
       )}
 
       {modal === 'report' && (
         <SimpleModal
-          title="Listing created"
-          body={<p className="report-message">Listing created, thank you for using kiosk.</p>}
+          title={t('report.title')}
+          body={<p className="report-message">{t('report.body')}</p>}
           footer={
             <button type="button" className="btn primary" onClick={() => setModal(null)}>
-              Close
+              {t('common.close')}
             </button>
           }
           onClose={() => setModal(null)}
@@ -1303,11 +1324,11 @@ function KioskApp() {
 
       {pendingDelete && (
         <ConfirmModal
-          title="Delete listing"
-          message="Are you sure?"
-          detail={`${pendingDelete.title} will be permanently deleted.`}
-          confirmLabel="Yes"
-          busyLabel="Deleting…"
+          title={t('delete.title')}
+          message={t('delete.message')}
+          detail={t('delete.detail', { title: pendingDelete.title })}
+          confirmLabel={t('delete.confirm')}
+          busyLabel={t('delete.busy')}
           busy={deleting}
           onConfirm={confirmDeleteListing}
           onClose={() => {
@@ -1331,34 +1352,37 @@ function KioskApp() {
 }
 
 function LoadingPlaceholder() {
+  const { t } = useI18n()
   return (
     <div className="placeholder" aria-busy="true">
       <span className="placeholder-icon">
         <LayersIcon size={56} />
       </span>
-      <h2>Loading sessions…</h2>
-      <p>Fetching categories, listings and conversations from the backend.</p>
+      <h2>{t('loading.title')}</h2>
+      <p>{t('loading.body')}</p>
     </div>
   )
 }
 
 function ErrorPlaceholder({ message, onRetry }) {
+  const { t } = useI18n()
   return (
     <div className="placeholder">
       <span className="placeholder-icon error">
         <AlertIcon size={56} />
       </span>
-      <h2>Cannot load data</h2>
+      <h2>{t('error.title')}</h2>
       <p>{message}</p>
-      <p>Make sure the backend is running on http://localhost:3000.</p>
+      <p>{t('error.hint')}</p>
       <button type="button" className="btn primary" onClick={onRetry}>
-        Try again
+        {t('error.retry')}
       </button>
     </div>
   )
 }
 
 function EmptyPlaceholder({ hasSessions, onBrowse }) {
+  const { t } = useI18n()
   return (
     <div className="placeholder">
       <span className="placeholder-icon">
@@ -1366,10 +1390,10 @@ function EmptyPlaceholder({ hasSessions, onBrowse }) {
       </span>
       {hasSessions ? (
         <button type="button" className="btn primary" onClick={onBrowse}>
-          Browse
+          {t('empty.browse')}
         </button>
       ) : (
-        <p>The backend has no categories, so there is nothing to interview yet.</p>
+        <p>{t('empty.noCategories')}</p>
       )}
     </div>
   )
@@ -1377,14 +1401,16 @@ function EmptyPlaceholder({ hasSessions, onBrowse }) {
 
 export default function App() {
   return (
-    <div className="app">
-      <Routes>
-        <Route path="/" element={<Navigate to="/search" replace />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/app" element={<KioskApp />} />
-        <Route path="/search" element={<KioskApp />} />
-        <Route path="*" element={<Navigate to="/search" replace />} />
-      </Routes>
-    </div>
+    <LanguageProvider>
+      <div className="app">
+        <Routes>
+          <Route path="/" element={<Navigate to="/search" replace />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/app" element={<KioskApp />} />
+          <Route path="/search" element={<KioskApp />} />
+          <Route path="*" element={<Navigate to="/search" replace />} />
+        </Routes>
+      </div>
+    </LanguageProvider>
   )
 }

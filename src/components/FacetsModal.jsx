@@ -2,8 +2,10 @@
 // chips, used to refine the /search results. Answers stay local to the screen.
 import { useEffect } from 'react'
 import { XIcon } from '../icons.jsx'
+import { useI18n } from '../i18n.jsx'
 
 export default function FacetsModal({ sessions, answers, onToggle, onClose }) {
+  const { t } = useI18n()
   useEffect(() => {
     const onKey = (event) => {
       if (event.key === 'Escape') onClose()
@@ -21,16 +23,16 @@ export default function FacetsModal({ sessions, answers, onToggle, onClose }) {
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="modal-card wide" role="dialog" aria-modal="true" aria-label="Filter">
+      <div className="modal-card wide" role="dialog" aria-modal="true" aria-label={t('facets.aria')}>
         <header className="modal-head">
-          <h2>Filter</h2>
-          <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>
+          <h2>{t('facets.title')}</h2>
+          <button type="button" className="icon-btn" aria-label={t('common.close')} onClick={onClose}>
             <XIcon />
           </button>
         </header>
 
         {groups.length === 0 ? (
-          <p className="facets-empty">No facets for this category.</p>
+          <p className="facets-empty">{t('facets.empty')}</p>
         ) : (
           <div className="facets-list scrollable">
             {groups.map((session) => (
@@ -61,7 +63,7 @@ export default function FacetsModal({ sessions, answers, onToggle, onClose }) {
 
         <footer className="modal-footer">
           <button type="button" className="btn primary" onClick={onClose}>
-            Done
+            {t('facets.done')}
           </button>
         </footer>
       </div>

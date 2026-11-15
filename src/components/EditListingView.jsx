@@ -2,6 +2,7 @@
 // Existing listings upload immediately; a brand-new listing keeps the picks
 // locally (object URLs) and uploads them when Publish creates the listing.
 import { ImageIcon, StarIcon, TrashIcon } from '../icons.jsx'
+import { pluralKey, useI18n } from '../i18n.jsx'
 
 export default function EditListingView({
   session,
@@ -12,6 +13,7 @@ export default function EditListingView({
   uploading = false,
   actions,
 }) {
+  const { t } = useI18n()
   function handleFiles(event) {
     onAddImages(event.target.files)
     // Reset so picking the same file again still fires a change event.
@@ -19,21 +21,21 @@ export default function EditListingView({
   }
 
   return (
-    <section className="wizard-view" aria-label="Edit listing">
+    <section className="wizard-view" aria-label={t('wizard.editAria')}>
       <header className="wizard-head">
-        <span className="wizard-step">Step 2 of 3 · Edit</span>
+        <span className="wizard-step">{t('wizard.step2')}</span>
         <h2 className="wizard-title">{session.title}</h2>
       </header>
 
       <div className="wizard-scroll scrollable">
         <div className="field-label-row">
           <span className="field-label" id="listing-images-label">
-            Images
+            {t('wizard.images')}
           </span>
           <span className="field-hint">
             {images.length === 0
-              ? 'No images yet'
-              : `${images.length} image${images.length === 1 ? '' : 's'}`}
+              ? t('wizard.noImages')
+              : t(pluralKey(images.length, 'wizard.imageCount'), { count: images.length })}
           </span>
         </div>
 
@@ -46,13 +48,13 @@ export default function EditListingView({
               <img src={image.url} alt={image.name} />
 
               {image.isPrimary ? (
-                <span className="thumb-primary-badge">Primary</span>
+                <span className="thumb-primary-badge">{t('wizard.primary')}</span>
               ) : (
                 <button
                   type="button"
                   className="thumb-primary"
-                  aria-label="Make primary image"
-                  title="Make primary image"
+                  aria-label={t('wizard.makePrimary')}
+                  title={t('wizard.makePrimary')}
                   onClick={() => onSetPrimary(image.id)}
                 >
                   <StarIcon size={12} />
@@ -62,8 +64,8 @@ export default function EditListingView({
               <button
                 type="button"
                 className="thumb-remove"
-                aria-label={`Remove ${image.name}`}
-                title="Remove image"
+                aria-label={t('wizard.removeAria', { name: image.name })}
+                title={t('wizard.removeImage')}
                 onClick={() => onRemoveImage(image.id)}
               >
                 <TrashIcon size={12} />
@@ -73,7 +75,7 @@ export default function EditListingView({
 
           <label className="thumb-add" htmlFor="listing-images">
             <ImageIcon size={20} />
-            <span>{uploading ? 'Uploading…' : 'Add images'}</span>
+            <span>{uploading ? t('wizard.uploading') : t('wizard.addImages')}</span>
             <input
               id="listing-images"
               type="file"
@@ -85,9 +87,7 @@ export default function EditListingView({
           </label>
         </div>
 
-        <p className="field-hint">
-          The primary image is the thumbnail shown in search results.
-        </p>
+        <p className="field-hint">{t('wizard.primaryHint')}</p>
       </div>
 
       {actions ? (

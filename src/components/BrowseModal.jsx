@@ -1,8 +1,10 @@
 // Category browser modal: breadcrumbs + category list, footer with OK/Cancel.
 import { useMemo, useState } from 'react'
 import { ChevronRightIcon, XIcon, ThumbGlyph } from '../icons.jsx'
+import { useI18n } from '../i18n.jsx'
 
 export default function BrowseModal({ data, onClose, onPick, startId = 'root' }) {
+  const { t } = useI18n()
   const [currentId, setCurrentId] = useState(data[startId] ? startId : 'root')
 
   const node = data[currentId]
@@ -54,7 +56,7 @@ export default function BrowseModal({ data, onClose, onPick, startId = 'root' })
         <button
           type="button"
           className="nav-btn"
-          aria-label={`Open ${item.title}`}
+          aria-label={t('browse.open', { title: item.title })}
           onClick={(e) => {
             e.stopPropagation()
             navigate(item.id)
@@ -68,15 +70,15 @@ export default function BrowseModal({ data, onClose, onPick, startId = 'root' })
 
   return (
     <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal-card wide" role="dialog" aria-modal="true" aria-label="Browse marketplace">
+      <div className="modal-card wide" role="dialog" aria-modal="true" aria-label={t('browse.aria')}>
         <header className="modal-head">
-          <h2>Browse</h2>
-          <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>
+          <h2>{t('browse.title')}</h2>
+          <button type="button" className="icon-btn" aria-label={t('common.close')} onClick={onClose}>
             <XIcon />
           </button>
         </header>
 
-        <nav className="breadcrumb-bar" aria-label="Breadcrumb">
+        <nav className="breadcrumb-bar" aria-label={t('browse.breadcrumb')}>
           {node.path.map((segment, i) => {
             const isCurrent = i === node.path.length - 1
             return (
@@ -105,10 +107,10 @@ export default function BrowseModal({ data, onClose, onPick, startId = 'root' })
 
         <footer className="modal-footer">
           <button type="button" className="btn secondary" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button type="button" className="btn primary" onClick={pick}>
-            OK
+            {t('common.ok')}
           </button>
         </footer>
       </div>

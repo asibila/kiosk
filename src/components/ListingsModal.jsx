@@ -2,6 +2,7 @@
 // Each row has an envelope action that starts an inbox conversation; the action
 // is disabled for the signed-in user's own listings.
 import { EnvelopeIcon, XIcon, ThumbGlyph } from '../icons.jsx'
+import { useI18n } from '../i18n.jsx'
 import { mediaUrl } from '../api.js'
 
 export default function ListingsModal({
@@ -12,18 +13,19 @@ export default function ListingsModal({
   contactingId = null,
   currentUserId = null,
 }) {
+  const { t } = useI18n()
   return (
     <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal-card wide" role="dialog" aria-modal="true" aria-label={title}>
         <header className="modal-head">
           <h2>{title}</h2>
-          <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>
+          <button type="button" className="icon-btn" aria-label={t('common.close')} onClick={onClose}>
             <XIcon />
           </button>
         </header>
 
         {listings.length === 0 ? (
-          <p className="messages-empty">No listings match the current filters.</p>
+          <p className="messages-empty">{t('listings.empty')}</p>
         ) : (
           <ul className="browse-list scrollable">
             {listings.map((listing) => {
@@ -50,10 +52,10 @@ export default function ListingsModal({
                         className="icon-btn listing-contact"
                         aria-label={
                           owned
-                            ? `Your listing: ${listing.title}`
-                            : `Start conversation about ${listing.title}`
+                            ? t('listings.your', { title: listing.title })
+                            : t('listings.start', { title: listing.title })
                         }
-                        title={owned ? 'This is your listing' : 'Start conversation'}
+                        title={owned ? t('listings.yourTitle') : t('listings.startTitle')}
                         disabled={owned || contactingId === listing.id}
                         onClick={() => onContact(listing)}
                       >
