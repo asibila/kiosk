@@ -134,6 +134,9 @@ const STRINGS = {
     'browse.category': 'Category',
 
     'interview.choose': 'Choose one of the options.',
+    'interview.priceHint': 'Enter the asking price.',
+    'interview.yearHint': 'Enter the model year.',
+    'interview.saveAnswer': 'Save',
     'interview.next': 'Next >',
     'interview.creatingDraft': 'Creating draft…',
     'interview.previous': '< Previous',
@@ -387,6 +390,9 @@ const STRINGS = {
     'browse.category': 'Kategorija',
 
     'interview.choose': 'Odaberi jednu od opcija.',
+    'interview.priceHint': 'Upiši traženu cijenu.',
+    'interview.yearHint': 'Upiši godinu modela.',
+    'interview.saveAnswer': 'Spremi',
     'interview.next': 'Dalje >',
     'interview.creatingDraft': 'Stvaranje skice…',
     'interview.previous': '< Natrag',

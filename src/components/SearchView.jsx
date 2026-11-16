@@ -82,7 +82,13 @@ export default function SearchView({
     const seen = new Set()
     for (const session of categories) {
       for (const question of session.questions ?? []) {
-        if (!question.isGeneric || seen.has(question.id)) continue
+        if (
+          !question.isGeneric ||
+          question.kind === 'number' ||
+          seen.has(question.id)
+        ) {
+          continue
+        }
         seen.add(question.id)
         genericQuestions.push(question)
       }
@@ -105,6 +111,7 @@ export default function SearchView({
     for (const ancestor of chain) {
       const questions = (ancestor.questions ?? []).filter(
         (question) =>
+          question.kind !== 'number' &&
           !question.isGeneric &&
           String(question.categoryId) === String(ancestor.categoryId),
       )

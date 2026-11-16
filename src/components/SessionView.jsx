@@ -1,7 +1,60 @@
 // Interview session view: progress bar, question cards with wrapping chips,
-// and an action bar (buy/sell chips, search, publish) at the bottom.
+// numeric questions for price/year, and an action bar (buy/sell chips, search,
+// publish) at the bottom.
+import { useEffect, useState } from 'react'
 import { CheckIcon, SessionGlyph } from '../icons.jsx'
 import { useI18n } from '../i18n.jsx'
+
+function NumberQuestion({ question, value, onAnswer }) {
+  const { t } = useI18n()
+  const [draft, setDraft] = useState(value != null ? String(value) : '')
+
+  useEffect(() => {
+    setDraft(value != null ? String(value) : '')
+  }, [value])
+
+  function submit(event) {
+    event.preventDefault()
+    const trimmed = draft.trim()
+    if (trimmed === '') {
+      onAnswer(question.id, null)
+      return
+    }
+    const number = Number(trimmed)
+    if (Number.isFinite(number)) onAnswer(question.id, number)
+  }
+
+  return (
+    <form className="q-number-form" aria-label={question.text} onSubmit={submit}>
+      <input
+        className="q-number-input"
+        type="number"
+        inputMode={question.step === 0.01 ? 'decimal' : 'numeric'}
+        min={question.min ?? 0}
+        step={question.step ?? 1}
+        value={draft}
+        aria-label={question.text}
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      {question.unit && <span className="q-number-unit">{question.unit}</span>}
+      <button type="submit" className="btn secondary q-number-save">
+        {t('interview.saveAnswer')}
+      </button>
+      {value != null && (
+        <button
+          type="button"
+          className="btn secondary"
+          onClick={() => {
+            setDraft('')
+            onAnswer(question.id, null)
+          }}
+        >
+          {t('facet.rangeClear')}
+        </button>
+      )}
+    </form>
+  )
+}
 
 export default function SessionView({ session, answers, onAnswer, actions }) {
   const { t } = useI18n()
@@ -54,19 +107,23 @@ export default function SessionView({ session, answers, onAnswer, actions }) {
                   )}
                 </header>
                 <p className="q-hint">{q.hint}</p>
-                <div className="chips">
-                  {q.options.map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      className={chosen === option.id ? 'chip selected' : 'chip'}
-                      aria-pressed={chosen === option.id}
-                      onClick={() => onAnswer(q.id, option.id)}
-                    >
-                      {option.text}
-                    </button>
-                  ))}
-                </div>
+                {q.kind === 'number' ? (
+                  <NumberQuestion question={q} value={chosen} onAnswer={onAnswer} />
+                ) : (
+                  <div className="chips">
+                    {q.options.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        className={chosen === option.id ? 'chip selected' : 'chip'}
+                        aria-pressed={chosen === option.id}
+                        onClick={() => onAnswer(q.id, option.id)}
+                      >
+                        {option.text}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </article>
             )
           })

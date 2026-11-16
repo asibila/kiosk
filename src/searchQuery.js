@@ -170,8 +170,8 @@ export function categoryScope(categoryId, categories = []) {
 /**
  * Apply a structured query to a flat listing list. Category filters include
  * descendants, a buy search shows sell listings (and vice versa), value chips
- * are AND constraints, and numeric ranges are carried but not applied until
- * numeric facet values exist in the catalog.
+ * are AND constraints, and price/year ranges filter the matching Listing
+ * fields. Listings without the requested numeric field are excluded.
  */
 export function filterListings({
   listings = [],
@@ -185,10 +185,24 @@ export function filterListings({
   const wantedOrientation =
     direction === 'buy' ? 'sell' : direction === 'sell' ? 'buy' : null
   const valueIds = chips.filter(isValueChip).map((chip) => String(chip.valueId))
+  const rangeChips = chips.filter(isRangeChip)
 
   const rows = listings.filter((listing) => {
     if (scope && !scope.has(String(listing.categoryId))) return false
     if (wantedOrientation && listing.orientation !== wantedOrientation) return false
+
+    for (const chip of rangeChips) {
+      const value =
+        chip.facet === 'price'
+          ? listing.price
+          : chip.facet === 'year'
+            ? listing.year
+            : null
+      if (value == null) return false
+      if (chip.min != null && Number(value) < chip.min) return false
+      if (chip.max != null && Number(value) > chip.max) return false
+    }
+
     if (valueIds.length === 0) return true
 
     const owned = new Set(

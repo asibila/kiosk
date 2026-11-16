@@ -604,7 +604,7 @@ function KioskApp() {
 
       const relevant = Object.keys(answers ?? {}).filter((qid) => {
         const question = questionById[qid]
-        if (!question) return false
+        if (!question || question.kind === 'number') return false
         return question.isGeneric || categoryChain.has(String(question.categoryId))
       })
       return relevant.every((qid) => {
@@ -713,6 +713,9 @@ function KioskApp() {
   async function publish() {
     if (!selectedSession || !user || publishing || savingQuestionId != null) return
     const answered = selectedSession.questions.filter((q) => answers[q.id] != null)
+    const answeredFacets = answered.filter((q) => q.kind !== 'number')
+    const price = answers.price != null ? Number(answers.price) : null
+    const year = answers.year != null ? Number(answers.year) : null
 
     // Only a listing from the category currently open can be updated; another
     // category's selection is ignored (browse clears it, this is a safety net).
@@ -721,12 +724,13 @@ function KioskApp() {
     setPublishing(true)
     try {
       let listingId
+      let savedListing
       let orientation = listingDirection ?? 'sell'
       if (target) {
         // Keep the listing's category and owner; apply the chosen direction and
         // publish the draft.
         orientation = listingDirection ?? target.orientation
-        const updated = await api.update(
+        savedListing = await api.update(
           'listings',
           target.listingId,
           {
@@ -734,22 +738,26 @@ function KioskApp() {
             orientation,
             userId: user.id,
             isActive: true,
+            price,
+            year,
           },
           user.id,
         )
-        listingId = updated.id
+        listingId = savedListing.id
       } else {
-        const created = await api.create(
+        savedListing = await api.create(
           'listings',
           {
             categoryId: selectedSession.categoryId,
             orientation,
             userId: user.id,
             isActive: true,
+            price,
+            year,
           },
           user.id,
         )
-        listingId = created.id
+        listingId = savedListing.id
       }
 
       // Publishing always needs a title row for the current language; fall back
@@ -770,7 +778,7 @@ function KioskApp() {
       const existingForListing = selections.filter(
         (selection) => selection.listingId === listingId,
       )
-      for (const question of answered) {
+      for (const question of answeredFacets) {
         const optionId = Number(answers[question.id])
         const existing = existingForListing.find(
           (selection) => Number(optionSchema[selection.facetValueOptionId]) === Number(question.id),
@@ -797,10 +805,17 @@ function KioskApp() {
       setSelections(nextSelections)
 
       const answerTexts = answered
-        .map((question) => question.options.find((option) => option.id === answers[question.id])?.text)
+        .map((question) =>
+          question.kind === 'number'
+            ? `${question.text}: ${answers[question.id]}${question.unit ? ` ${question.unit}` : ''}`
+            : question.options.find((option) => option.id === answers[question.id])?.text,
+        )
         .filter(Boolean)
       const listingAnswers = Object.fromEntries(
-        answered.map((question) => [question.id, String(answers[question.id])]),
+        answered.map((question) => [
+          question.id,
+          question.kind === 'number' ? answers[question.id] : String(answers[question.id]),
+        ]),
       )
       const nextListing = {
         id: String(listingId),
@@ -809,6 +824,11 @@ function KioskApp() {
         categoryId: selectedSession.categoryId,
         orientation,
         isActive: true,
+        price,
+        year,
+        facetsCount: savedListing?.facetsCount,
+        facetsCountMax: selectedSession.facetsCountMax,
+        facetsCountMaxAnswerable: selectedSession.facetsCountMaxAnswerable,
         title: publishTitle || generatedTitle(selectedSession, listingId),
         titles: {
           ...titlesForListing(listingId),
@@ -1126,6 +1146,8 @@ function KioskApp() {
       setCreatingDraft(true)
       try {
         const orientation = listingDirection ?? 'sell'
+        const price = answers.price != null ? Number(answers.price) : null
+        const year = answers.year != null ? Number(answers.year) : null
         const created = await api.create(
           'listings',
           {
@@ -1133,6 +1155,8 @@ function KioskApp() {
             orientation,
             userId: user.id,
             isActive: false,
+            price,
+            year,
           },
           user.id,
         )
@@ -1157,6 +1181,7 @@ function KioskApp() {
         // Persist the answers chosen during the interview on the new draft.
         const createdSelections = []
         for (const question of selectedSession.questions ?? []) {
+          if (question.kind === 'number') continue
           const optionId = Number(answers[question.id])
           if (!Number.isFinite(optionId)) continue
           try {
@@ -1179,15 +1204,21 @@ function KioskApp() {
           (question) => answers[question.id] != null,
         )
         const answerTexts = answered
-          .map(
-            (question) =>
-              question.options.find(
-                (option) => option.id === String(answers[question.id]),
-              )?.text,
+          .map((question) =>
+            question.kind === 'number'
+              ? `${question.text}: ${answers[question.id]}${question.unit ? ` ${question.unit}` : ''}`
+              : question.options.find(
+                  (option) => option.id === String(answers[question.id]),
+                )?.text,
           )
           .filter(Boolean)
         const listingAnswers = Object.fromEntries(
-          answered.map((question) => [question.id, String(answers[question.id])]),
+          answered.map((question) => [
+            question.id,
+            question.kind === 'number'
+              ? answers[question.id]
+              : String(answers[question.id]),
+          ]),
         )
         const titles = titleRow ? { [language]: titleRow.title } : {}
 
@@ -1201,6 +1232,11 @@ function KioskApp() {
             categoryId: selectedSession.categoryId,
             orientation,
             isActive: false,
+            price,
+            year,
+            facetsCount: created.facetsCount,
+            facetsCountMax: selectedSession.facetsCountMax,
+            facetsCountMaxAnswerable: selectedSession.facetsCountMaxAnswerable,
             title: titleRow?.title ?? titleText,
             titles,
             desc: [
@@ -1227,43 +1263,94 @@ function KioskApp() {
   // Replace the answer and persist it as a facet-value-selection. When a drawer
   // listing of this category is selected, its own selection is patched/created;
   // otherwise the category's first listing keeps the interview answers.
-  async function answerQuestion(session, questionId, optionId) {
-    if (answers[questionId] === optionId || savingQuestionId === questionId) return
+  async function answerQuestion(session, questionId, value) {
+    if (answers[questionId] === value || savingQuestionId === questionId) return
 
+    const question = (session.questions ?? []).find((row) => row.id === questionId)
     const previous = answers[questionId]
     const listingId = interviewTargetListingId(session)
-    setAnswers((prev) => ({ ...prev, [questionId]: optionId }))
+
+    setAnswers((prev) => {
+      const next = { ...prev }
+      if (value == null) delete next[questionId]
+      else next[questionId] = value
+      return next
+    })
 
     // Before the draft exists the answer is only local; Next creates the
-    // inactive listing and flushes every answer to facet-value-selections.
+    // inactive listing and flushes every answer to the backend.
     if (!listingId) return
-
-    const existing = selections.find(
-      (selection) =>
-        selection.listingId === listingId &&
-        optionSchema[selection.facetValueOptionId] === Number(questionId),
-    )
 
     setSavingQuestionId(questionId)
     try {
-      if (existing) {
+      if (question?.kind === 'number') {
+        const field = question.facet === 'year' ? 'year' : 'price'
+        const fieldValue = value == null ? null : Number(value)
         const updated = await api.update(
-          'facet-value-selections',
-          existing.id,
-          { facetValueOptionId: Number(optionId) },
+          'listings',
+          listingId,
+          { [field]: fieldValue },
           user?.id,
         )
-        setSelections((prev) => prev.map((selection) => (selection.id === updated.id ? updated : selection)))
+
+        setMyListings((prev) =>
+          prev.map((item) => {
+            if (Number(item.listingId) !== Number(listingId)) return item
+            const nextAnswers = { ...(item.answers ?? {}) }
+            if (fieldValue == null) delete nextAnswers[questionId]
+            else nextAnswers[questionId] = fieldValue
+            return {
+              ...item,
+              [field]: fieldValue,
+              facetsCount: updated.facetsCount,
+              answers: nextAnswers,
+            }
+          }),
+        )
+        setBrowseData((prev) => {
+          const next = {}
+          for (const [key, node] of Object.entries(prev)) {
+            next[key] = {
+              ...node,
+              items: node.items.map((item) =>
+                item.type === 'listing' && String(item.id) === String(listingId)
+                  ? {
+                      ...item,
+                      [field]: fieldValue,
+                      facetsCount: updated.facetsCount,
+                    }
+                  : item,
+              ),
+            }
+          }
+          return next
+        })
       } else {
-        const created = await api.create(
-          'facet-value-selections',
-          { facetValueOptionId: Number(optionId), listingId },
-          user?.id,
+        const existing = selections.find(
+          (selection) =>
+            selection.listingId === listingId &&
+            optionSchema[selection.facetValueOptionId] === Number(questionId),
         )
-        setSelections((prev) => [...prev, created])
+
+        if (existing) {
+          const updated = await api.update(
+            'facet-value-selections',
+            existing.id,
+            { facetValueOptionId: Number(value) },
+            user?.id,
+          )
+          setSelections((prev) => prev.map((selection) => (selection.id === updated.id ? updated : selection)))
+        } else {
+          const created = await api.create(
+            'facet-value-selections',
+            { facetValueOptionId: Number(value), listingId },
+            user?.id,
+          )
+          setSelections((prev) => [...prev, created])
+        }
       }
     } catch (err) {
-      // Roll the chip back so the UI matches what the backend actually stored.
+      // Roll the answer back so the UI matches what the backend actually stored.
       setAnswers((prev) => {
         const next = { ...prev }
         if (previous == null) delete next[questionId]

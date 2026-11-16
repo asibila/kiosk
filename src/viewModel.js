@@ -247,7 +247,7 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
           : undefined
     }
 
-    const questions = facetSchemas
+    const facetQuestions = facetSchemas
       .filter(
         (schema) => schema.isGeneric === true || ancestorIds.has(schema.categoryId),
       )
@@ -268,6 +268,41 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
         }
       })
 
+    // Price and year are numeric questions stored directly on Listing. They are
+    // part of facetsCountMax, so include them in every interview session.
+    const numberQuestions = [
+      {
+        id: 'price',
+        facet: 'price',
+        kind: 'number',
+        categoryId: ALL_CATEGORY_ID,
+        categoryTitle: t('search.allCategories'),
+        isGeneric: true,
+        priority: facetQuestions.length + 1,
+        text: t('facet.price'),
+        hint: t('interview.priceHint'),
+        unit: '€',
+        min: 0,
+        step: 0.01,
+        options: [],
+      },
+      {
+        id: 'year',
+        facet: 'year',
+        kind: 'number',
+        categoryId: ALL_CATEGORY_ID,
+        categoryTitle: t('search.allCategories'),
+        isGeneric: true,
+        priority: facetQuestions.length + 2,
+        text: t('facet.year'),
+        hint: t('interview.yearHint'),
+        min: 0,
+        step: 1,
+        options: [],
+      },
+    ]
+    const questions = [...facetQuestions, ...numberQuestions]
+
     return {
       id: String(category.id),
       categoryId: category.id,
@@ -276,13 +311,13 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
       icon: iconForCategory(title),
       listingId: listingsByCategory.get(category.id)?.id ?? null,
       questions,
-      // The backend counts the two range questions (price, year) that are not
-      // FacetSchema rows; keep the fallback for older cached responses.
-      facetsCountMax: category.facetsCountMax ?? questions.length + 2,
+      // Price and year are included in `questions`; keep the fallbacks for
+      // older cached responses that predate the backend counters.
+      facetsCountMax: category.facetsCountMax ?? questions.length,
       facetsCountMaxAnswerable:
         category.facetsCountMaxAnswerable ??
         answerableMaxByCategory.get(category.id) ??
-        questions.length,
+        facetQuestions.length,
     }
   })
 
@@ -296,6 +331,8 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
       const option = optionsById.get(selection.facetValueOptionId)
       if (option) answers[String(option.schemaId)] = String(option.id)
     }
+    if (listing.price != null) answers.price = listing.price
+    if (listing.year != null) answers.year = listing.year
   }
 
   // The signed-in user's listings — the drawer shows GET /listings filtered by userId.
@@ -307,6 +344,8 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
         const option = optionsById.get(selection.facetValueOptionId)
         if (option) listingAnswers[String(option.schemaId)] = String(option.id)
       }
+      if (listing.price != null) listingAnswers.price = listing.price
+      if (listing.year != null) listingAnswers.year = listing.year
       return {
         id: String(listing.id),
         listingId: listing.id,
@@ -314,13 +353,17 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
         categoryId: listing.categoryId,
         orientation: listing.orientation,
         isActive: listing.isActive !== false,
+        price: listing.price ?? null,
+        year: listing.year ?? null,
         title: listingTitle(listing),
         titles: listingTitles(listing),
         desc: listingDescription(listing),
         answers: listingAnswers,
         facetsCount:
           listing.facetsCount ??
-          facetSelections.filter((row) => row.listingId === listing.id).length,
+          facetSelections.filter((row) => row.listingId === listing.id).length +
+            (listing.price != null ? 1 : 0) +
+            (listing.year != null ? 1 : 0),
         facetsCountMax:
           facetsCountMaxByCategory.get(listing.categoryId) ?? 0,
         facetsCountMaxAnswerable:
@@ -364,9 +407,13 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
     categoryId: String(listing.categoryId),
     orientation: listing.orientation,
     isActive: listing.isActive !== false,
+    price: listing.price ?? null,
+    year: listing.year ?? null,
     facetsCount:
       listing.facetsCount ??
-      facetSelections.filter((row) => row.listingId === listing.id).length,
+      facetSelections.filter((row) => row.listingId === listing.id).length +
+        (listing.price != null ? 1 : 0) +
+        (listing.year != null ? 1 : 0),
     facetsCountMax:
       facetsCountMaxByCategory.get(listing.categoryId) ?? 0,
     facetsCountMaxAnswerable:

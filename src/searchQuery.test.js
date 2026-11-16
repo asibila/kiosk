@@ -32,6 +32,8 @@ const listings = [
     categoryId: '2',
     orientation: 'sell',
     title: 'Mobile phones #28',
+    price: 100,
+    year: 2020,
     createdAt: '2026-01-01T10:00:00.000Z',
   },
   {
@@ -39,6 +41,8 @@ const listings = [
     categoryId: '2',
     orientation: 'buy',
     title: 'Mobile phones #25',
+    price: 250,
+    year: 2022,
     createdAt: '2026-01-02T10:00:00.000Z',
   },
   {
@@ -46,6 +50,8 @@ const listings = [
     categoryId: '1',
     orientation: 'sell',
     title: 'Electronics #30',
+    price: 150,
+    year: 2019,
     createdAt: '2026-01-03T10:00:00.000Z',
   },
   {
@@ -53,6 +59,8 @@ const listings = [
     categoryId: '3',
     orientation: 'sell',
     title: 'Vehicles #31',
+    price: null,
+    year: null,
     createdAt: '2026-01-04T10:00:00.000Z',
   },
 ]
@@ -129,15 +137,22 @@ describe('categoryScope / filterListings', () => {
     expect(rows.map((row) => row.id)).toEqual(['1'])
   })
 
-  it('keeps range chips in the query but does not filter on them yet', () => {
-    const rows = filterListings({
+  it('filters price and year ranges and excludes listings without the field', () => {
+    const byPrice = filterListings({
       listings,
       selections,
       categories,
       chips: [{ kind: 'range', facet: 'price', min: 100, max: 200 }],
     })
+    expect(byPrice.map((row) => row.id)).toEqual(['3', '1'])
 
-    expect(rows).toHaveLength(4)
+    const byYear = filterListings({
+      listings,
+      selections,
+      categories,
+      chips: [{ kind: 'range', facet: 'year', min: 2020, max: null }],
+    })
+    expect(byYear.map((row) => row.id)).toEqual(['2', '1'])
   })
 
   it('sorts newest first', () => {

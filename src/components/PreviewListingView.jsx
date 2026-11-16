@@ -19,11 +19,16 @@ export default function PreviewListingView({ session, title, answers, images, ac
         ) : (
           <ul className="facet-list">
             {answered.map((question) => {
-              const option = question.options.find((o) => o.id === answers[question.id])
+              const value = answers[question.id]
+              const option = question.options?.find((o) => o.id === value)
+              const text =
+                question.kind === 'number'
+                  ? `${value}${question.unit ? ` ${question.unit}` : ''}`
+                  : (option?.text ?? '—')
               return (
                 <li key={question.id} className="facet-row">
                   <span className="facet-q">{question.text}</span>
-                  <span className="chip selected">{option?.text ?? '—'}</span>
+                  <span className="chip selected">{text}</span>
                 </li>
               )
             })}

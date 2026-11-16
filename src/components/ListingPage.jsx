@@ -52,8 +52,26 @@ export default function ListingPage({
         priority: match.question.priority ?? 0,
       })
     }
+
+    if (listing.price != null) {
+      rows.push({
+        key: 'price',
+        label: t('facet.price'),
+        value: `${listing.price} €`,
+        priority: 1000,
+      })
+    }
+    if (listing.year != null) {
+      rows.push({
+        key: 'year',
+        label: t('facet.year'),
+        value: String(listing.year),
+        priority: 1001,
+      })
+    }
+
     return rows.sort((a, b) => a.priority - b.priority)
-  }, [listing, optionIndex, selections])
+  }, [listing, optionIndex, selections, t])
 
   // A results page passes its exact URL so "back" restores the query; a direct
   // bookmark falls back to the search form.

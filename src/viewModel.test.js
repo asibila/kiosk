@@ -84,6 +84,34 @@ describe('buildViewModel category and listing counts', () => {
     expect(view.myListings).toEqual([])
   })
 
+  it('adds price and year numeric questions to every session', () => {
+    const view = buildViewModel(
+      {
+        users,
+        categories,
+        'facet-schemas': [
+          { id: 1, categoryId: 1, isGeneric: true, name: 'condition', descriptionId: 1 },
+        ],
+        listings: [{ ...listings[0], price: 199.99, year: 2024 }],
+      },
+      { userId: null, language: 'en' },
+    )
+
+    expect(view.sessions[0].questions.map((question) => question.id)).toEqual([
+      '1',
+      'price',
+      'year',
+    ])
+    expect(view.sessions[0].questions[1]).toMatchObject({
+      kind: 'number',
+      facet: 'price',
+      unit: '€',
+    })
+    expect(view.sessions[0].facetsCountMax).toBe(3)
+    expect(view.answers.price).toBe(199.99)
+    expect(view.answers.year).toBe(2024)
+  })
+
   it('passes the listing answered count through to listing items', () => {
     const view = buildViewModel(
       {
