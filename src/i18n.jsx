@@ -90,6 +90,7 @@ const STRINGS = {
     'listing.contacting': 'Starting conversation…',
     'listing.signInToContact': 'Sign in to contact the seller',
     'listing.yourNote': 'This is your listing.',
+    'listing.draft': 'Draft',
 
     'facet.placeholder': 'Search by model, fuel, year…',
     'facet.inputLabel': 'Search filters',
@@ -131,6 +132,7 @@ const STRINGS = {
 
     'interview.choose': 'Choose one of the options.',
     'interview.next': 'Next >',
+    'interview.creatingDraft': 'Creating draft…',
     'interview.previous': '< Previous',
     'interview.search': 'Search',
     'interview.publish': 'Publish',
@@ -143,6 +145,16 @@ const STRINGS = {
     'wizard.editAria': 'Edit listing',
     'wizard.previewAria': 'Preview listing',
     'wizard.images': 'Images',
+    'wizard.title': 'Title ({language})',
+    'wizard.translate': 'Translate',
+    'wizard.titleHint':
+      'Shown in search results. Pick Translate to add the other languages.',
+    'wizard.titleSaving': 'Saving title…',
+    'translate.title': 'Translate title',
+    'translate.hint':
+      'Enter a title for each language. Empty languages fall back to another translation.',
+    'translate.save': 'Save translations',
+    'translate.saving': 'Saving…',
     'wizard.noImages': 'No images yet',
     'wizard.imageCount.one': '{count} image',
     'wizard.imageCount.many': '{count} images',
@@ -239,8 +251,8 @@ const STRINGS = {
     'notice.conversationFailed': 'Could not start conversation: {message}',
     'notice.directionFailed': 'Direction not saved: {message}',
     'notice.answerFailed': 'Answer not saved: {message}',
-    'notice.noListing':
-      'This category has no listing yet, so the answer is only kept in this browser.',
+    'notice.draftFailed': 'Could not create the draft listing: {message}',
+    'notice.titleFailed': 'Title not saved: {message}',
     'notice.publishFailed': 'Publish failed: {message}',
     'notice.publishImageFailed':
       'Listing saved, but image upload failed: {message}',
@@ -326,6 +338,7 @@ const STRINGS = {
     'listing.contacting': 'Pokretanje razgovora…',
     'listing.signInToContact': 'Prijavi se za kontakt s prodavačem',
     'listing.yourNote': 'Ovo je tvoj oglas.',
+    'listing.draft': 'Skica',
 
     'facet.placeholder': 'Pretraži po modelu, gorivu, godini…',
     'facet.inputLabel': 'Pretraži filtre',
@@ -367,6 +380,7 @@ const STRINGS = {
 
     'interview.choose': 'Odaberi jednu od opcija.',
     'interview.next': 'Dalje >',
+    'interview.creatingDraft': 'Stvaranje skice…',
     'interview.previous': '< Natrag',
     'interview.search': 'Traži',
     'interview.publish': 'Objavi',
@@ -379,6 +393,16 @@ const STRINGS = {
     'wizard.editAria': 'Uredi oglas',
     'wizard.previewAria': 'Pregled oglasa',
     'wizard.images': 'Slike',
+    'wizard.title': 'Naslov ({language})',
+    'wizard.translate': 'Prevedi',
+    'wizard.titleHint':
+      'Prikazuje se u rezultatima pretrage. Odaberi Prevedi za ostale jezike.',
+    'wizard.titleSaving': 'Spremanje naslova…',
+    'translate.title': 'Prevedi naslov',
+    'translate.hint':
+      'Upiši naslov za svaki jezik. Prazni jezici koriste drugi dostupni prijevod.',
+    'translate.save': 'Spremi prijevode',
+    'translate.saving': 'Spremanje…',
     'wizard.noImages': 'Još nema slika',
     'wizard.imageCount.one': '{count} slika',
     'wizard.imageCount.many': '{count} slika',
@@ -475,8 +499,8 @@ const STRINGS = {
     'notice.conversationFailed': 'Razgovor nije započet: {message}',
     'notice.directionFailed': 'Smjer nije spremljen: {message}',
     'notice.answerFailed': 'Odgovor nije spremljen: {message}',
-    'notice.noListing':
-      'Ova kategorija još nema oglas pa je odgovor spremljen samo u ovom pregledniku.',
+    'notice.draftFailed': 'Skica oglasa nije stvorena: {message}',
+    'notice.titleFailed': 'Naslov nije spremljen: {message}',
     'notice.publishFailed': 'Objava nije uspjela: {message}',
     'notice.publishImageFailed':
       'Oglas je spremljen, ali prijenos slike nije uspio: {message}',

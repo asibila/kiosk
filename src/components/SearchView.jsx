@@ -20,6 +20,7 @@ export default function SearchView({
   categories,
   selections = [],
   categoryId = '',
+  currentUserId = null,
   onOpenBrowse,
   onCommitText,
   onUnmatchedToken,
@@ -240,9 +241,23 @@ export default function SearchView({
             categoryId,
             direction,
             chips,
-          }).length
+          }).filter(
+            (listing) =>
+              listing.isActive !== false ||
+              (currentUserId != null &&
+                Number(listing.userId) === Number(currentUserId)),
+          ).length
         : null,
-    [categories, categoryId, chips, direction, hasQuery, listings, selections],
+    [
+      categories,
+      categoryId,
+      chips,
+      currentUserId,
+      direction,
+      hasQuery,
+      listings,
+      selections,
+    ],
   )
 
   const facetCount = chips.length

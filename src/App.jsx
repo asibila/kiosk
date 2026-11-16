@@ -23,6 +23,7 @@ import PreviewListingView from './components/PreviewListingView.jsx'
 import SearchView from './components/SearchView.jsx'
 import ResultsView from './components/ResultsView.jsx'
 import ListingPage from './components/ListingPage.jsx'
+import TranslateTitlesModal from './components/TranslateTitlesModal.jsx'
 import { getCategoryIdFromSearch } from './searchQuery.js'
 
 const MODAL_TITLES = { settings: 'settings.title', profile: 'profile.title' }
@@ -113,6 +114,12 @@ function KioskApp() {
   const [wizardStage, setWizardStage] = useState('interview') // 'interview' | 'edit' | 'preview'
   const [draftImages, setDraftImages] = useState([]) // { id, name, url, file, isPrimary } (new listings)
   const [listingImages, setListingImages] = useState([]) // backend ListingImage rows
+  const [listingTranslations, setListingTranslations] = useState([])
+  const listingTranslationsRef = useRef([])
+  const [draftListingId, setDraftListingId] = useState(null) // inactive listing created on Next
+  const [creatingDraft, setCreatingDraft] = useState(false)
+  const [translationsOpen, setTranslationsOpen] = useState(false)
+  const [savingTitle, setSavingTitle] = useState(false)
   const [uploadingImages, setUploadingImages] = useState(false)
 
   // Live-chat connection + latest values looked up by the SSE handler without
@@ -167,6 +174,8 @@ function KioskApp() {
         setMyListings(view.myListings)
         setBrowseData(view.browseData)
         setListingImages(view.listingImages ?? [])
+        listingTranslationsRef.current = view.listingTranslations ?? []
+        setListingTranslations(listingTranslationsRef.current)
         if (dataChanged) {
           setAnswers(view.answers)
           setSelections(view.selections)
@@ -327,6 +336,8 @@ function KioskApp() {
     setSelectedChatId(null)
     setSelectedSessionId(null)
     setCategoryDirty(false)
+    setDraftListingId(null)
+    setTranslationsOpen(false)
     setAnswers({})
     setListingDirection(null)
     setWizardStage('interview')
@@ -348,14 +359,15 @@ function KioskApp() {
     })
   }
 
-  // The drawer listing the wizard is editing, if one of the open category is
-  // selected. New listings have no id until Publish.
+  // The listing the wizard is editing: the selected drawer listing or the
+  // inactive draft created when Next was pressed. Null before a draft exists.
   function wizardTargetListing() {
-    if (!selectedListingId) return null
+    const targetId = selectedListingId ?? draftListingId
+    if (!targetId) return null
     return (
       myListings.find(
         (listing) =>
-          String(listing.listingId) === String(selectedListingId) &&
+          String(listing.listingId) === String(targetId) &&
           String(listing.sessionId) === String(selectedSessionId),
       ) ?? null
     )
@@ -687,20 +699,15 @@ function KioskApp() {
 
     // Only a listing from the category currently open can be updated; another
     // category's selection is ignored (browse clears it, this is a safety net).
-    const target = selectedListingId
-      ? myListings.find(
-          (listing) =>
-            String(listing.listingId) === String(selectedListingId) &&
-            String(listing.sessionId) === String(selectedSession.id),
-        ) ?? null
-      : null
+    const target = wizardTargetListing()
 
     setPublishing(true)
     try {
       let listingId
       let orientation = listingDirection ?? 'sell'
       if (target) {
-        // Keep the listing's category and owner; apply the chosen direction.
+        // Keep the listing's category and owner; apply the chosen direction and
+        // publish the draft.
         orientation = listingDirection ?? target.orientation
         const updated = await api.update(
           'listings',
@@ -709,6 +716,7 @@ function KioskApp() {
             categoryId: selectedSession.categoryId,
             orientation,
             userId: user.id,
+            isActive: true,
           },
           user.id,
         )
@@ -716,10 +724,27 @@ function KioskApp() {
       } else {
         const created = await api.create(
           'listings',
-          { categoryId: selectedSession.categoryId, orientation, userId: user.id },
+          {
+            categoryId: selectedSession.categoryId,
+            orientation,
+            userId: user.id,
+            isActive: true,
+          },
           user.id,
         )
         listingId = created.id
+      }
+
+      // Publishing always needs a title row for the current language; fall back
+      // to the generated label if the user never edited it.
+      let publishTitle = titleForListing(listingId)
+      if (!titlesForListing(listingId)[language]) {
+        const saved = await saveListingTitle(
+          listingId,
+          language,
+          generatedTitle(selectedSession, listingId),
+        )
+        publishTitle = saved?.title ?? publishTitle
       }
 
       // Reconcile facets: patch the selection already holding each answered
@@ -766,7 +791,12 @@ function KioskApp() {
         sessionId: selectedSession.id,
         categoryId: selectedSession.categoryId,
         orientation,
-        title: `${selectedSession.title} #${listingId}`,
+        isActive: true,
+        title: publishTitle || generatedTitle(selectedSession, listingId),
+        titles: {
+          ...titlesForListing(listingId),
+          ...(publishTitle ? { [language]: publishTitle } : {}),
+        },
         desc: [
           t(orientation === 'buy' ? 'direction.buy' : 'direction.sell'),
           ...answerTexts,
@@ -796,9 +826,11 @@ function KioskApp() {
       }
 
       // The wizard's last step: clear the interview and show the report dialog
-      // over the "No category selected" screen.
+      // over the "No category selected" screen, then refresh the catalog so the
+      // now-active listing appears in search/results.
       startNewListing()
       setModal('report')
+      setReloadToken((n) => n + 1)
     } catch (err) {
       setNotice(t('notice.publishFailed', { message: err.message }))
     } finally {
@@ -846,6 +878,12 @@ function KioskApp() {
         prev.filter((image) => image.listingId !== listing.listingId),
       )
       setSelections((prev) => prev.filter((selection) => selection.listingId !== listing.listingId))
+      setListingTranslations((prev) =>
+        prev.filter((row) => Number(row.listingId) !== Number(listing.listingId)),
+      )
+      listingTranslationsRef.current = listingTranslationsRef.current.filter(
+        (row) => Number(row.listingId) !== Number(listing.listingId),
+      )
       setBrowseData((prev) => {
         const next = {}
         for (const [key, node] of Object.entries(prev)) {
@@ -870,6 +908,10 @@ function KioskApp() {
       if (String(selectedListingId) === String(listing.listingId)) {
         setSelectedListingId(null)
       }
+      if (String(draftListingId) === String(listing.listingId)) {
+        setDraftListingId(null)
+        setWizardStage('interview')
+      }
       setPendingDelete(null)
       setNotice(t('notice.deleted', { title: listing.title }))
     } catch (err) {
@@ -885,6 +927,8 @@ function KioskApp() {
     setCategoryDirty(false) // a plain category pick is not a browse change
     setSelectedChatId(null)
     setSelectedSessionId(sessionId)
+    setDraftListingId(null)
+    setTranslationsOpen(false)
     if (!keepDrawerOpen) setDrawerOpen(false)
     setWizardStage('interview')
     resetDraft()
@@ -934,15 +978,233 @@ function KioskApp() {
   }
 
   // The listing that receives interview answers and the buy/sell orientation:
-  // the selected drawer listing of this category, otherwise the category's
-  // first listing. Null when the category has no listing yet.
+  // the selected drawer listing, otherwise the draft created on Next. Before a
+  // draft exists the answers stay in local state and are flushed when Next
+  // creates the inactive listing.
   function interviewTargetListingId(session) {
     const selectedListing = selectedListingId
       ? myListings.find((listing) => String(listing.listingId) === String(selectedListingId))
       : null
-    return selectedListing && String(selectedListing.sessionId) === String(session.id)
-      ? selectedListing.listingId
-      : categoryListing[session.id] ?? null
+    if (selectedListing && String(selectedListing.sessionId) === String(session.id)) {
+      return selectedListing.listingId
+    }
+    const draft = draftListingId
+      ? myListings.find(
+          (listing) =>
+            String(listing.listingId) === String(draftListingId) &&
+            String(listing.sessionId) === String(session.id),
+        )
+      : null
+    return draft?.listingId ?? null
+  }
+
+  // Per-language titles: the UI language's title, then English, then any.
+  function titlesForListing(listingId) {
+    const titles = {}
+    for (const row of listingTranslations) {
+      if (Number(row.listingId) === Number(listingId)) titles[row.language] = row.title
+    }
+    return titles
+  }
+
+  function titleForListing(listingId, lang = language) {
+    const titles = titlesForListing(listingId)
+    return titles[lang] ?? titles.en ?? Object.values(titles)[0] ?? ''
+  }
+
+  function generatedTitle(session, listingId) {
+    return `${session.title} #${listingId}`
+  }
+
+  // Upsert one title translation and refresh the model so drawer/result titles
+  // pick up the change. Returns the saved row, or null on failure.
+  async function saveListingTitle(listingId, lang, text) {
+    const title = String(text ?? '').trim()
+    if (!listingId || !title) return null
+
+    setSavingTitle(true)
+    try {
+      const saved = await api.create(
+        'listing-translations',
+        { listingId: Number(listingId), language: lang, title },
+        user?.id,
+      )
+      // Patch the title in the already-mounted model instead of triggering a
+      // data reload (a reload would reset the wizard's local answers). The ref
+      // keeps sequential translation saves (modal) consistent.
+      const nextRows = [
+        ...listingTranslationsRef.current.filter(
+          (row) =>
+            !(
+              Number(row.listingId) === Number(saved.listingId) &&
+              row.language === saved.language
+            ),
+        ),
+        saved,
+      ]
+      listingTranslationsRef.current = nextRows
+      setListingTranslations(nextRows)
+
+      const nextTitles = {}
+      for (const row of nextRows) {
+        if (Number(row.listingId) === Number(saved.listingId)) {
+          nextTitles[row.language] = row.title
+        }
+      }
+      const displayTitle =
+        nextTitles[language] ?? nextTitles.en ?? Object.values(nextTitles)[0] ?? ''
+      setMyListings((prev) =>
+        prev.map((listing) =>
+          Number(listing.listingId) === Number(saved.listingId)
+            ? { ...listing, title: displayTitle || listing.title, titles: nextTitles }
+            : listing,
+        ),
+      )
+      setChats((prev) =>
+        prev.map((chat) =>
+          Number(chat.listingId) === Number(saved.listingId)
+            ? { ...chat, title: displayTitle || chat.title }
+            : chat,
+        ),
+      )
+      setBrowseData((prev) => {
+        const next = {}
+        for (const [key, node] of Object.entries(prev)) {
+          next[key] = {
+            ...node,
+            items: node.items.map((item) =>
+              item.type === 'listing' &&
+              Number(item.id) === Number(saved.listingId)
+                ? { ...item, title: displayTitle || item.title, titles: nextTitles }
+                : item,
+            ),
+          }
+        }
+        return next
+      })
+      return saved
+    } catch (err) {
+      setNotice(t('notice.titleFailed', { message: err.message }))
+      return null
+    } finally {
+      setSavingTitle(false)
+    }
+  }
+
+  // Fill in the generated title for the current language when a listing has no
+  // row for it yet (existing listings, or a language added after the draft).
+  async function ensureDefaultTitle(session, listingId) {
+    if (titlesForListing(listingId)[language]) return
+    await saveListingTitle(listingId, language, generatedTitle(session, listingId))
+  }
+
+  // Pressing Next opens the edit step. A new listing is materialised as an
+  // inactive draft first, so the edit screen can save images and translations.
+  // Pressing Next again reuses that draft instead of creating another one.
+  async function openEditStage() {
+    if (!selectedSession || !user || creatingDraft || publishing) return
+
+    let target = wizardTargetListing()
+    if (!target) {
+      setCreatingDraft(true)
+      try {
+        const orientation = listingDirection ?? 'sell'
+        const created = await api.create(
+          'listings',
+          {
+            categoryId: selectedSession.categoryId,
+            orientation,
+            userId: user.id,
+            isActive: false,
+          },
+          user.id,
+        )
+
+        const titleText = generatedTitle(selectedSession, created.id)
+        let titleRow = null
+        try {
+          titleRow = await api.create(
+            'listing-translations',
+            { listingId: created.id, language, title: titleText },
+            user.id,
+          )
+          listingTranslationsRef.current = [
+            ...listingTranslationsRef.current,
+            titleRow,
+          ]
+          setListingTranslations(listingTranslationsRef.current)
+        } catch (err) {
+          setNotice(t('notice.titleFailed', { message: err.message }))
+        }
+
+        // Persist the answers chosen during the interview on the new draft.
+        const createdSelections = []
+        for (const question of selectedSession.questions ?? []) {
+          const optionId = Number(answers[question.id])
+          if (!Number.isFinite(optionId)) continue
+          try {
+            createdSelections.push(
+              await api.create(
+                'facet-value-selections',
+                { facetValueOptionId: optionId, listingId: created.id },
+                user.id,
+              ),
+            )
+          } catch (err) {
+            setNotice(t('notice.answerFailed', { message: err.message }))
+          }
+        }
+        if (createdSelections.length > 0) {
+          setSelections((prev) => [...prev, ...createdSelections])
+        }
+
+        const answered = (selectedSession.questions ?? []).filter(
+          (question) => answers[question.id] != null,
+        )
+        const answerTexts = answered
+          .map(
+            (question) =>
+              question.options.find(
+                (option) => option.id === String(answers[question.id]),
+              )?.text,
+          )
+          .filter(Boolean)
+        const listingAnswers = Object.fromEntries(
+          answered.map((question) => [question.id, String(answers[question.id])]),
+        )
+        const titles = titleRow ? { [language]: titleRow.title } : {}
+
+        setDraftListingId(created.id)
+        setMyListings((prev) => [
+          ...prev,
+          {
+            id: String(created.id),
+            listingId: created.id,
+            sessionId: selectedSession.id,
+            categoryId: selectedSession.categoryId,
+            orientation,
+            isActive: false,
+            title: titleRow?.title ?? titleText,
+            titles,
+            desc: [
+              t(orientation === 'buy' ? 'direction.buy' : 'direction.sell'),
+              ...answerTexts,
+            ].join(' · '),
+            answers: listingAnswers,
+          },
+        ])
+        target = { listingId: created.id }
+      } catch (err) {
+        setNotice(t('notice.draftFailed', { message: err.message }))
+        return
+      } finally {
+        setCreatingDraft(false)
+      }
+    } else {
+      await ensureDefaultTitle(selectedSession, target.listingId)
+    }
+
+    setWizardStage('edit')
   }
 
   // Replace the answer and persist it as a facet-value-selection. When a drawer
@@ -955,10 +1217,9 @@ function KioskApp() {
     const listingId = interviewTargetListingId(session)
     setAnswers((prev) => ({ ...prev, [questionId]: optionId }))
 
-    if (!listingId) {
-      setNotice(t('notice.noListing'))
-      return
-    }
+    // Before the draft exists the answer is only local; Next creates the
+    // inactive listing and flushes every answer to facet-value-selections.
+    if (!listingId) return
 
     const existing = selections.find(
       (selection) =>
@@ -1107,6 +1368,14 @@ function KioskApp() {
     })),
   ]
 
+  const wizardListingId = wizardTarget?.listingId ?? draftListingId
+  const wizardTitles = wizardListingId ? titlesForListing(wizardListingId) : {}
+  const wizardTitle = wizardTitles[language] ?? ''
+  const wizardTitlePlaceholder =
+    selectedSession && wizardListingId
+      ? generatedTitle(selectedSession, wizardListingId)
+      : ''
+
   // Flat, de-duplicated listing list for the /search suggestions.
   const searchListings = (() => {
     const seen = new Set()
@@ -1184,10 +1453,15 @@ function KioskApp() {
         <button
           type="button"
           className="btn primary"
-          onClick={() => setWizardStage('edit')}
-          disabled={!canPublish || publishing || savingQuestionId != null}
+          onClick={openEditStage}
+          disabled={
+            !canPublish ||
+            publishing ||
+            savingQuestionId != null ||
+            creatingDraft
+          }
         >
-          {t('interview.next')}
+          {creatingDraft ? t('interview.creatingDraft') : t('interview.next')}
         </button>
       </div>
     </div>
@@ -1200,7 +1474,12 @@ function KioskApp() {
         {t('interview.previous')}
       </button>
       <div className="action-buttons">
-        <button type="button" className="btn primary" onClick={() => setWizardStage('preview')}>
+        <button
+          type="button"
+          className="btn primary"
+          onClick={() => setWizardStage('preview')}
+          disabled={savingTitle}
+        >
           {t('interview.next')}
         </button>
       </div>
@@ -1219,7 +1498,7 @@ function KioskApp() {
           type="button"
           className="btn primary"
           onClick={publish}
-          disabled={publishing || listingDirection == null}
+          disabled={publishing || listingDirection == null || savingTitle}
         >
           {publishing ? t('interview.publishing') : t('interview.publish')}
         </button>
@@ -1341,6 +1620,7 @@ function KioskApp() {
               categories={sessions}
               selections={selections}
               categoryId={searchCategoryId}
+              currentUserId={isLoggedIn ? user?.id : null}
               onCommitText={handleCommitSearchText}
               onUnmatchedToken={handleUnmatchedSearchToken}
               onOpenBrowse={() => {
@@ -1353,6 +1633,14 @@ function KioskApp() {
           ) : selectedSession && wizardStage === 'edit' ? (
             <EditListingView
               session={selectedSession}
+              language={language}
+              title={wizardTitle}
+              titlePlaceholder={wizardTitlePlaceholder}
+              savingTitle={savingTitle}
+              onSaveTitle={(text) =>
+                saveListingTitle(wizardListingId, language, text)
+              }
+              onOpenTranslate={() => setTranslationsOpen(true)}
               images={wizardImages}
               onAddImages={addImages}
               onRemoveImage={removeImage}
@@ -1363,6 +1651,7 @@ function KioskApp() {
           ) : selectedSession && wizardStage === 'preview' ? (
             <PreviewListingView
               session={selectedSession}
+              title={wizardTitle || wizardTitlePlaceholder}
               answers={answers}
               images={wizardImages}
               actions={previewActions}
@@ -1380,6 +1669,19 @@ function KioskApp() {
           )}
         </main>
       </div>
+
+      {translationsOpen && wizardListingId && selectedSession && (
+        <TranslateTitlesModal
+          languages={languages}
+          titles={wizardTitles}
+          fallbackTitle={wizardTitlePlaceholder}
+          saving={savingTitle}
+          onSave={(lang, text) =>
+            saveListingTitle(wizardListingId, lang, text)
+          }
+          onClose={() => setTranslationsOpen(false)}
+        />
+      )}
 
       {modal === 'browse' && (
         <BrowseModal

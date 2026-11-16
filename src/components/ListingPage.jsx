@@ -62,7 +62,14 @@ export default function ListingPage({
   const backLabel =
     backTo === '/search' ? t('listing.back') : t('listing.backResults')
 
-  if (!listing) {
+  const owned =
+    listing != null &&
+    isLoggedIn &&
+    currentUserId != null &&
+    Number(listing.userId) === Number(currentUserId)
+
+  // Drafts are private: only their owner can open the bookmarkable page.
+  if (!listing || (listing.isActive === false && !owned)) {
     return (
       <section className="listing-page" aria-label={t('listing.aria')}>
         <div className="listing-inner">
@@ -81,8 +88,6 @@ export default function ListingPage({
     (row) => String(row.categoryId) === String(listing.categoryId),
   )
   const seller = users.find((row) => Number(row.id) === Number(listing.userId))
-  const owned =
-    isLoggedIn && currentUserId != null && Number(listing.userId) === Number(currentUserId)
   const orientation =
     listing.orientation === 'buy' ? t('direction.buy') : t('direction.sell')
 
@@ -143,9 +148,18 @@ export default function ListingPage({
             <div className="listing-badges">
               <span className="chip selected">{orientation}</span>
               {category && <span className="chip">{category.title}</span>}
+              {listing.isActive === false && (
+                <span className="listing-status">{t('listing.draft')}</span>
+              )}
             </div>
 
-            <h1 className="listing-title">{listing.title}</h1>
+            <h1
+              className={
+                listing.isActive === false ? 'listing-title inactive' : 'listing-title'
+              }
+            >
+              {listing.title}
+            </h1>
             <p className="listing-desc">{listing.desc}</p>
 
             <div className="listing-actions">

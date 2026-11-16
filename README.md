@@ -41,6 +41,7 @@ VITE_API_BASE_URL=/backend npm run dev
 | Chip/suggestion JSDoc types + range formatting | `src/facetTypes.js` |
 | Search URL encoding/parsing + result filtering | `src/searchQuery.js` |
 | Listing detail page | `src/components/ListingPage.jsx` |
+| Listing title translations | `src/components/TranslateTitlesModal.jsx` |
 | STATE (drawer, selection, answers, messages, modals) | `src/App.jsx` |
 | ICONS (inline SVG string → components) | `src/icons.jsx` |
 | RENDER functions (components) | `src/components/*.jsx` |
@@ -158,8 +159,9 @@ removal is a real button with an aria-label, and result counts are announced via
   back to "Back to search". A deleted or unknown id shows a not-found state.
 - **New listing** - the drawer's **New listing** action opens the Browse modal to
   choose a category; OK clears the selected category/listing and interview answers
-  locally (no API call) and opens that category's interview, so the next Publish
-  creates a fresh listing. Cancel keeps the current screen unchanged.
+  locally and opens that category's interview. Cancel keeps the current screen
+  unchanged. Pressing **Next >** materialises an inactive draft (`isActive:
+  false`), creates its UI-language title and saves the interview answers on it.
 - **Dark mode** — toggles between light and dark palettes, follows the OS preference on first
   visit, and remembers the choice in `localStorage` (`kiosk-theme`).
 - **Drawer** - overlay slide-in, 340px (full-width ≤600px), a flat list of the signed-in
@@ -184,17 +186,27 @@ removal is a real button with an aria-label, and result counts are announced via
   `Listing.orientation` (`buy` / `sell`) on the same listing that receives the answers,
   opening a drawer listing preselects its stored orientation, and both Search and
   "Next >" stay disabled until Buy or Sell is chosen. Answers are saved to
-  `facet-value-selections` on the selected drawer listing (or the category's first
-  listing when none is selected).
+  `facet-value-selections` on the selected drawer listing or the draft created by
+  **Next >**; before that draft exists they stay in component state and are
+  flushed when the draft is created. After the draft exists, answers save
+  immediately. Drafts are shown in the drawer in italic with a **Draft** marker.
   Search results show an envelope action per listing; clicking it creates a new
   `chat-threads` row linked through `listing-chat-threads` and an `inbox-items` row in the
   signed-in user's inbox. The envelope is grayed out and disabled on the user's own listings.
-- **Listing wizard** - after the interview: **Edit** (image grid with upload,
-  remove and "make primary"; editing a saved listing uploads immediately, a new
-  listing keeps its picks locally until Publish), **Preview** (answered facets,
-  images) with **Publish**, then a report dialog ("Listing created, thank you
-  for using kiosk.") over the starting screen. "< Previous" moves back a step
-  at every stage. Search results show the listing's primary image as a small
+- **Listing wizard** - after the interview: **Edit** (per-language title with
+  **Translate**, image grid with upload, remove and "make primary"), **Preview**
+  (answered facets, title, images) with **Publish**, then a report dialog
+  ("Listing created, thank you for using kiosk.") over the starting screen.
+  "< Previous" moves back a step at every stage.
+  The **Next >** step creates the listing as an inactive draft; **Publish** sets
+  `isActive: true`. Drafts are private to their owner in search/listing pages and
+  render italic in the drawer. The title field shows the UI language's
+  `ListingTranslation` (prefilled with `"Category #id"` when the draft is
+  created); **Translate** opens a modal with one input per language from the
+  `languages` table. Missing translations fall back to the UI language, English,
+  any saved title, then the generated label. Editing a saved listing uploads
+  images immediately; a draft keeps earlier picks local until Publish.
+  Search results show the listing's primary image as a small
   thumbnail (the glyph remains when a listing has no image).
 - **Chat view** - WhatsApp-style bubbles with timestamps, paperclip popover
   (Image / YouTube / GPS placeholders), Enter-to-send. Text messages are POSTed

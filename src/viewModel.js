@@ -57,6 +57,7 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
   const inboxItems = raw['inbox-items'] ?? []
   const listingChatThreads = raw['listing-chat-threads'] ?? []
   const listingImages = raw['listing-images'] ?? []
+  const listingTranslations = raw['listing-translations'] ?? []
 
   const descriptionsById = byId(descriptions)
   const categoriesById = byId(categories)
@@ -88,7 +89,22 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
     if (!listingsByCategory.has(listing.categoryId)) listingsByCategory.set(listing.categoryId, listing)
   }
 
-  const listingTitle = (listing) => `${categoryTitle(listing.categoryId)} #${listing.id}`
+  // Titles come from ListingTranslation. Missing languages fall back to the UI
+  // language, then English, then any available title, then the generated label.
+  const titlesByListing = new Map()
+  for (const row of listingTranslations) {
+    const titles = titlesByListing.get(row.listingId) ?? {}
+    titles[row.language] = row.title
+    titlesByListing.set(row.listingId, titles)
+  }
+  const listingTitles = (listing) => titlesByListing.get(listing.id) ?? {}
+  const listingTitleFor = (listing, lang = language) => {
+    const titles = listingTitles(listing)
+    const text =
+      titles[lang] ?? titles.en ?? Object.values(titles)[0] ?? ''
+    return text || `${categoryTitle(listing.categoryId)} #${listing.id}`
+  }
+  const listingTitle = (listing) => listingTitleFor(listing, language)
   const listingDescription = (listing) => {
     const selected = facetSelections
       .filter((selection) => selection.listingId === listing.id)
@@ -240,7 +256,9 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
         sessionId: String(listing.categoryId),
         categoryId: listing.categoryId,
         orientation: listing.orientation,
+        isActive: listing.isActive !== false,
         title: listingTitle(listing),
+        titles: listingTitles(listing),
         desc: listingDescription(listing),
         answers: listingAnswers,
       }
@@ -272,11 +290,13 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
     userId: listing.userId,
     createdAt: listing.createdAt ?? null,
     title: listingTitle(listing),
+    titles: listingTitles(listing),
     desc: listingDescription(listing),
     thumb: 'box',
     imageUrl: primaryImageByListing.get(listing.id)?.url ?? null,
     categoryId: String(listing.categoryId),
     orientation: listing.orientation,
+    isActive: listing.isActive !== false,
   })
 
   const pathForCategory = (category) => {
@@ -315,6 +335,7 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
     myListings,
     browseData,
     listingImages,
+    listingTranslations,
     answers,
     selections: facetSelections,
     optionSchema: Object.fromEntries(facetOptions.map((option) => [option.id, option.schemaId])),

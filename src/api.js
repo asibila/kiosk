@@ -83,6 +83,7 @@ const RESOURCES = [
   'descriptions',
   'categories',
   'listings',
+  'listing-translations',
   'facet-schemas',
   'facet-value-options',
   'facet-value-selections',

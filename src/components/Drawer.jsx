@@ -41,13 +41,21 @@ export default function Drawer({
         {listings.length === 0 && <p className="drawer-empty">{t('drawer.empty')}</p>}
         {listings.map((listing) => {
           const isSelected = selectedListingId === listing.id
+          const inactive = listing.isActive === false
           const listingChats = isSelected
             ? chats.filter((chat) => String(chat.listingId) === String(listing.id))
             : []
           return (
             <Fragment key={listing.id}>
               <div
-                className={isSelected ? 'drawer-row listing-row selected' : 'drawer-row listing-row'}
+                className={[
+                  'drawer-row',
+                  'listing-row',
+                  isSelected ? 'selected' : '',
+                  inactive ? 'inactive' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
                 role="button"
                 tabIndex={0}
                 onClick={() => onListingClick(listing)}
@@ -63,6 +71,9 @@ export default function Drawer({
                 </span>
                 <span className="drawer-row-title">
                   <span className="listing-row-name">{listing.title}</span>
+                  {inactive && (
+                    <span className="listing-status">{t('listing.draft')}</span>
+                  )}
                   {listing.desc && <span className="listing-row-desc">{listing.desc}</span>}
                 </span>
                 <button

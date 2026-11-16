@@ -1,11 +1,18 @@
 // Wizard edit screen: upload, preview, remove and prioritise listing images.
 // Existing listings upload immediately; a brand-new listing keeps the picks
 // locally (object URLs) and uploads them when Publish creates the listing.
+import { useEffect, useState } from 'react'
 import { ImageIcon, StarIcon, TrashIcon } from '../icons.jsx'
 import { pluralKey, useI18n } from '../i18n.jsx'
 
 export default function EditListingView({
   session,
+  language,
+  title = '',
+  titlePlaceholder = '',
+  savingTitle = false,
+  onSaveTitle,
+  onOpenTranslate,
   images,
   onAddImages,
   onRemoveImage,
@@ -14,6 +21,22 @@ export default function EditListingView({
   actions,
 }) {
   const { t } = useI18n()
+  const [titleValue, setTitleValue] = useState(title)
+
+  // Follow the language switch and freshly saved titles.
+  useEffect(() => {
+    setTitleValue(title)
+  }, [title, language])
+
+  function commitTitle() {
+    const trimmed = titleValue.trim()
+    if (trimmed === '') {
+      setTitleValue(title)
+      return
+    }
+    if (trimmed !== title) onSaveTitle(trimmed)
+  }
+
   function handleFiles(event) {
     onAddImages(event.target.files)
     // Reset so picking the same file again still fires a change event.
@@ -28,6 +51,44 @@ export default function EditListingView({
       </header>
 
       <div className="wizard-scroll scrollable">
+        <div className="title-field">
+          <label className="field-label" htmlFor="listing-title">
+            {t('wizard.title', { language: language.toUpperCase() })}
+          </label>
+          <div className="title-row">
+            <input
+              id="listing-title"
+              className="chat-input"
+              value={titleValue}
+              placeholder={titlePlaceholder}
+              maxLength={225}
+              onChange={(event) => setTitleValue(event.target.value)}
+              onBlur={commitTitle}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  event.currentTarget.blur()
+                }
+                if (event.key === 'Escape') {
+                  setTitleValue(title)
+                  event.currentTarget.blur()
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={onOpenTranslate}
+              disabled={savingTitle}
+            >
+              {t('wizard.translate')}
+            </button>
+          </div>
+          <p className="field-hint">
+            {savingTitle ? t('wizard.titleSaving') : t('wizard.titleHint')}
+          </p>
+        </div>
+
         <div className="field-label-row">
           <span className="field-label" id="listing-images-label">
             {t('wizard.images')}

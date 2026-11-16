@@ -2167,6 +2167,87 @@ button {
   color: var(--text);
 }
 
+/* Draft/published title field in the edit step. */
+.title-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title-row .chat-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.title-row .btn {
+  flex-shrink: 0;
+}
+
+/* Draft marker + italic titles for inactive listings. */
+.listing-status {
+  display: inline-block;
+  align-self: flex-start;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--hover);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.listing-row.inactive .listing-row-name,
+.browse-item.inactive .browse-item-title,
+.result-card.inactive .result-title,
+.listing-title.inactive {
+  font-style: italic;
+}
+
+.listing-badges .listing-status {
+  margin-left: 0;
+}
+
+.result-body .listing-status {
+  margin-left: 0;
+}
+
+.translate-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.translate-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.translate-language {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.translate-code {
+  color: var(--muted);
+  font-size: 10.5px;
+  letter-spacing: 0.4px;
+}
+
 .field-label-row {
   display: flex;
   align-items: baseline;

@@ -131,6 +131,15 @@ describe('ListingPage', () => {
     expect(screen.getByRole('link', { name: 'Back to search' })).toBeInTheDocument()
   })
 
+  it('hides another user\'s draft', () => {
+    renderPage({
+      listing: { ...listing, isActive: false },
+      currentUserId: 1,
+    })
+
+    expect(screen.getByText('This listing no longer exists.')).toBeInTheDocument()
+  })
+
   it('renders the gallery and selects the primary image first', () => {
     renderPage({
       images: [

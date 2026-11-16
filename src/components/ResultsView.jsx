@@ -66,8 +66,21 @@ export default function ResultsView({
         categoryId,
         direction: query.direction,
         chips,
-      }),
-    [categories, categoryId, chips, listings, query.direction, selections],
+      }).filter(
+        (listing) =>
+          listing.isActive !== false ||
+          (currentUserId != null &&
+            Number(listing.userId) === Number(currentUserId)),
+      ),
+    [
+      categories,
+      categoryId,
+      chips,
+      currentUserId,
+      listings,
+      query.direction,
+      selections,
+    ],
   )
 
   const directionLabel =
@@ -129,7 +142,14 @@ export default function ResultsView({
                 )?.title ?? ''
 
               return (
-                <li key={listing.id} className="result-card">
+                <li
+                  key={listing.id}
+                  className={
+                    listing.isActive === false
+                      ? 'result-card inactive'
+                      : 'result-card'
+                  }
+                >
                   <Link
                     className="result-card-link"
                     to={`/listing/${listing.id}`}
@@ -166,6 +186,9 @@ export default function ResultsView({
 
                   <div className="result-body">
                     <h2 className="result-title">{listing.title}</h2>
+                    {listing.isActive === false && (
+                      <span className="listing-status">{t('listing.draft')}</span>
+                    )}
                     <p className="result-desc">{listing.desc}</p>
                     <div className="result-meta">
                       <span className="result-category">{listingCategory}</span>
