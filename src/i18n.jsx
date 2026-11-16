@@ -93,6 +93,8 @@ const STRINGS = {
     'listing.yourNote': 'This is your listing.',
     'listing.draft': 'Draft',
 
+    'completeness.aria': '{answered} of {total} interview questions answered',
+
     'facet.placeholder': 'Search by model, fuel, year…',
     'facet.inputLabel': 'Search filters',
     'facet.suggestions': 'Filter suggestions',
@@ -343,6 +345,8 @@ const STRINGS = {
     'listing.signInToContact': 'Prijavi se za kontakt s prodavačem',
     'listing.yourNote': 'Ovo je tvoj oglas.',
     'listing.draft': 'Skica',
+
+    'completeness.aria': '{answered} od {total} pitanja intervjua odgovoreno',
 
     'facet.placeholder': 'Pretraži po modelu, gorivu, godini…',
     'facet.inputLabel': 'Pretraži filtre',

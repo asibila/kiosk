@@ -7,6 +7,7 @@ import { mediaUrl } from '../api.js'
 import { formatRange } from '../facetTypes.js'
 import { pluralKey, useI18n } from '../i18n.jsx'
 import { EnvelopeIcon, SearchIcon, ThumbGlyph, XIcon } from '../icons.jsx'
+import CompletenessScore from './CompletenessScore.jsx'
 import {
   buildOptionIndex,
   filterListings,
@@ -214,7 +215,13 @@ export default function ResultsView({
                   </div>
 
                   <div className="result-body">
-                    <h2 className="result-title">{listing.title}</h2>
+                    <div className="result-title-row">
+                      <h2 className="result-title">{listing.title}</h2>
+                      <CompletenessScore
+                        answered={listing.facetsCount}
+                        total={listing.facetsCountMax}
+                      />
+                    </div>
                     {listing.isActive === false && (
                       <span className="listing-status">{t('listing.draft')}</span>
                     )}

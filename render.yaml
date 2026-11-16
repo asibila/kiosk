@@ -13,6 +13,12 @@ services:
       - key: VITE_API_BASE_URL
         value: https://kiosk-api-znxy.onrender.com
     routes:
+      # Old cached bundles call /api/* on the static site origin. Proxy those to
+      # the API so they keep working (and so the app can also be used
+      # same-origin). This rule must come before the SPA fallback.
+      - type: rewrite
+        source: /api/*
+        destination: https://kiosk-api-znxy.onrender.com/*
       - type: rewrite
         source: /*
         destination: /index.html

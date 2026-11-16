@@ -4,6 +4,7 @@
 import { EnvelopeIcon, XIcon, ThumbGlyph } from '../icons.jsx'
 import { useI18n } from '../i18n.jsx'
 import { mediaUrl } from '../api.js'
+import CompletenessScore from './CompletenessScore.jsx'
 
 export default function ListingsModal({
   title,
@@ -54,7 +55,13 @@ export default function ListingsModal({
                       )}
                     </span>
                     <div className="browse-item-main">
-                      <span className="browse-item-title">{listing.title}</span>
+                      <div className="browse-item-title-row">
+                        <span className="browse-item-title">{listing.title}</span>
+                        <CompletenessScore
+                          answered={listing.facetsCount}
+                          total={listing.facetsCountMax}
+                        />
+                      </div>
                       {listing.isActive === false && (
                         <span className="listing-status">{t('listing.draft')}</span>
                       )}

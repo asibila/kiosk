@@ -46,6 +46,68 @@ describe('buildViewModel current user', () => {
   })
 })
 
+describe('buildViewModel category and listing counts', () => {
+  it('keeps the virtual all category in sessions but out of the browse tree', () => {
+    const view = buildViewModel(
+      {
+        users,
+        listings: [{ ...listings[0], facetsCount: 2 }],
+        categories: [
+          {
+            id: 0,
+            descriptionId: 0,
+            parentCategoryId: null,
+            facetsCountMax: 3,
+            facetsCountMaxAnswerable: 1,
+          },
+          {
+            ...categories[0],
+            facetsCountMax: 5,
+            facetsCountMaxAnswerable: 4,
+          },
+        ],
+      },
+      { userId: null, language: 'en' },
+    )
+
+    expect(view.sessions.map((session) => session.id)).toEqual(['0', '1'])
+    expect(view.sessions[0]).toMatchObject({
+      title: 'All categories',
+      facetsCountMax: 3,
+      facetsCountMaxAnswerable: 1,
+    })
+    expect(view.sessions[1].facetsCountMax).toBe(5)
+    expect(view.sessions[1].facetsCountMaxAnswerable).toBe(4)
+    expect(view.browseData.root.items).toHaveLength(1)
+    expect(view.browseData.root.items[0].id).toBe('1')
+    expect(view.browseData.root.items[0].facetsCount).toBeUndefined()
+    expect(view.myListings).toEqual([])
+  })
+
+  it('passes the listing answered count through to listing items', () => {
+    const view = buildViewModel(
+      {
+        users,
+        categories,
+        'facet-schemas': [
+          { id: 1, categoryId: 1, isGeneric: true },
+          { id: 2, categoryId: 1, isGeneric: false },
+        ],
+        listings: [{ ...listings[0], facetsCount: 2 }],
+      },
+      { userId: 1, language: 'en' },
+    )
+
+    expect(view.myListings[0].facetsCount).toBe(2)
+    expect(view.myListings[0].facetsCountMax).toBe(4)
+    expect(view.myListings[0].facetsCountMaxAnswerable).toBe(2)
+    expect(view.browseData.root.items[0].items).toBeUndefined()
+    expect(view.browseData['1'].items[0].facetsCount).toBe(2)
+    expect(view.browseData['1'].items[0].facetsCountMax).toBe(4)
+    expect(view.browseData['1'].items[0].facetsCountMaxAnswerable).toBe(2)
+  })
+})
+
 describe('buildViewModel category tree', () => {
   it('terminates when stored categories form a cycle', () => {
     const view = buildViewModel(

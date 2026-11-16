@@ -5,6 +5,7 @@
 import { Fragment } from 'react'
 import { ChatIcon, GearIcon, LogOutIcon, MessageIcon, PlusIcon, TagIcon, TrashIcon, UserIcon } from '../icons.jsx'
 import { useI18n } from '../i18n.jsx'
+import CompletenessScore from './CompletenessScore.jsx'
 
 export default function Drawer({
   open,
@@ -91,7 +92,13 @@ export default function Drawer({
                   <TagIcon size={18} />
                 </span>
                 <span className="drawer-row-title">
-                  <span className="listing-row-name">{listing.title}</span>
+                  <span className="listing-row-heading">
+                    <span className="listing-row-name">{listing.title}</span>
+                    <CompletenessScore
+                      answered={listing.facetsCount}
+                      total={listing.facetsCountMax}
+                    />
+                  </span>
                   {inactive && (
                     <span className="listing-status">{t('listing.draft')}</span>
                   )}

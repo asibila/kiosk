@@ -2,8 +2,41 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import mkcert from 'vite-plugin-mkcert'
+import { copyFile, mkdir } from 'node:fs/promises'
+import { resolve } from 'node:path'
 
+/**
+ * Static hosts only serve files that exist. Emit an index.html shell for each
+ * fixed app route so a direct visit to /search or /results works even when the
+ * host has no SPA rewrite rule. /listing/:id still needs the host rewrite.
+ */
+function routeShells(routes) {
+  let root = process.cwd()
+  let outDir = 'dist'
 
+  return {
+    name: 'kiosk-route-shells',
+    apply: 'build',
+    configResolved(config) {
+      root = config.root
+      outDir = config.build.outDir
+    },
+    async closeBundle() {
+      const publishDir = resolve(root, outDir)
+      const shell = resolve(publishDir, 'index.html')
+      await Promise.all(
+        routes.map(async (route) => {
+          const routeDir = resolve(publishDir, route)
+          await mkdir(routeDir, { recursive: true })
+          await copyFile(shell, resolve(routeDir, 'index.html'))
+          // Also emit /route.html: some static hosts resolve /route to it
+          // instead of /route/index.html.
+          await copyFile(shell, resolve(publishDir, `${route}.html`))
+        }),
+      )
+    },
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig( ({ mode }) => {
@@ -13,8 +46,7 @@ export default defineConfig( ({ mode }) => {
   // that the dev/preview server proxies those requests to.
   const apiTarget = env.VITE_API_PROXY_TARGET;
 
-  // The NestJS API has no /api prefix and no CORS config, so dev/preview proxy
-  // /api/* to it.
+  // The NestJS API has no /api prefix, so dev/preview proxy /api/* to it.
   const apiProxy = apiTarget
     ? {
         '/api': {
@@ -50,7 +82,8 @@ export default defineConfig( ({ mode }) => {
             }
           ]
         }
-      })
+      }),
+      routeShells(['app', 'login', 'results', 'search']),
     ],
     server: {
       proxy: apiProxy,

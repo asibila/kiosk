@@ -730,6 +730,47 @@ button {
   text-transform: uppercase;
 }
 
+/* ── Listing completeness score ────────────────────────────────────────────
+   Percentage inline with the title, e.g. "Mobiteli #12 (95)". */
+.completeness-score {
+  flex-shrink: 0;
+  color: var(--muted-2);
+  font-size: 0.78em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.completeness-score.complete {
+  color: var(--success-text);
+}
+
+/* Titles and their score share one baseline row. */
+.result-title-row,
+.listing-title-row,
+.browse-item-title-row,
+.listing-row-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.result-title-row .result-title,
+.listing-title-row .listing-title,
+.browse-item-title-row .browse-item-title {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.listing-row-heading {
+  gap: 6px;
+}
+
+.listing-row-heading .listing-row-name {
+  min-width: 0;
+}
+
 /* Contact action slides in on card hover (desktop only). */
 .result-card .listing-contact {
   width: 34px;

@@ -13,6 +13,9 @@ const listing = {
   desc: 'For sale · New · Samsung',
   thumb: 'box',
   createdAt: '2026-01-01T10:00:00.000Z',
+  facetsCount: 2,
+  facetsCountMax: 3,
+  facetsCountMaxAnswerable: 3,
 }
 
 const categories = [
@@ -99,6 +102,7 @@ describe('ListingPage', () => {
     expect(screen.getByText('Condition')).toBeInTheDocument()
     expect(screen.getByText('Brand')).toBeInTheDocument()
     expect(screen.getByText('Samsung')).toBeInTheDocument()
+    expect(screen.getByText('(66.67)')).toBeInTheDocument()
   })
 
   it('notifies the contact handler', () => {

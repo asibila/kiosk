@@ -4,6 +4,9 @@ import { pluralKey, translate } from './i18n.jsx'
 
 const byId = (rows) => new Map(rows.map((row) => [row.id, row]))
 
+/** The backend's virtual category for the questions shared by all categories. */
+const ALL_CATEGORY_ID = 0
+
 export function formatTime(iso) {
   if (!iso) return ''
   const date = new Date(iso)
@@ -79,6 +82,8 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
   const descriptionText = (descriptionId, fallback = '') =>
     descriptionTextFor(descriptionsById.get(descriptionId), language) || fallback
   const categoryTitle = (categoryId) => {
+    // The virtual "all" category has no Description row; the UI label lives in i18n.
+    if (categoryId === ALL_CATEGORY_ID) return t('search.allCategories')
     const category = categoriesById.get(categoryId)
     return category ? descriptionText(category.descriptionId, `Category ${category.id}`) : `Category ${categoryId}`
   }
@@ -88,6 +93,49 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
   for (const listing of listings) {
     if (!listingsByCategory.has(listing.categoryId)) listingsByCategory.set(listing.categoryId, listing)
   }
+
+  // Completion score denominator: the facets that can actually be answered with
+  // a FacetValueSelection (price/year ranges are not selections). The backend
+  // sends this as facetsCountMaxAnswerable; recompute it when older cached data
+  // does not have the key yet.
+  const answerableMaxFor = (category) => {
+    if (!category) return 0
+    if (category.id === ALL_CATEGORY_ID) {
+      return new Set(
+        facetSchemas.filter((schema) => schema.isGeneric === true).map((schema) => schema.id),
+      ).size
+    }
+
+    const ancestorIds = new Set()
+    let current = category
+    while (current && !ancestorIds.has(current.id)) {
+      ancestorIds.add(current.id)
+      current =
+        current.parentCategoryId != null
+          ? categoriesById.get(current.parentCategoryId)
+          : undefined
+    }
+
+    return new Set(
+      facetSchemas
+        .filter(
+          (schema) =>
+            schema.isGeneric === true || ancestorIds.has(schema.categoryId),
+        )
+        .map((schema) => schema.id),
+    ).size
+  }
+
+  const answerableMaxByCategory = new Map(
+    categories.map((category) => [category.id, answerableMaxFor(category)]),
+  )
+  const facetsCountMaxByCategory = new Map(
+    categories.map((category) => [
+      category.id,
+      category.facetsCountMax ??
+        Math.max(3, (answerableMaxByCategory.get(category.id) ?? 0) + 2),
+    ]),
+  )
 
   // Titles come from ListingTranslation. Missing languages fall back to the UI
   // language, then English, then any available title, then the generated label.
@@ -199,6 +247,27 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
           : undefined
     }
 
+    const questions = facetSchemas
+      .filter(
+        (schema) => schema.isGeneric === true || ancestorIds.has(schema.categoryId),
+      )
+      .map((schema, index) => {
+        const text = descriptionText(schema.descriptionId, schema.name)
+        return {
+          id: String(schema.id),
+          facet: schema.name,
+          categoryId: schema.categoryId,
+          categoryTitle: categoryTitle(schema.categoryId),
+          isGeneric: schema.isGeneric === true,
+          priority: index + 1,
+          text,
+          hint: t('interview.choose'),
+          options: facetOptions
+            .filter((option) => option.schemaId === schema.id)
+            .map((option) => ({ id: String(option.id), text: optionText(option) })),
+        }
+      })
+
     return {
       id: String(category.id),
       categoryId: category.id,
@@ -206,26 +275,14 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
       title,
       icon: iconForCategory(title),
       listingId: listingsByCategory.get(category.id)?.id ?? null,
-      questions: facetSchemas
-        .filter(
-          (schema) => schema.isGeneric === true || ancestorIds.has(schema.categoryId),
-        )
-        .map((schema, index) => {
-          const text = descriptionText(schema.descriptionId, schema.name)
-          return {
-            id: String(schema.id),
-            facet: schema.name,
-            categoryId: schema.categoryId,
-            categoryTitle: categoryTitle(schema.categoryId),
-            isGeneric: schema.isGeneric === true,
-            priority: index + 1,
-            text,
-            hint: t('interview.choose'),
-            options: facetOptions
-              .filter((option) => option.schemaId === schema.id)
-              .map((option) => ({ id: String(option.id), text: optionText(option) })),
-          }
-        }),
+      questions,
+      // The backend counts the two range questions (price, year) that are not
+      // FacetSchema rows; keep the fallback for older cached responses.
+      facetsCountMax: category.facetsCountMax ?? questions.length + 2,
+      facetsCountMaxAnswerable:
+        category.facetsCountMaxAnswerable ??
+        answerableMaxByCategory.get(category.id) ??
+        questions.length,
     }
   })
 
@@ -261,12 +318,22 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
         titles: listingTitles(listing),
         desc: listingDescription(listing),
         answers: listingAnswers,
+        facetsCount:
+          listing.facetsCount ??
+          facetSelections.filter((row) => row.listingId === listing.id).length,
+        facetsCountMax:
+          facetsCountMaxByCategory.get(listing.categoryId) ?? 0,
+        facetsCountMaxAnswerable:
+          answerableMaxByCategory.get(listing.categoryId) ?? 0,
       }
     })
 
+  // The virtual "all" category is an interview session, not a browsable node.
+  const browseCategories = categories.filter((category) => category.id !== ALL_CATEGORY_ID)
+
   // Category tree for the browse modal.
   const categoryItem = (category) => {
-    const childCount = categories.filter((child) => child.parentCategoryId === category.id).length
+    const childCount = browseCategories.filter((child) => child.parentCategoryId === category.id).length
     const listingCount = listings.filter((listing) => listing.categoryId === category.id).length
     const parts = []
     if (childCount) {
@@ -297,6 +364,13 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
     categoryId: String(listing.categoryId),
     orientation: listing.orientation,
     isActive: listing.isActive !== false,
+    facetsCount:
+      listing.facetsCount ??
+      facetSelections.filter((row) => row.listingId === listing.id).length,
+    facetsCountMax:
+      facetsCountMaxByCategory.get(listing.categoryId) ?? 0,
+    facetsCountMaxAnswerable:
+      answerableMaxByCategory.get(listing.categoryId) ?? 0,
   })
 
   const pathForCategory = (category) => {
@@ -312,18 +386,22 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
   }
 
   const browseData = {}
-  for (const category of categories) {
+  for (const category of browseCategories) {
     browseData[String(category.id)] = {
       path: pathForCategory(category),
       items: [
-        ...categories.filter((child) => child.parentCategoryId === category.id).map(categoryItem),
+        ...browseCategories
+          .filter((child) => child.parentCategoryId === category.id)
+          .map(categoryItem),
         ...listings.filter((listing) => listing.categoryId === category.id).map(listingItem),
       ],
     }
   }
   browseData.root = {
     path: [t('browse.home')],
-    items: categories.filter((category) => category.parentCategoryId == null).map(categoryItem),
+    items: browseCategories
+      .filter((category) => category.parentCategoryId == null)
+      .map(categoryItem),
   }
 
   return {

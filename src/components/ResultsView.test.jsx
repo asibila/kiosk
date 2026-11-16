@@ -40,6 +40,9 @@ const listings = [
     thumb: 'box',
     imageUrl: null,
     createdAt: '2026-01-01T10:00:00.000Z',
+    facetsCount: 2,
+    facetsCountMax: 3,
+    facetsCountMaxAnswerable: 3,
   },
   {
     id: '25',
@@ -51,6 +54,9 @@ const listings = [
     thumb: 'box',
     imageUrl: null,
     createdAt: '2026-01-02T10:00:00.000Z',
+    facetsCount: 0,
+    facetsCountMax: 3,
+    facetsCountMaxAnswerable: 3,
   },
 ]
 
@@ -90,6 +96,7 @@ describe('ResultsView', () => {
       screen.getByRole('heading', { name: 'Mobile phones #28' }),
     ).toBeInTheDocument()
     expect(screen.queryByText('Mobile phones #25')).not.toBeInTheDocument()
+    expect(screen.getByText('(66.67)')).toBeInTheDocument()
 
     const filters = within(screen.getByLabelText('Active filters'))
     expect(filters.getByText('Mobile phones')).toBeInTheDocument()

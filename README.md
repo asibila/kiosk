@@ -35,18 +35,25 @@ calls the API directly instead of using the Vite `/api` proxy. The default
 production API is `https://kiosk-api-znxy.onrender.com`; set
 `VITE_API_BASE_URL` at build time to point somewhere else.
 
-The app uses `BrowserRouter`, so the static host must rewrite unknown paths to
-`index.html`. On Render, add this rule under **Redirects/Rewrites** for the
-static site (or apply `render.yaml`):
+The app uses `BrowserRouter`, so the static host should rewrite unknown paths to
+`index.html`. On Render, add these rules under **Redirects/Rewrites** for the
+static site, **in this order** (or apply `render.yaml`):
 
 | Source | Destination | Action |
 | --- | --- | --- |
+| `/api/*` | `https://kiosk-api-znxy.onrender.com/*` | Rewrite |
 | `/*` | `/index.html` | Rewrite |
 
-Without it, opening or refreshing `/search`, `/results` or `/listing/:id`
-returns a 404 instead of the app. The API also has to allow the frontend origin
-through CORS; `FRONTEND_ORIGINS` overrides the defaults in the backend's
-`src/main.ts`.
+The first rule keeps older cached bundles working by proxying their `/api/*`
+requests to the backend. It must come before the SPA fallback.
+
+Without the second rule, opening or refreshing `/listing/:id` returns a 404
+instead of the app. The fixed routes (`/search`, `/results`, `/login`, `/app`)
+also get their own `index.html` shell at build time, so they load on hosts that
+only serve existing files. `/listing/:id` still needs the rewrite.
+
+The API also has to allow the frontend origin through CORS; `FRONTEND_ORIGINS`
+overrides the defaults in the backend's `src/main.ts`.
 
 ## Structure
 

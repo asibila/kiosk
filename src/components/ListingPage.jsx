@@ -8,6 +8,7 @@ import { localeFor } from '../facetTypes.js'
 import { useI18n } from '../i18n.jsx'
 import { ChevronLeftIcon, EnvelopeIcon, ThumbGlyph } from '../icons.jsx'
 import { buildOptionIndex } from '../searchQuery.js'
+import CompletenessScore from './CompletenessScore.jsx'
 
 export default function ListingPage({
   listing = null,
@@ -154,13 +155,19 @@ export default function ListingPage({
               )}
             </div>
 
-            <h1
-              className={
-                listing.isActive === false ? 'listing-title inactive' : 'listing-title'
-              }
-            >
-              {listing.title}
-            </h1>
+            <div className="listing-title-row">
+              <h1
+                className={
+                  listing.isActive === false ? 'listing-title inactive' : 'listing-title'
+                }
+              >
+                {listing.title}
+              </h1>
+              <CompletenessScore
+                answered={listing.facetsCount}
+                total={listing.facetsCountMax}
+              />
+            </div>
             <p className="listing-desc">{listing.desc}</p>
 
             <div className="listing-actions">
