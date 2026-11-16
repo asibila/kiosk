@@ -6,7 +6,7 @@ import { Link, useLocation } from 'react-router'
 import { mediaUrl } from '../api.js'
 import { localeFor } from '../facetTypes.js'
 import { useI18n } from '../i18n.jsx'
-import { EnvelopeIcon, ThumbGlyph } from '../icons.jsx'
+import { ChevronLeftIcon, EnvelopeIcon, ThumbGlyph } from '../icons.jsx'
 import { buildOptionIndex } from '../searchQuery.js'
 
 export default function ListingPage({
@@ -104,6 +104,7 @@ export default function ListingPage({
     <section className="listing-page" aria-label={t('listing.aria')}>
       <div className="listing-inner">
         <Link className="results-back" to={backTo}>
+          <ChevronLeftIcon size={14} />
           {backLabel}
         </Link>
 

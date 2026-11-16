@@ -2,7 +2,7 @@
 // chips, a category picker (the Browse modal) and a "Filter" modal on one row.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import { ChevronDownIcon, LayersIcon } from '../icons.jsx'
+import { ChevronDownIcon, LayersIcon, SearchIcon } from '../icons.jsx'
 import { pluralKey, useI18n } from '../i18n.jsx'
 import { isRangeChip, isValueChip } from '../facetTypes.js'
 import {
@@ -316,7 +316,7 @@ export default function SearchView({
 
           <button
             type="button"
-            className="search-category"
+            className="search-category filter-btn"
             aria-haspopup="dialog"
             onClick={() => setFacetsOpen(true)}
           >
@@ -328,14 +328,15 @@ export default function SearchView({
           </button>
 
           <button type="button" className="btn primary search-submit" onClick={submitSearch}>
+            <SearchIcon size={16} />
             {t('search.submit')}
           </button>
         </div>
 
         {resultCount != null && (
-          <p className="search-result-summary">
-            {t(pluralKey(resultCount, 'search.resultCount'), { count: resultCount })}
-          </p>
+          <div className="search-result-count">
+            <span>{t(pluralKey(resultCount, 'search.resultCount'), { count: resultCount })}</span>
+          </div>
         )}
 
         <span className="sr-only" aria-live="polite">

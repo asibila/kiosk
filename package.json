@@ -20,6 +20,8 @@
     "@vitejs/plugin-react": "^5.0.0",
     "jsdom": "^31.0.1",
     "vite": "^7.0.0",
+    "vite-plugin-mkcert": "^2.1.0",
+    "vite-plugin-pwa": "^2.0.0",
     "vitest": "^5.1.0"
   },
   "allowScripts": {

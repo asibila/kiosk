@@ -12,21 +12,20 @@ npm run build    # production build in dist/
 npm test         # Vitest + Testing Library
 ```
 
-The UI reads live data from the NestJS backend. Start it first on
-`http://localhost:3000`:
+The UI reads live data from the NestJS backend, so start it first:
 
 ```bash
 cd ../backend
 npm run start:dev
 ```
 
-Vite proxies `/api/*` to `http://localhost:3000` in both dev and preview, so the
-browser never hits a cross-origin request. Set `VITE_API_BASE_URL` to use a
-different base path (it replaces the default `/api` verbatim, so point it at a
-same-origin path or an API host that allows CORS):
+The browser always calls `/api` on the same origin. Vite proxies `/api/*` to
+`VITE_API_PROXY_TARGET` in both dev and preview, so the browser never hits a
+cross-origin request. That proxy target is the only backend setting and lives
+in `.env` (copy `.env.example` if you don't have one):
 
 ```bash
-VITE_API_BASE_URL=/backend npm run dev
+VITE_API_PROXY_TARGET=http://localhost:3000
 ```
 
 ## Structure

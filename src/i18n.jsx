@@ -73,6 +73,7 @@ const STRINGS = {
     'results.title': 'Search results',
     'results.edit': 'Edit search',
     'results.filters': 'Active filters',
+    'results.removeFilter': 'Remove filter {label}',
     'results.open': 'Open {title}',
     'listing.aria': 'Listing details',
     'listing.back': 'Back to search',
@@ -240,7 +241,7 @@ const STRINGS = {
     'loading.body':
       'Fetching categories, listings and conversations from the backend.',
     'error.title': 'Cannot load data',
-    'error.hint': 'Make sure the backend is running on http://localhost:3000.',
+    'error.hint': 'Make sure the backend is running, then try again.',
     'error.retry': 'Try again',
     'empty.browse': 'Browse',
     'empty.noCategories':
@@ -323,6 +324,7 @@ const STRINGS = {
     'results.title': 'Rezultati pretrage',
     'results.edit': 'Uredi pretragu',
     'results.filters': 'Aktivni filtri',
+    'results.removeFilter': 'Ukloni filter {label}',
     'results.open': 'Otvori {title}',
     'listing.aria': 'Detalji oglasa',
     'listing.back': 'Natrag na pretragu',
@@ -490,7 +492,7 @@ const STRINGS = {
     'loading.body':
       'Dohvaćanje kategorija, oglasa i razgovora s poslužitelja.',
     'error.title': 'Nije moguće učitati podatke',
-    'error.hint': 'Provjerite radi li poslužitelj na http://localhost:3000.',
+    'error.hint': 'Provjerite radi li poslužitelj, pa pokušajte ponovno.',
     'error.retry': 'Pokušaj ponovno',
     'empty.browse': 'Pregledaj',
     'empty.noCategories':

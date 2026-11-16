@@ -1,6 +1,7 @@
 // Thin client for the NestJS CRUD API (see ../backend/API_ROUTES.md).
-// In dev, Vite proxies /api → http://localhost:3000 (see vite.config.js).
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/+$/, '')
+// The browser always calls /api on the Vite origin. In dev/preview, Vite
+// proxies it to VITE_API_PROXY_TARGET (see vite.config.js).
+const API_BASE = '/api'
 
 export { API_BASE }
 

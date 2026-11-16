@@ -1520,7 +1520,7 @@ function KioskApp() {
       <div className="action-buttons">
         <button
           type="button"
-          className="btn primary"
+          className="btn success"
           onClick={publish}
           disabled={publishing || listingDirection == null || savingTitle}
         >
@@ -1605,6 +1605,7 @@ function KioskApp() {
           unreadCount={unreadTotal}
           signedIn={isLoggedIn}
           onSignIn={signIn}
+          user={user}
         />
 
         {/* Clicking the main content (outside the drawer) closes it. */}

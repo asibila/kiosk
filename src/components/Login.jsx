@@ -2,8 +2,7 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { useI18n } from '../i18n.jsx'
-
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/+$/, '')
+import { API_BASE } from '../api.js'
 
 export default function Login() {
   const [email, setEmail] = useState('')

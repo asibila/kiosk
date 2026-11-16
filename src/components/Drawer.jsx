@@ -3,7 +3,7 @@
 // The selected listing expands to show its chat threads (via listing-chat-threads);
 // clicking one opens that conversation on the main screen.
 import { Fragment } from 'react'
-import { ChatIcon, GearIcon, LogOutIcon, MessageIcon, PlusIcon, TagIcon, TrashIcon } from '../icons.jsx'
+import { ChatIcon, GearIcon, LogOutIcon, MessageIcon, PlusIcon, TagIcon, TrashIcon, UserIcon } from '../icons.jsx'
 import { useI18n } from '../i18n.jsx'
 
 export default function Drawer({
@@ -22,8 +22,17 @@ export default function Drawer({
   unreadCount = 0,
   signedIn = true,
   onSignIn,
+  user = null,
 }) {
   const { t } = useI18n()
+  const userInitials = user?.name
+    ? String(user.name)
+        .split(' ')
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase()
+    : <UserIcon size={16} />
   return (
     <aside
       className={open ? 'drawer open' : 'drawer'}
@@ -32,7 +41,19 @@ export default function Drawer({
       inert={open ? undefined : true}
     >
       <div className="drawer-head">
-        <span className="drawer-title">{t('drawer.title')}</span>
+        {signedIn && user ? (
+          <div className="drawer-user">
+            <span className="drawer-user-avatar" aria-hidden="true">
+              {userInitials}
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <div className="drawer-user-name">{user.name}</div>
+              <div className="drawer-user-role">{user.email}</div>
+            </div>
+          </div>
+        ) : (
+          <span className="drawer-title">{t('drawer.title')}</span>
+        )}
       </div>
 
       {signedIn ? (

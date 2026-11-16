@@ -78,7 +78,14 @@ export default function ChatView({ chat, onSend, liveStatus = 'connecting' }) {
     <section className="chat-view" aria-label={t('chat.aria', { title: chat.title })}>
       <header className="chat-head">
         <span className="avatar" aria-hidden="true">
-          <UserIcon size={20} />
+          {chat.partnerName
+            ? String(chat.partnerName)
+                .split(' ')
+                .map((n) => n[0])
+                .slice(0, 2)
+                .join('')
+                .toUpperCase()
+            : <UserIcon size={20} />}
         </span>
         <div>
           <div className="chat-head-text">

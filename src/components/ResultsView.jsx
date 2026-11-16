@@ -2,11 +2,11 @@
 // (category, direction, value/range chips); labels are resolved from the
 // catalog on each render so shared links work in either language.
 import { useMemo } from 'react'
-import { Link, useLocation } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { mediaUrl } from '../api.js'
 import { formatRange } from '../facetTypes.js'
 import { pluralKey, useI18n } from '../i18n.jsx'
-import { EnvelopeIcon, ThumbGlyph } from '../icons.jsx'
+import { EnvelopeIcon, SearchIcon, ThumbGlyph, XIcon } from '../icons.jsx'
 import {
   buildOptionIndex,
   filterListings,
@@ -30,6 +30,7 @@ export default function ResultsView({
 }) {
   const { language, t } = useI18n()
   const location = useLocation()
+  const navigate = useNavigate()
 
   const query = useMemo(() => parseSearchQuery(location.search), [location.search])
   const optionIndex = useMemo(() => buildOptionIndex(categories), [categories])
@@ -95,6 +96,24 @@ export default function ResultsView({
     return `${chip.facetLabel}: ${formatRange(chip, language, t)}`
   }
 
+  function removeChip(chip) {
+    const nextChips = chips.filter((c) => chipKey(c) !== chipKey(chip))
+    const params = new URLSearchParams(location.search)
+    params.delete('facet')
+    params.delete('range')
+    for (const c of nextChips) {
+      if (c.kind === 'value') {
+        params.append('facet', `${c.facet}:${c.valueId}`)
+      } else {
+        params.append(
+          'range',
+          `${c.facet}:${c.min ?? ''}-${c.max ?? ''}`,
+        )
+      }
+    }
+    navigate({ pathname: '/results', search: params.toString() ? `?${params.toString()}` : '' }, { replace: true })
+  }
+
   return (
     <section className="results-page" aria-label={t('results.aria')}>
       <div className="results-inner">
@@ -117,14 +136,24 @@ export default function ResultsView({
           <span className="chip">{category?.title ?? t('search.allCategories')}</span>
           {directionLabel && <span className="chip selected">{directionLabel}</span>}
           {chips.map((chip) => (
-            <span className="chip" key={chipKey(chip)} title={chipLabel(chip)}>
+            <button
+              type="button"
+              className="chip"
+              key={chipKey(chip)}
+              title={t('results.removeFilter', { label: chipLabel(chip) })}
+              onClick={() => removeChip(chip)}
+            >
               {chipLabel(chip)}
-            </span>
+              <XIcon size={12} style={{ marginLeft: 4 }} />
+            </button>
           ))}
         </div>
 
         {results.length === 0 ? (
           <div className="results-empty">
+            <span className="placeholder-icon">
+              <SearchIcon size={36} />
+            </span>
             <p>{t('listings.empty')}</p>
             <Link className="btn primary" to={{ pathname: '/search', search: location.search }}>
               {t('results.edit')}
