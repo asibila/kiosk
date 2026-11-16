@@ -115,9 +115,9 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
 
   // Only threads in the current user's inbox appear in Messages.
   // The logged-in user (from the login response) drives the inbox and the
-  // sent-vs-received message split. Falls back to the first user when no login
-  // has happened yet.
-  const currentUser = users.find((u) => u.id === userId) ?? users[0] ?? null
+  // sent-vs-received message split. With nobody signed in there is no current
+  // user: guests see the catalog, and nothing is attributed to anyone.
+  const currentUser = users.find((u) => u.id === userId) ?? null
   const userInboxItems = inboxItems.filter(
     (item) => currentUser && item.userId === currentUser.id,
   )
@@ -191,7 +191,7 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
     const title = categoryTitle(category.id)
     const ancestorIds = new Set()
     let current = category
-    while (current) {
+    while (current && !ancestorIds.has(current.id)) {
       ancestorIds.add(current.id)
       current =
         current.parentCategoryId != null
@@ -301,8 +301,10 @@ export function buildViewModel(raw, { userId, language = 'en' } = {}) {
 
   const pathForCategory = (category) => {
     const chain = []
+    const seen = new Set()
     let current = category
-    while (current) {
+    while (current && !seen.has(current.id)) {
+      seen.add(current.id)
       chain.unshift(categoryTitle(current.id))
       current = current.parentCategoryId != null ? categoriesById.get(current.parentCategoryId) : null
     }

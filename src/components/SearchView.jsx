@@ -93,7 +93,7 @@ export default function SearchView({
     )
     const chain = []
     let current = byCategoryId.get(String(categoryId))
-    while (current) {
+    while (current && !chain.includes(current)) {
       chain.unshift(current)
       current =
         current.parentCategoryId != null

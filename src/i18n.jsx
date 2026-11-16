@@ -134,6 +134,7 @@ const STRINGS = {
     'interview.next': 'Next >',
     'interview.creatingDraft': 'Creating draft…',
     'interview.previous': '< Previous',
+    'interview.signInToPublish': 'Sign in to publish',
     'interview.search': 'Search',
     'interview.publish': 'Publish',
     'interview.publishing': 'Publishing…',
@@ -233,6 +234,7 @@ const STRINGS = {
     'profile.userId': 'User ID',
     'profile.note': 'Loaded from the backend users table.',
     'profile.noUsers': 'The backend has no users yet.',
+    'profile.guest': 'Sign in to see your profile.',
 
     'loading.title': 'Loading sessions…',
     'loading.body':
@@ -382,6 +384,7 @@ const STRINGS = {
     'interview.next': 'Dalje >',
     'interview.creatingDraft': 'Stvaranje skice…',
     'interview.previous': '< Natrag',
+    'interview.signInToPublish': 'Prijavite se za objavu',
     'interview.search': 'Traži',
     'interview.publish': 'Objavi',
     'interview.publishing': 'Objavljivanje…',
@@ -481,6 +484,7 @@ const STRINGS = {
     'profile.userId': 'ID korisnika',
     'profile.note': 'Učitano iz tablice korisnika na poslužitelju.',
     'profile.noUsers': 'Poslužitelj još nema korisnika.',
+    'profile.guest': 'Prijavite se da vidite svoj profil.',
 
     'loading.title': 'Učitavanje sesija…',
     'loading.body':

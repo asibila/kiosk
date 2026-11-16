@@ -60,6 +60,17 @@ function getLoggedInUserId() {
   }
 }
 
+/** Forgets the signed-in user on this device. Returns false if storage refuses. */
+function clearSignedInUserId() {
+  try {
+    localStorage.removeItem(LOGGED_IN_USER_ID_KEY)
+    return true
+  } catch {
+    // Storage can be blocked; signing out still navigates away from the session.
+    return false
+  }
+}
+
 function KioskApp() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -165,6 +176,12 @@ function KioskApp() {
       .then((raw) => {
         if (cancelled) return
         const view = buildViewModel(raw, { userId: loggedInUserId, language })
+        // The stored sign-in names a user that no longer exists (for example
+        // after a database reset). Forget it and load again as a guest.
+        if (loggedInUserId != null && !view.user && clearSignedInUserId()) {
+          setReloadToken((n) => n + 1)
+          return
+        }
         setUser(view.user)
         setUsers(view.users ?? [])
         setLanguages(view.languages?.length ? view.languages : LANGUAGES)
@@ -577,7 +594,7 @@ function KioskApp() {
     const listings = found.filter((listing) => {
       const categoryChain = new Set()
       let current = sessionByCategoryId.get(String(listing.categoryId))
-      while (current) {
+      while (current && !categoryChain.has(String(current.categoryId))) {
         categoryChain.add(String(current.categoryId))
         current =
           current.parentCategoryId != null
@@ -1262,7 +1279,7 @@ function KioskApp() {
   // Persist text messages and show the saved row once; attachments stay local.
   async function sendMessage(chatId, message) {
     const chat = chats.find((c) => c.id === chatId)
-    if (!chat) return
+    if (!chat || !user) return
 
     // Attachments are browser-local placeholders and are not persisted.
     if (!message.text) {
@@ -1335,14 +1352,16 @@ function KioskApp() {
   // KioskApp unmounts on /login, so user-scoped state and live streams are
   // discarded; the language and theme preferences stay on the device.
   function signOut() {
-    try {
-      localStorage.removeItem(LOGGED_IN_USER_ID_KEY)
-    } catch {
-      // Ignore storage failures; navigating away still ends the signed-in view.
-    }
+    clearSignedInUserId()
     setDrawerOpen(false)
     setModal(null)
     navigate('/login', { replace: true })
+  }
+
+  // Guests reach the sign-in form from the drawer, the profile or the interview
+  // and return to the same screen afterwards.
+  function signIn() {
+    navigate('/login', { state: { from: `${location.pathname}${location.search}` } })
   }
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId) || null
@@ -1450,6 +1469,11 @@ function KioskApp() {
         >
           {t('interview.search')}
         </button>
+        {!user && (
+          <button type="button" className="btn secondary" onClick={signIn}>
+            {t('interview.signInToPublish')}
+          </button>
+        )}
         <button
           type="button"
           className="btn primary"
@@ -1536,7 +1560,7 @@ function KioskApp() {
         <p className="profile-note">{t('profile.note')}</p>
       </div>
     ) : (
-      <p>{t('profile.noUsers')}</p>
+      <p>{isLoggedIn ? t('profile.noUsers') : t('profile.guest')}</p>
     )
 
   return (
@@ -1580,11 +1604,7 @@ function KioskApp() {
           onSignOut={signOut}
           unreadCount={unreadTotal}
           signedIn={isLoggedIn}
-          onSignIn={() =>
-            navigate('/login', {
-              state: { from: `${location.pathname}${location.search}` },
-            })
-          }
+          onSignIn={signIn}
         />
 
         {/* Clicking the main content (outside the drawer) closes it. */}
@@ -1713,6 +1733,10 @@ function KioskApp() {
             modal === 'profile' && isLoggedIn ? (
               <button type="button" className="btn secondary" onClick={signOut}>
                 {t('drawer.signOut')}
+              </button>
+            ) : modal === 'profile' ? (
+              <button type="button" className="btn primary" onClick={signIn}>
+                {t('drawer.signIn')}
               </button>
             ) : undefined
           }
