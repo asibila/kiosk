@@ -99,7 +99,7 @@ describe('FacetChipInput', () => {
     fireEvent.click(await screen.findByRole('option', { name: /Samsung/ }))
 
     expect(onChange).toHaveBeenCalledWith([samsungChip])
-    expect(screen.getByText('Brand: Samsung')).toBeInTheDocument()
+    expect(screen.getByText('BRAND: Samsung')).toBeInTheDocument()
     expect(input).toHaveValue('')
     expect(input).toHaveFocus()
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
@@ -117,7 +117,7 @@ describe('FacetChipInput', () => {
     type('sam')
     fireEvent.click(await screen.findByRole('option', { name: /Samsung/ }))
 
-    expect(screen.getAllByText('Brand: Samsung')).toHaveLength(1)
+    expect(screen.getAllByText('BRAND: Samsung')).toHaveLength(1)
     expect(onChange).not.toHaveBeenCalled()
   })
 
@@ -128,7 +128,7 @@ describe('FacetChipInput', () => {
     fireEvent.keyDown(screen.getByTestId('facet-chip-input'), { key: 'Backspace' })
 
     expect(onChange).toHaveBeenCalledWith([samsungChip])
-    expect(screen.queryByText('Fuel: Diesel')).not.toBeInTheDocument()
+    expect(screen.queryByText('FUEL: Diesel')).not.toBeInTheDocument()
   })
 
   it('moves the highlight with arrow keys and selects it with Enter', async () => {
@@ -147,7 +147,7 @@ describe('FacetChipInput', () => {
     expect(option).toHaveAttribute('aria-selected', 'true')
 
     fireEvent.keyDown(input, { key: 'Enter' })
-    expect(screen.getByText('Brand: Samsung')).toBeInTheDocument()
+    expect(screen.getByText('BRAND: Samsung')).toBeInTheDocument()
     expect(input).toHaveValue('')
   })
 
@@ -165,7 +165,7 @@ describe('FacetChipInput', () => {
 
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
     expect(input).toHaveValue('sam')
-    expect(screen.getByText('Brand: Samsung')).toBeInTheDocument()
+    expect(screen.getByText('BRAND: Samsung')).toBeInTheDocument()
   })
 
   it('removes a chip through its ✕ button and fires onChange', () => {
@@ -175,7 +175,7 @@ describe('FacetChipInput', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove Brand Samsung' }))
 
     expect(onChange).toHaveBeenCalledWith([])
-    expect(screen.queryByText('Brand: Samsung')).not.toBeInTheDocument()
+    expect(screen.queryByText('BRAND: Samsung')).not.toBeInTheDocument()
     expect(screen.getByTestId('facet-chip-input')).toHaveFocus()
   })
 

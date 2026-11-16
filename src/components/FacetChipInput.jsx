@@ -299,9 +299,11 @@ export default function FacetChipInput({
               }}
             >
               {chips.map((chip, index) => {
+                // The facet name is a category label; the value keeps its case.
+                const facetName = chip.facetLabel.toUpperCase()
                 const label = isValueChip(chip)
-                  ? `${chip.facetLabel}: ${chip.label}`
-                  : `${chip.facetLabel}: ${formatRange(chip, lang, t)}`
+                  ? `${facetName}: ${chip.label}`
+                  : `${facetName}: ${formatRange(chip, lang, t)}`
                 const removalLabel = isValueChip(chip)
                   ? chip.label
                   : formatRange(chip, lang, t)
