@@ -28,6 +28,26 @@ in `.env` (copy `.env.example` if you don't have one):
 VITE_API_PROXY_TARGET=http://localhost:3000
 ```
 
+## Deployment
+
+In production the frontend and the API run on different origins, so the build
+calls the API directly instead of using the Vite `/api` proxy. The default
+production API is `https://kiosk-api-znxy.onrender.com`; set
+`VITE_API_BASE_URL` at build time to point somewhere else.
+
+The app uses `BrowserRouter`, so the static host must rewrite unknown paths to
+`index.html`. On Render, add this rule under **Redirects/Rewrites** for the
+static site (or apply `render.yaml`):
+
+| Source | Destination | Action |
+| --- | --- | --- |
+| `/*` | `/index.html` | Rewrite |
+
+Without it, opening or refreshing `/search`, `/results` or `/listing/:id`
+returns a 404 instead of the app. The API also has to allow the frontend origin
+through CORS; `FRONTEND_ORIGINS` overrides the defaults in the backend's
+`src/main.ts`.
+
 ## Structure
 
 | Spec section | Where it lives |

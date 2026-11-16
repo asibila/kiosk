@@ -1,7 +1,25 @@
 // Thin client for the NestJS CRUD API (see ../backend/API_ROUTES.md).
-// The browser always calls /api on the Vite origin. In dev/preview, Vite
-// proxies it to VITE_API_PROXY_TARGET (see vite.config.js).
-const API_BASE = '/api'
+//
+// In dev/preview the browser calls /api on the Vite origin and Vite proxies it
+// to VITE_API_PROXY_TARGET (see vite.config.js). A production build cannot use
+// that proxy, so it calls the deployed API directly. Override the production
+// URL with VITE_API_BASE_URL when the API moves.
+const PRODUCTION_API_BASE = 'https://kiosk-api-znxy.onrender.com'
+
+/**
+ * Resolve the API origin for this build.
+ * @param {string | undefined} configuredBase `VITE_API_BASE_URL` from the build env.
+ * @param {boolean} isProduction whether this is a production build.
+ */
+export function resolveApiBase(configuredBase, isProduction) {
+  const base = configuredBase?.trim() || (isProduction ? PRODUCTION_API_BASE : '/api')
+  return base.replace(/\/+$/, '') || '/api'
+}
+
+const API_BASE = resolveApiBase(
+  import.meta.env.VITE_API_BASE_URL,
+  import.meta.env.PROD,
+)
 
 export { API_BASE }
 
