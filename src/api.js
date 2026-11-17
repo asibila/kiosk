@@ -96,6 +96,21 @@ export const api = {
     }),
 }
 
+let descriptionsPromise
+
+/**
+ * Load `/descriptions` once. The i18n provider and the regular data load both
+ * need this response, so they share the same in-flight request. A failed load
+ * clears the cache so a later retry can try again.
+ */
+export function loadDescriptions() {
+  descriptionsPromise ??= api.list('descriptions').catch((error) => {
+    descriptionsPromise = undefined
+    throw error
+  })
+  return descriptionsPromise
+}
+
 const RESOURCES = [
   'users',
   'languages',
@@ -115,6 +130,12 @@ const RESOURCES = [
 
 /** Fetch every resource the UI needs, in parallel. */
 export async function fetchKioskData() {
-  const rows = await Promise.all(RESOURCES.map((resource) => api.list(resource)))
+  const rows = await Promise.all(
+    RESOURCES.map((resource) =>
+      resource === 'descriptions'
+        ? loadDescriptions()
+        : api.list(resource),
+    ),
+  )
   return Object.fromEntries(RESOURCES.map((resource, index) => [resource, rows[index]]))
 }

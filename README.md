@@ -61,7 +61,7 @@ overrides the defaults in the backend's `src/main.ts`.
 | --- | --- |
 | API client + resource loader | `src/api.js` |
 | Backend rows → sessions / chats / browse tree | `src/viewModel.js` |
-| UI translations + language provider | `src/i18n.jsx` |
+| UI translations + language provider (strings loaded from `GET /descriptions`) | `src/i18n.jsx` |
 | Structured search input | `src/components/FacetChipInput.jsx` |
 | Suggestion fetch (debounce/abort/stale discard) | `src/useFacetSuggestions.js` |
 | Chip/suggestion JSDoc types + range formatting | `src/facetTypes.js` |
@@ -79,7 +79,7 @@ overrides the defaults in the backend's `src/main.ts`.
 | Backend resource | UI use |
 | --- | --- |
 | `users` | Profile modal (first user is the signed-in user) |
-| `categories` + `descriptions` | Drawer sessions, browse tree (translated per selected language) |
+| `categories` + `descriptions` | Drawer sessions and browse tree use descriptions by id; descriptions with a `name` are the UI translation dictionary loaded at startup |
 | `languages` | Codes/names for the topbar EN/HR switcher |
 | `facet-schemas` + `facet-value-options` | Interview questions and answer chips |
 | `facet-value-selections` | Saved answers (on the category's first listing) |

@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router'
 import { api, CHAT_EVENTS_URL, fetchKioskData, mediaUrl } from './api.js'
 import { buildViewModel, formatTime } from './viewModel.js'
-import { LANGUAGES, LanguageProvider, useI18n } from './i18n.jsx'
+import { LANGUAGES, LanguageProvider, setStrings, useI18n } from './i18n.jsx'
 import { AlertIcon, LayersIcon, XIcon } from './icons.jsx'
 import TopBar from './components/TopBar.jsx'
 import Drawer from './components/Drawer.jsx'
@@ -175,6 +175,9 @@ function KioskApp() {
     fetchKioskData()
       .then((raw) => {
         if (cancelled) return
+        // The provider normally loads these before the app mounts; updating
+        // here covers a retry after a failed initial translation request.
+        setStrings(raw.descriptions)
         const view = buildViewModel(raw, { userId: loggedInUserId, language })
         // The stored sign-in names a user that no longer exists (for example
         // after a database reset). Forget it and load again as a guest.
