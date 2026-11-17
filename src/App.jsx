@@ -10,7 +10,7 @@ import { hasStrings, LANGUAGES, LanguageProvider, useI18n } from './i18n.jsx'
 import { AlertIcon, LayersIcon, XIcon } from './icons.jsx'
 import TopBar from './components/TopBar.jsx'
 import Drawer from './components/Drawer.jsx'
-import SessionView from './components/SessionView.jsx'
+import InterviewView from './components/InterviewView.jsx'
 import ChatView from './components/ChatView.jsx'
 import BrowseModal from './components/BrowseModal.jsx'
 import MessagesModal from './components/MessagesModal.jsx'
@@ -82,7 +82,7 @@ function clearSignedInUserId() {
     localStorage.removeItem(LOGGED_IN_USER_ID_KEY)
     return true
   } catch {
-    // Storage can be blocked; signing out still navigates away from the session.
+    // Storage can be blocked; signing out still navigates away from the account.
     return false
   }
 }
@@ -97,9 +97,9 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   // render cannot read that, so it passes `initialUserId: null` and the browser
   // resolves the stored id after hydration. `undefined` keeps the plain
   // client-side behaviour of reading storage on every render.
-  const [sessionUserId, setSessionUserId] = useState(() => initialUserId)
+  const [authUserId, setAuthUserId] = useState(() => initialUserId)
   const loggedInUserId =
-    sessionUserId === undefined ? getLoggedInUserId() : sessionUserId
+    authUserId === undefined ? getLoggedInUserId() : authUserId
   const isLoggedIn = loggedInUserId != null
 
   // Seed the first render from a server payload. This is what lets the server
@@ -119,7 +119,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   const isResultsRoute = location.pathname === '/results'
   const isListingRoute = listingRouteId != null
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [selectedSessionId, setSelectedSessionId] = useState(null)
+  const [selectedInterviewId, setSelectedInterviewId] = useState(null)
   const [selectedChatId, setSelectedChatId] = useState(null)
   const [modal, setModal] = useState(null) // 'browse' | 'messages' | 'settings' | 'profile' | null
   const [browseFor, setBrowseFor] = useState('listing') // 'listing' | 'search' | 'new'
@@ -143,7 +143,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   const [regions, setRegions] = useState(initialView?.regions ?? [])
   // `null` until the stored choice or the IP detection resolves it.
   const [regionId, setRegionId] = useState(() => getStoredRegionId())
-  const [sessions, setSessions] = useState(initialView?.sessions ?? [])
+  const [interviews, setInterviews] = useState(initialView?.interviews ?? [])
   const [chats, setChats] = useState(initialView?.chats ?? [])
   const [inbox, setInbox] = useState(initialView?.inbox ?? [])
   const [browseData, setBrowseData] = useState(
@@ -219,10 +219,10 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   // not know it, so it rendered the public version of the page.
   useEffect(() => {
     if (initialUserId !== null) return
-    setSessionUserId(getLoggedInUserId())
+    setAuthUserId(getLoggedInUserId())
   }, [initialUserId])
 
-  // Load every resource the UI needs, then map it onto the session/chat model.
+  // Load every resource the UI needs, then map it onto the interview/chat model.
   useEffect(() => {
     if (skipInitialFetchRef.current) {
       skipInitialFetchRef.current = false
@@ -264,7 +264,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
         setUsers(view.users ?? [])
         setLanguages(view.languages?.length ? view.languages : LANGUAGES)
         setRegions(view.regions ?? [])
-        setSessions(view.sessions)
+        setInterviews(view.interviews)
         setChats(view.chats)
         setInbox(view.inbox ?? [])
         setMyListings(view.myListings)
@@ -322,7 +322,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
     try {
       localStorage.setItem(REGION_KEY, String(value))
     } catch {
-      // Storage can be blocked; the choice still applies to this session.
+      // Storage can be blocked; the choice still applies to this visit.
     }
   }
 
@@ -415,7 +415,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
     try {
       localStorage.setItem(THEME_KEY, theme)
     } catch {
-      // Ignore storage failures; the theme still applies for this session.
+      // Ignore storage failures; the theme still applies for this visit.
     }
   }, [theme])
 
@@ -482,7 +482,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
     setPendingDelete(null)
     setSelectedListingId(null)
     setSelectedChatId(null)
-    setSelectedSessionId(null)
+    setSelectedInterviewId(null)
     setCategoryDirty(false)
     setDraftListingId(null)
     setTranslationsOpen(false)
@@ -515,7 +515,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
       myListings.find(
         (listing) =>
           String(listing.listingId) === String(targetId) &&
-          String(listing.sessionId) === String(selectedSessionId),
+          String(listing.categoryId) === String(selectedInterviewId),
       ) ?? null
     )
   }
@@ -660,7 +660,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   }
 
   // (g) Browse modal: OK adopts the browsed category as the current one; Cancel just closes.
-  // Sessions are categories, so adopting a category means selecting the matching session,
+  // Interviews are categories, so adopting a category means selecting the matching interview,
   // whose questions are that category's facet schemas. Start with unanswered questions.
   function handleBrowsePick(categoryId) {
     setModal(null)
@@ -676,28 +676,28 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
     }
     const node = browseData[categoryId]
     if (!node || node.path.length < 2) return // root path is not a category
-    const targetSession = sessions.find((s) => String(s.categoryId) === String(categoryId))
-    if (!targetSession) return
+    const targetInterview = interviews.find((s) => String(s.categoryId) === String(categoryId))
+    if (!targetInterview) return
 
     // Opened from the drawer's "New listing": start a fresh wizard in the
     // chosen category (no listing is written until Publish).
     if (browseFor === 'new') {
       startNewListing()
       setCategoryDirty(true)
-      setSelectedSessionId(String(targetSession.id))
+      setSelectedInterviewId(String(targetInterview.id))
       return
     }
-    const alreadyCurrent = selectedSessionId === String(targetSession.id)
+    const alreadyCurrent = selectedInterviewId === String(targetInterview.id)
 
     setSelectedListingId(null)
     setAnswers((prev) => {
       const next = { ...prev }
-      for (const question of targetSession.questions ?? []) delete next[question.id]
+      for (const question of targetInterview.questions ?? []) delete next[question.id]
       return next
     })
 
-    selectSession(String(targetSession.id))
-    // Re-picking the category the session already has is not a change.
+    selectInterview(String(targetInterview.id))
+    // Re-picking the category the interview already has is not a change.
     setCategoryDirty(!alreadyCurrent)
   }
 
@@ -708,11 +708,11 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
     // A question applies to a listing when it is generic or when it is defined
     // on the listing's category or one of its ancestors.
     const questionById = {}
-    const sessionByCategoryId = new Map(
-      sessions.map((session) => [String(session.categoryId), session]),
+    const interviewByCategoryId = new Map(
+      interviews.map((interview) => [String(interview.categoryId), interview]),
     )
-    for (const session of sessions) {
-      for (const question of session.questions) questionById[question.id] = question
+    for (const interview of interviews) {
+      for (const question of interview.questions) questionById[question.id] = question
     }
     const found = []
     for (const node of Object.values(browseData)) {
@@ -722,12 +722,12 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
     }
     const listings = found.filter((listing) => {
       const categoryChain = new Set()
-      let current = sessionByCategoryId.get(String(listing.categoryId))
+      let current = interviewByCategoryId.get(String(listing.categoryId))
       while (current && !categoryChain.has(String(current.categoryId))) {
         categoryChain.add(String(current.categoryId))
         current =
           current.parentCategoryId != null
-            ? sessionByCategoryId.get(String(current.parentCategoryId))
+            ? interviewByCategoryId.get(String(current.parentCategoryId))
             : undefined
       }
 
@@ -791,12 +791,12 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   // listing owned by the signed-in user. Either way the answered facets become
   // facet-value-selections on the listing that was written.
   async function publish() {
-    if (!selectedSession || !user || publishing || savingQuestionId != null) return
-    if (requiredQuestionsMissing(selectedSession).length > 0) {
+    if (!selectedInterview || !user || publishing || savingQuestionId != null) return
+    if (requiredQuestionsMissing(selectedInterview).length > 0) {
       setNotice(t('interview.requiredMissing'))
       return
     }
-    const answered = selectedSession.questions.filter((q) => answers[q.id] != null)
+    const answered = selectedInterview.questions.filter((q) => answers[q.id] != null)
     const answeredFacets = answered.filter(
       (q) => q.type !== 'numeric' && q.facet !== 'orientation',
     )
@@ -819,7 +819,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
           'listings',
           target.listingId,
           {
-            categoryId: selectedSession.categoryId,
+            categoryId: selectedInterview.categoryId,
             orientation,
             userId: user.id,
             isActive: true,
@@ -833,7 +833,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
         savedListing = await api.create(
           'listings',
           {
-            categoryId: selectedSession.categoryId,
+            categoryId: selectedInterview.categoryId,
             regionId: regionId ?? 0,
             orientation,
             userId: user.id,
@@ -853,7 +853,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
         const saved = await saveListingTitle(
           listingId,
           language,
-          generatedTitle(selectedSession, listingId),
+          generatedTitle(selectedInterview, listingId),
         )
         publishTitle = saved?.title ?? publishTitle
       }
@@ -907,16 +907,15 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
       const nextListing = {
         id: String(listingId),
         listingId,
-        sessionId: selectedSession.id,
-        categoryId: selectedSession.categoryId,
+        categoryId: selectedInterview.categoryId,
         orientation,
         isActive: true,
         price,
         year,
         facetsCount: savedListing?.facetsCount,
-        facetsCountMax: selectedSession.facetsCountMax,
-        facetsCountMaxAnswerable: selectedSession.facetsCountMaxAnswerable,
-        title: publishTitle || generatedTitle(selectedSession, listingId),
+        facetsCountMax: selectedInterview.facetsCountMax,
+        facetsCountMaxAnswerable: selectedInterview.facetsCountMaxAnswerable,
+        title: publishTitle || generatedTitle(selectedInterview, listingId),
         titles: {
           ...titlesForListing(listingId),
           ...(publishTitle ? { [language]: publishTitle } : {}),
@@ -962,19 +961,19 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
     }
   }
 
-  // Drawer listing row: open its category session and recall the listing's facets.
+  // Drawer listing row: open its category interview and recall the listing's facets.
   function openListing(listing) {
     // Keep the drawer open so its nested chat threads stay visible.
     navigate('/app')
-    selectSession(listing.sessionId, { keepDrawerOpen: true })
+    selectInterview(listing.categoryId, { keepDrawerOpen: true })
     setSelectedListingId(listing.id)
-    // Show exactly this listing's answers: clear answers for the session's
+    // Show exactly this listing's answers: clear answers for the interview's
     // questions that this listing has no selection for.
-    const session = sessions.find((s) => s.id === listing.sessionId)
+    const interview = interviews.find((s) => s.id === listing.categoryId)
     const ownAnswers = listing.answers ?? {}
     setAnswers((prev) => {
       const next = { ...prev }
-      for (const question of session?.questions ?? []) {
+      for (const question of interview?.questions ?? []) {
         if (ownAnswers[question.id] != null) next[question.id] = ownAnswers[question.id]
         else delete next[question.id]
       }
@@ -1046,10 +1045,11 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
 
   // Open a category interview as the main view. Switching categories abandons
   // the wizard's edit/preview draft for the previous category.
-  function selectSession(sessionId, { keepDrawerOpen = false } = {}) {
+  function selectInterview(interviewId, { keepDrawerOpen = false } = {}) {
     setCategoryDirty(false) // a plain category pick is not a browse change
     setSelectedChatId(null)
-    setSelectedSessionId(sessionId)
+    // Interview ids are the category ids as strings, whatever the caller passes.
+    setSelectedInterviewId(interviewId == null ? null : String(interviewId))
     setDraftListingId(null)
     setTranslationsOpen(false)
     if (!keepDrawerOpen) setDrawerOpen(false)
@@ -1063,7 +1063,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
     const chat = chats.find((c) => c.id === chatId)
     if (!chat) return
     navigate('/app')
-    setSelectedSessionId(chat.sessionId) // parent session is highlighted too
+    setSelectedInterviewId(String(chat.categoryId)) // parent interview is highlighted too
     setSelectedChatId(chatId)
     markChatRead(chatId)
     setDrawerOpen(false)
@@ -1104,18 +1104,18 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   // the selected drawer listing, otherwise the draft created on Next. Before a
   // draft exists the answers stay in local state and are flushed when Next
   // creates the inactive listing.
-  function interviewTargetListingId(session) {
+  function interviewTargetListingId(interview) {
     const selectedListing = selectedListingId
       ? myListings.find((listing) => String(listing.listingId) === String(selectedListingId))
       : null
-    if (selectedListing && String(selectedListing.sessionId) === String(session.id)) {
+    if (selectedListing && String(selectedListing.categoryId) === String(interview.id)) {
       return selectedListing.listingId
     }
     const draft = draftListingId
       ? myListings.find(
           (listing) =>
             String(listing.listingId) === String(draftListingId) &&
-            String(listing.sessionId) === String(session.id),
+            String(listing.categoryId) === String(interview.id),
         )
       : null
     return draft?.listingId ?? null
@@ -1123,8 +1123,8 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
 
   // Required facet questions gate Next/Publish. Orientation and condition are
   // always required; the backend can mark more facets as required.
-  function requiredQuestionsMissing(session = selectedSession) {
-    return (session?.questions ?? []).filter(
+  function requiredQuestionsMissing(interview = selectedInterview) {
+    return (interview?.questions ?? []).filter(
       (question) => question.required && answers[question.id] == null,
     )
   }
@@ -1143,8 +1143,8 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
     return titles[lang] ?? titles.en ?? Object.values(titles)[0] ?? ''
   }
 
-  function generatedTitle(session, listingId) {
-    return `${session.title} #${listingId}`
+  function generatedTitle(interview, listingId) {
+    return `${interview.title} #${listingId}`
   }
 
   // Upsert one title translation and refresh the model so drawer/result titles
@@ -1224,17 +1224,17 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
 
   // Fill in the generated title for the current language when a listing has no
   // row for it yet (existing listings, or a language added after the draft).
-  async function ensureDefaultTitle(session, listingId) {
+  async function ensureDefaultTitle(interview, listingId) {
     if (titlesForListing(listingId)[language]) return
-    await saveListingTitle(listingId, language, generatedTitle(session, listingId))
+    await saveListingTitle(listingId, language, generatedTitle(interview, listingId))
   }
 
   // Pressing Next opens the edit step. A new listing is materialised as an
   // inactive draft first, so the edit screen can save images and translations.
   // Pressing Next again reuses that draft instead of creating another one.
   async function openEditStage() {
-    if (!selectedSession || !user || creatingDraft || publishing) return
-    if (requiredQuestionsMissing(selectedSession).length > 0) {
+    if (!selectedInterview || !user || creatingDraft || publishing) return
+    if (requiredQuestionsMissing(selectedInterview).length > 0) {
       setNotice(t('interview.requiredMissing'))
       return
     }
@@ -1249,7 +1249,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
         const created = await api.create(
           'listings',
           {
-            categoryId: selectedSession.categoryId,
+            categoryId: selectedInterview.categoryId,
             regionId: regionId ?? 0,
             orientation,
             userId: user.id,
@@ -1260,7 +1260,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
           user.id,
         )
 
-        const titleText = generatedTitle(selectedSession, created.id)
+        const titleText = generatedTitle(selectedInterview, created.id)
         let titleRow = null
         try {
           titleRow = await api.create(
@@ -1279,7 +1279,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
 
         // Persist the answers chosen during the interview on the new draft.
         const createdSelections = []
-        for (const question of selectedSession.questions ?? []) {
+        for (const question of selectedInterview.questions ?? []) {
           if (question.type === 'numeric' || question.facet === 'orientation') continue
           const optionId = Number(answers[question.id])
           if (!Number.isFinite(optionId)) continue
@@ -1299,7 +1299,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
           setSelections((prev) => [...prev, ...createdSelections])
         }
 
-        const answered = (selectedSession.questions ?? []).filter(
+        const answered = (selectedInterview.questions ?? []).filter(
           (question) => answers[question.id] != null,
         )
         const answerTexts = answered
@@ -1328,15 +1328,14 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
           {
             id: String(created.id),
             listingId: created.id,
-            sessionId: selectedSession.id,
-            categoryId: selectedSession.categoryId,
+            categoryId: selectedInterview.categoryId,
             orientation,
             isActive: false,
             price,
             year,
             facetsCount: created.facetsCount,
-            facetsCountMax: selectedSession.facetsCountMax,
-            facetsCountMaxAnswerable: selectedSession.facetsCountMaxAnswerable,
+            facetsCountMax: selectedInterview.facetsCountMax,
+            facetsCountMaxAnswerable: selectedInterview.facetsCountMaxAnswerable,
             title: titleRow?.title ?? titleText,
             titles,
             desc: [
@@ -1354,7 +1353,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
         setCreatingDraft(false)
       }
     } else {
-      await ensureDefaultTitle(selectedSession, target.listingId)
+      await ensureDefaultTitle(selectedInterview, target.listingId)
     }
 
     setWizardStage('edit')
@@ -1363,12 +1362,12 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   // Replace the answer and persist it as a facet-value-selection. When a drawer
   // listing of this category is selected, its own selection is patched/created;
   // otherwise the category's first listing keeps the interview answers.
-  async function answerQuestion(session, questionId, value) {
+  async function answerQuestion(interview, questionId, value) {
     if (answers[questionId] === value || savingQuestionId === questionId) return
 
-    const question = (session.questions ?? []).find((row) => row.id === questionId)
+    const question = (interview.questions ?? []).find((row) => row.id === questionId)
     const previous = answers[questionId]
-    const listingId = interviewTargetListingId(session)
+    const listingId = interviewTargetListingId(interview)
 
     setAnswers((prev) => {
       const next = { ...prev }
@@ -1593,7 +1592,8 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
     navigate('/login', { state: { from: `${location.pathname}${location.search}` } })
   }
 
-  const selectedSession = sessions.find((s) => s.id === selectedSessionId) || null
+  const selectedInterview =
+    interviews.find((s) => String(s.id) === String(selectedInterviewId)) || null
   const selectedChat = chats.find((c) => c.id === selectedChatId) || null
 
   // Images shown by the wizard: saved rows for the edited listing plus the
@@ -1620,8 +1620,8 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   const wizardTitles = wizardListingId ? titlesForListing(wizardListingId) : {}
   const wizardTitle = wizardTitles[language] ?? ''
   const wizardTitlePlaceholder =
-    selectedSession && wizardListingId
-      ? generatedTitle(selectedSession, wizardListingId)
+    selectedInterview && wizardListingId
+      ? generatedTitle(selectedInterview, wizardListingId)
       : ''
 
   // Flat, de-duplicated listing list for the /search suggestions.
@@ -1657,14 +1657,14 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
     0,
   )
 
-  const answeredCount = selectedSession
-    ? selectedSession.questions.filter((q) => answers[q.id] != null).length
+  const answeredCount = selectedInterview
+    ? selectedInterview.questions.filter((q) => answers[q.id] != null).length
     : 0
-  const missingRequired = requiredQuestionsMissing(selectedSession)
+  const missingRequired = requiredQuestionsMissing(selectedInterview)
   const orientationAnswer = answers.orientation ?? null
   const canPublish =
     !!user &&
-    !!selectedSession &&
+    !!selectedInterview &&
     missingRequired.length === 0 &&
     (categoryDirty || answeredCount > 0)
 
@@ -1834,7 +1834,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
           ) : isResultsRoute ? (
             <ResultsView
               listings={searchListings}
-              categories={sessions}
+              categories={interviews}
               selections={selections}
               regions={regions}
               currentUserId={isLoggedIn ? user?.id : null}
@@ -1844,7 +1844,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
           ) : isListingRoute ? (
             <ListingPage
               listing={listingPageItem}
-              categories={sessions}
+              categories={interviews}
               selections={selections}
               images={listingImages}
               users={users}
@@ -1856,7 +1856,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
           ) : isSearchRoute ? (
             <SearchView
               listings={searchListings}
-              categories={sessions}
+              categories={interviews}
               selections={selections}
               categoryId={searchCategoryId}
               currentUserId={isLoggedIn ? user?.id : null}
@@ -1872,9 +1872,9 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
             />
           ) : selectedChat ? (
             <ChatView chat={selectedChat} onSend={sendMessage} liveStatus={liveStatus} />
-          ) : selectedSession && wizardStage === 'edit' ? (
+          ) : selectedInterview && wizardStage === 'edit' ? (
             <EditListingView
-              session={selectedSession}
+              interview={selectedInterview}
               language={language}
               title={wizardTitle}
               titlePlaceholder={wizardTitlePlaceholder}
@@ -1890,19 +1890,19 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
               uploading={uploadingImages}
               actions={editActions}
             />
-          ) : selectedSession && wizardStage === 'preview' ? (
+          ) : selectedInterview && wizardStage === 'preview' ? (
             <PreviewListingView
-              session={selectedSession}
+              interview={selectedInterview}
               title={wizardTitle || wizardTitlePlaceholder}
               answers={answers}
               images={wizardImages}
               actions={previewActions}
             />
-          ) : selectedSession ? (
-            <SessionView session={selectedSession} answers={answers} onAnswer={(questionId, optionId) => answerQuestion(selectedSession, questionId, optionId)} actions={interviewActions} />
+          ) : selectedInterview ? (
+            <InterviewView interview={selectedInterview} answers={answers} onAnswer={(questionId, optionId) => answerQuestion(selectedInterview, questionId, optionId)} actions={interviewActions} />
           ) : (
             <EmptyPlaceholder
-              hasSessions={sessions.length > 0}
+              hasInterviews={interviews.length > 0}
               onBrowse={() => {
                 setBrowseFor('listing')
                 setModal('browse')
@@ -1912,7 +1912,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
         </main>
       </div>
 
-      {translationsOpen && wizardListingId && selectedSession && (
+      {translationsOpen && wizardListingId && selectedInterview && (
         <TranslateTitlesModal
           languages={languages}
           titles={wizardTitles}
@@ -2055,14 +2055,14 @@ function ErrorPlaceholder({ message, onRetry }) {
   )
 }
 
-function EmptyPlaceholder({ hasSessions, onBrowse }) {
+function EmptyPlaceholder({ hasInterviews, onBrowse }) {
   const { t } = useI18n()
   return (
     <div className="placeholder">
       <span className="placeholder-icon">
         <LayersIcon size={56} />
       </span>
-      {hasSessions ? (
+      {hasInterviews ? (
         <button type="button" className="btn primary" onClick={onBrowse}>
           {t('empty.browse')}
         </button>

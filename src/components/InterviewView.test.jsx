@@ -2,9 +2,9 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LanguageProvider } from '../i18n.jsx'
 import { TEST_STRINGS } from '../test/strings.js'
-import SessionView from './SessionView.jsx'
+import InterviewView from './InterviewView.jsx'
 
-const session = {
+const interview = {
   title: 'Mobile phones',
   icon: 'laptop',
   questions: [
@@ -47,11 +47,11 @@ const session = {
   ],
 }
 
-function renderSession(props = {}) {
+function renderInterview(props = {}) {
   return render(
     <LanguageProvider initialStrings={TEST_STRINGS}>
-      <SessionView
-        session={session}
+      <InterviewView
+        interview={interview}
         answers={{}}
         onAnswer={vi.fn()}
         actions={null}
@@ -65,9 +65,9 @@ beforeEach(() => {
   localStorage.clear()
 })
 
-describe('SessionView numeric questions', () => {
+describe('InterviewView numeric questions', () => {
   it('renders price and year inputs alongside option chips', () => {
-    renderSession()
+    renderInterview()
 
     expect(screen.getByRole('button', { name: 'New' })).toBeInTheDocument()
     expect(screen.getByText('Required')).toBeInTheDocument()
@@ -77,7 +77,7 @@ describe('SessionView numeric questions', () => {
 
   it('submits a numeric answer', () => {
     const onAnswer = vi.fn()
-    renderSession({ onAnswer })
+    renderInterview({ onAnswer })
 
     const priceForm = screen.getByRole('form', { name: 'Price' })
     fireEvent.change(within(priceForm).getByRole('spinbutton'), {
@@ -90,7 +90,7 @@ describe('SessionView numeric questions', () => {
 
   it('shows an existing numeric answer and can clear it', () => {
     const onAnswer = vi.fn()
-    renderSession({ onAnswer, answers: { price: 199.99 } })
+    renderInterview({ onAnswer, answers: { price: 199.99 } })
 
     const priceForm = screen.getByRole('form', { name: 'Price' })
     expect(within(priceForm).getByRole('spinbutton')).toHaveValue(199.99)

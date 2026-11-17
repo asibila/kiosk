@@ -1,7 +1,7 @@
 {
   "name": "Kiosk",
   "short_name": "Kiosk",
-  "description": "Interview sessions, chats and a marketplace browser.",
+  "description": "Category interviews, chats and a marketplace browser.",
   "start_url": "/search",
   "scope": "/",
   "display": "standalone",

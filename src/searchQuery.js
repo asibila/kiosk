@@ -125,11 +125,11 @@ export function getCategoryIdFromSearch(search = '') {
   return parseSearchQuery(search).categoryId
 }
 
-/** Flat option id -> { question, option } index over every interview session. */
+/** Flat option id -> { question, option } index over every category interview. */
 export function buildOptionIndex(categories = []) {
   const index = new Map()
-  for (const session of categories) {
-    for (const question of session.questions ?? []) {
+  for (const category of categories) {
+    for (const question of category.questions ?? []) {
       for (const option of question.options ?? []) {
         index.set(String(option.id), { question, option })
       }

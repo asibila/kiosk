@@ -1,6 +1,6 @@
 # Kiosk (React)
 
-A session & chat interface with an overlay drawer, converted from the original
+An interview & chat interface with an overlay drawer, converted from the original
 single-file vanilla JS spec into a **React + Vite** application.
 
 ## Run
@@ -60,7 +60,7 @@ overrides the defaults in the backend's `src/main.ts`.
 | Spec section | Where it lives |
 | --- | --- |
 | API client + resource loader | `src/api.js` |
-| Backend rows → sessions / chats / browse tree | `src/viewModel.js` |
+| Backend rows → interviews / chats / browse tree | `src/viewModel.js` |
 | Pure translations: dictionaries, `translate()`, language cookie | `src/strings.js` |
 | React language provider (strings loaded from `GET /descriptions`) | `src/i18n.jsx` |
 | Server-side page data (catalog cache, `/results`, `/listing/:id`) | `src/data.server.js` |
@@ -81,7 +81,7 @@ overrides the defaults in the backend's `src/main.ts`.
 | Backend resource | UI use |
 | --- | --- |
 | `users` | Profile modal (first user is the signed-in user) |
-| `categories` + `descriptions` | Drawer sessions and browse tree use descriptions by id; descriptions with a `name` are the UI translation dictionary loaded at startup |
+| `categories` + `descriptions` | Drawer interviews and browse tree use descriptions by id; descriptions with a `name` are the UI translation dictionary loaded at startup |
 | `languages` | Codes/names for the topbar EN/HR switcher |
 | `regions` + `/regions/detect` | Search region title/picker; detection is resolved by the API from the visitor's IP |
 | `facet-schemas` + `facet-value-options` | Interview questions and answer chips |
@@ -261,7 +261,7 @@ removal is a real button with an aria-label, and result counts are announced via
   the language and theme preferences are kept. The **Profile** modal also has a
   **Sign out** footer button. When nobody is signed in, the drawer shows a **Sign in**
   button (linking to `/login`) instead of the listings and these actions.
-- **Session view** — per-session progress bar, priority-sorted product questions,
+- **Interview view** - per-interview progress bar, priority-sorted product questions,
   wrapping chips (replace-only answers), green answered accents, and an action bar
   with right-aligned Search and a "Next >" button into the listing wizard. The
   first four shared questions are **For Sale / Wanted**, **Condition**, **Price**

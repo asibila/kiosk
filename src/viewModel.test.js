@@ -42,13 +42,13 @@ describe('buildViewModel current user', () => {
   it('still builds the catalog for guests', () => {
     const view = buildViewModel(raw, { userId: null, language: 'en', strings: TEST_STRINGS })
 
-    expect(view.sessions.map((session) => session.id)).toEqual(['1'])
+    expect(view.interviews.map((interview) => interview.id)).toEqual(['1'])
     expect(view.browseData.root.items).toHaveLength(1)
   })
 })
 
 describe('buildViewModel category and listing counts', () => {
-  it('keeps the virtual all category in sessions but out of the browse tree', () => {
+  it('keeps the virtual all category in interviews but out of the browse tree', () => {
     const view = buildViewModel(
       {
         users,
@@ -71,21 +71,21 @@ describe('buildViewModel category and listing counts', () => {
       { userId: null, language: 'en', strings: TEST_STRINGS },
     )
 
-    expect(view.sessions.map((session) => session.id)).toEqual(['0', '1'])
-    expect(view.sessions[0]).toMatchObject({
+    expect(view.interviews.map((interview) => interview.id)).toEqual(['0', '1'])
+    expect(view.interviews[0]).toMatchObject({
       title: 'All categories',
       facetsCountMax: 3,
       facetsCountMaxAnswerable: 1,
     })
-    expect(view.sessions[1].facetsCountMax).toBe(5)
-    expect(view.sessions[1].facetsCountMaxAnswerable).toBe(4)
+    expect(view.interviews[1].facetsCountMax).toBe(5)
+    expect(view.interviews[1].facetsCountMaxAnswerable).toBe(4)
     expect(view.browseData.root.items).toHaveLength(1)
     expect(view.browseData.root.items[0].id).toBe('1')
     expect(view.browseData.root.items[0].facetsCount).toBeUndefined()
     expect(view.myListings).toEqual([])
   })
 
-  it('starts every session with orientation, then price and year', () => {
+  it('starts every interview with orientation, then price and year', () => {
     const view = buildViewModel(
       {
         users,
@@ -98,13 +98,13 @@ describe('buildViewModel category and listing counts', () => {
       { userId: null, language: 'en', strings: TEST_STRINGS },
     )
 
-    expect(view.sessions[0].questions.map((question) => question.id)).toEqual([
+    expect(view.interviews[0].questions.map((question) => question.id)).toEqual([
       'orientation',
       '1',
       'price',
       'year',
     ])
-    expect(view.sessions[0].questions[0]).toMatchObject({
+    expect(view.interviews[0].questions[0]).toMatchObject({
       facet: 'orientation',
       type: 'option',
       required: true,
@@ -113,13 +113,13 @@ describe('buildViewModel category and listing counts', () => {
         { id: 'buy', text: 'Wanted' },
       ],
     })
-    expect(view.sessions[0].questions[2]).toMatchObject({
+    expect(view.interviews[0].questions[2]).toMatchObject({
       type: 'numeric',
       facet: 'price',
       unit: '€',
     })
-    expect(view.sessions[0].facetsCountMax).toBe(4)
-    expect(view.sessions[0].facetsCountMaxAnswerable).toBe(2)
+    expect(view.interviews[0].facetsCountMax).toBe(4)
+    expect(view.interviews[0].facetsCountMaxAnswerable).toBe(2)
     expect(view.answers.orientation).toBe('sell')
     expect(view.answers.price).toBe(199.99)
     expect(view.answers.year).toBe(2024)
@@ -164,7 +164,7 @@ describe('buildViewModel category tree', () => {
       { userId: null, language: 'en', strings: TEST_STRINGS },
     )
 
-    expect(view.sessions.map((session) => session.id)).toEqual(['1', '2', '3'])
+    expect(view.interviews.map((interview) => interview.id)).toEqual(['1', '2', '3'])
     expect(view.browseData['2'].path).toEqual(['Home', 'Category 3', 'Category 2'])
   })
 })

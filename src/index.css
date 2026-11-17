@@ -1849,8 +1849,8 @@ button {
   margin-top: 6px;
 }
 
-/* ── Session (interview) view ────────────────────────────── */
-.session-view,
+/* ── Interview view ──────────────────────────────────────── */
+.interview-view,
 .chat-view {
   flex: 1;
   min-height: 0;
@@ -1858,21 +1858,21 @@ button {
   flex-direction: column;
 }
 
-.session-head {
+.interview-head {
   padding: 16px 22px 14px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
-.session-title-row {
+.interview-title-row {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 12px;
 }
 
-.session-title {
+.interview-title {
   margin: 0;
   font-size: 17px;
   font-weight: 700;
@@ -1923,7 +1923,7 @@ button {
   font-weight: 600;
 }
 
-.session-scroll {
+.interview-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -1933,7 +1933,7 @@ button {
   gap: 14px;
 }
 
-.session-empty {
+.interview-empty {
   margin: 0;
   padding: 22px;
   border: 1px dashed var(--border);
@@ -2081,7 +2081,7 @@ button {
   font-weight: 600;
 }
 
-.session-footer {
+.interview-footer {
   height: 66px;
   flex-shrink: 0;
 }
@@ -3269,11 +3269,11 @@ button {
     max-width: 90%;
   }
 
-  .session-scroll {
+  .interview-scroll {
     padding: 12px;
   }
 
-  .session-head {
+  .interview-head {
     padding: 12px 14px;
   }
 

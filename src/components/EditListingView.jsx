@@ -6,7 +6,7 @@ import { ImageIcon, StarIcon, TrashIcon } from '../icons.jsx'
 import { pluralKey, useI18n } from '../i18n.jsx'
 
 export default function EditListingView({
-  session,
+  interview,
   language,
   title = '',
   titlePlaceholder = '',
@@ -47,7 +47,7 @@ export default function EditListingView({
     <section className="wizard-view" aria-label={t('wizard.editAria')}>
       <header className="wizard-head">
         <span className="wizard-step">{t('wizard.step2')}</span>
-        <h2 className="wizard-title">{session.title}</h2>
+        <h2 className="wizard-title">{interview.title}</h2>
       </header>
 
       <div className="wizard-scroll scrollable">

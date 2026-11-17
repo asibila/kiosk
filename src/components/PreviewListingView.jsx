@@ -1,15 +1,15 @@
 // Wizard preview screen: answered facets and uploaded images.
 import { useI18n } from '../i18n.jsx'
 
-export default function PreviewListingView({ session, title, answers, images, actions }) {
+export default function PreviewListingView({ interview, title, answers, images, actions }) {
   const { t } = useI18n()
-  const answered = session.questions.filter((q) => answers[q.id] != null)
+  const answered = interview.questions.filter((q) => answers[q.id] != null)
 
   return (
     <section className="wizard-view" aria-label={t('wizard.previewAria')}>
       <header className="wizard-head">
         <span className="wizard-step">{t('wizard.step3')}</span>
-        <h2 className="wizard-title">{title || session.title}</h2>
+        <h2 className="wizard-title">{title || interview.title}</h2>
       </header>
 
       <div className="wizard-scroll scrollable">

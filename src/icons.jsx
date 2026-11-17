@@ -258,8 +258,8 @@ export function ThumbGlyph({ kind = 'box', size = 20 }) {
   }
 }
 
-/** Icon for a session kind (drawer rows + session view header). */
-export function SessionGlyph({ kind = 'bike', size = 20 }) {
+/** Icon for an interview kind (drawer rows + interview view header). */
+export function InterviewGlyph({ kind = 'bike', size = 20 }) {
   switch (kind) {
     case 'bike':
       return <BikeIcon size={size} />

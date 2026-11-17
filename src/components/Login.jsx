@@ -40,7 +40,7 @@ export default function Login() {
       try {
         localStorage.setItem('kiosk-user-id', String(data.userId))
       } catch {
-        // Ignore storage failures; the id still drives this session via navigation state.
+        // Ignore storage failures; the id still drives this visit via navigation state.
       }
       // Return to the page that asked for sign-in (for example a listing detail
       // page), but never follow an external URL.

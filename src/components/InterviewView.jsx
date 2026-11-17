@@ -1,8 +1,7 @@
-// Interview session view: progress bar, question cards with wrapping chips,
-// numeric questions for price/year, and an action bar (search, publish) at the
-// bottom.
+// Interview view: progress bar, question cards with wrapping chips, numeric
+// questions for price/year, and an action bar (search, publish) at the bottom.
 import { useEffect, useState } from 'react'
-import { CheckIcon, SessionGlyph } from '../icons.jsx'
+import { CheckIcon, InterviewGlyph } from '../icons.jsx'
 import { useI18n } from '../i18n.jsx'
 
 function NumberQuestion({ question, value, onAnswer }) {
@@ -56,27 +55,30 @@ function NumberQuestion({ question, value, onAnswer }) {
   )
 }
 
-export default function SessionView({ session, answers, onAnswer, actions }) {
+export default function InterviewView({ interview, answers, onAnswer, actions }) {
   const { t } = useI18n()
   // Sort by priority ascending (Array#sort is stable).
-  const questions = [...session.questions].sort((a, b) => a.priority - b.priority)
+  const questions = [...interview.questions].sort((a, b) => a.priority - b.priority)
   const answeredCount = questions.filter((q) => answers[q.id] != null).length
   const pct = questions.length ? (answeredCount / questions.length) * 100 : 0
 
   return (
-    <section className="session-view" aria-label={t('session.aria', { title: session.title })}>
-      <header className="session-head">
-        <div className="session-title-row">
+    <section
+      className="interview-view"
+      aria-label={t('interview.aria', { title: interview.title })}
+    >
+      <header className="interview-head">
+        <div className="interview-title-row">
           <span className="drawer-row-icon">
-            <SessionGlyph kind={session.icon} />
+            <InterviewGlyph kind={interview.icon} />
           </span>
-          <h2 className="session-title">{session.title}</h2>
+          <h2 className="interview-title">{interview.title}</h2>
         </div>
         <div className="progress-row">
           <div
             className="progress-track"
             role="progressbar"
-            aria-label={t('session.questionsAnswered')}
+            aria-label={t('interview.questionsAnswered')}
             aria-valuemin={0}
             aria-valuemax={questions.length}
             aria-valuenow={answeredCount}
@@ -84,14 +86,14 @@ export default function SessionView({ session, answers, onAnswer, actions }) {
             <div className="progress-fill" style={{ width: `${pct}%` }} />
           </div>
           <span className="progress-text">
-            {t('session.answered', { answered: answeredCount, total: questions.length })}
+            {t('interview.answered', { answered: answeredCount, total: questions.length })}
           </span>
         </div>
       </header>
 
-      <div className="session-scroll scrollable">
+      <div className="interview-scroll scrollable">
         {questions.length === 0 ? (
-          <p className="session-empty">{t('session.empty')}</p>
+          <p className="interview-empty">{t('interview.empty')}</p>
         ) : (
           questions.map((q) => {
             const chosen = answers[q.id]
@@ -106,7 +108,7 @@ export default function SessionView({ session, answers, onAnswer, actions }) {
                     </span>
                   )}
                   {isAnswered && (
-                    <span className="check-badge" title={t('session.answeredTitle')}>
+                    <span className="check-badge" title={t('interview.answeredTitle')}>
                       <CheckIcon size={13} />
                     </span>
                   )}
@@ -137,9 +139,9 @@ export default function SessionView({ session, answers, onAnswer, actions }) {
 
       {/* Action bar (search/publish) when provided by the parent. */}
       {actions ? (
-        <footer className="session-footer">{actions}</footer>
+        <footer className="interview-footer">{actions}</footer>
       ) : (
-        <footer className="session-footer" aria-hidden="true" />
+        <footer className="interview-footer" aria-hidden="true" />
       )}
     </section>
   )

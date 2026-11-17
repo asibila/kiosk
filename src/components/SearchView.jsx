@@ -120,8 +120,8 @@ export default function SearchView({
 
     const genericQuestions = []
     const seen = new Set()
-    for (const session of categories) {
-      for (const question of session.questions ?? []) {
+    for (const category of categories) {
+      for (const question of category.questions ?? []) {
         if (
           !question.isGeneric ||
           question.type === 'numeric' ||
@@ -138,7 +138,7 @@ export default function SearchView({
     if (!categoryId) return groups
 
     const byCategoryId = new Map(
-      categories.map((session) => [String(session.categoryId), session]),
+      categories.map((category) => [String(category.categoryId), category]),
     )
     const chain = []
     let current = byCategoryId.get(String(categoryId))

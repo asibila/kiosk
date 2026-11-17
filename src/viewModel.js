@@ -1,4 +1,4 @@
-// Map the backend's normalized CRUD rows onto the UI's session/chat/browse model.
+// Map the backend's normalized CRUD rows onto the UI's interview/chat/browse model.
 // Backend reference: ../backend/API_ROUTES.md
 import { createTranslator, pluralKey } from './strings.js'
 
@@ -147,7 +147,7 @@ export function buildViewModel(
     (item) => currentUser && item.userId === currentUser.id,
   )
 
-  // Chat threads -> chats. A thread's session is the category of its listing.
+  // Chat threads -> chats. A thread belongs to the category of its listing.
   // The API records who created each message (`ChatMessage.userId`); the current
   // user is the sender, so their messages render as sent and the rest as received.
   const linkByThreadId = new Map(listingChatThreads.map((link) => [link.chatThreadId, link]))
@@ -170,7 +170,7 @@ export function buildViewModel(
         threadId: thread.id,
         listingId: listing.id,
         listingChatThreadId: link?.id ?? null,
-        sessionId: String(listing.categoryId),
+        categoryId: String(listing.categoryId),
         title: listingTitle(listing),
         desc: listingDescription(listing),
         partnerName: partner?.name ?? null,
@@ -208,13 +208,13 @@ export function buildViewModel(
     })
     .filter(Boolean)
 
-  // Categories → interview sessions. A session includes the facets defined on
+  // Categories → interviews. An interview includes the facets defined on
   // the category and on its ancestors, so parent-category facets apply to every
   // subcategory (for example Electronics/brand on Mobile phones), plus generic
   // facets such as condition, which apply to products in every category.
   //
   // Orientation, price and year are special facets stored on the listing
-  // itself. They are always part of the session, even when a database has no
+  // itself. They are always part of the interview, even when a database has no
   // matching FacetSchema rows, so every listing can answer the same first four
   // questions: For Sale / Wanted, condition, price, year.
   const SPECIAL_FACET_NAMES = new Set(['orientation', 'price', 'year'])
@@ -222,7 +222,7 @@ export function buildViewModel(
   const priceSchema = facetSchemas.find((schema) => schema.name === 'price')
   const yearSchema = facetSchemas.find((schema) => schema.name === 'year')
 
-  const sessions = categories.map((category) => {
+  const interviews = categories.map((category) => {
     const title = categoryTitle(category.id)
     const ancestorIds = new Set()
     let current = category
@@ -353,10 +353,13 @@ export function buildViewModel(
   })
 
   const facetsCountMaxByCategory = new Map(
-    sessions.map((session) => [session.categoryId, session.facetsCountMax]),
+    interviews.map((interview) => [interview.categoryId, interview.facetsCountMax]),
   )
   const facetsCountMaxAnswerableByCategory = new Map(
-    sessions.map((session) => [session.categoryId, session.facetsCountMaxAnswerable]),
+    interviews.map((interview) => [
+      interview.categoryId,
+      interview.facetsCountMaxAnswerable,
+    ]),
   )
 
   // Existing selections on each category's first listing pre-fill the
@@ -389,7 +392,6 @@ export function buildViewModel(
       return {
         id: String(listing.id),
         listingId: listing.id,
-        sessionId: String(listing.categoryId),
         categoryId: listing.categoryId,
         regionId: listing.regionId ?? 0,
         orientation: listing.orientation,
@@ -413,7 +415,7 @@ export function buildViewModel(
       }
     })
 
-  // The virtual "all" category is an interview session, not a browsable node.
+  // The virtual "all" category is an interview, not a browsable node.
   const browseCategories = categories.filter((category) => category.id !== ALL_CATEGORY_ID)
 
   // Category tree for the browse modal.
@@ -501,7 +503,7 @@ export function buildViewModel(
     languages: raw.languages ?? [],
     regions: regionList,
     language,
-    sessions,
+    interviews,
     chats,
     inbox,
     myListings,

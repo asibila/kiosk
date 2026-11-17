@@ -86,12 +86,12 @@ export function LanguageProvider({
     try {
       document.cookie = languageCookie(language)
     } catch {
-      // Cookies can be blocked; the language still applies this session.
+      // Cookies can be blocked; the language still applies to this visit.
     }
     try {
       localStorage.setItem(LANGUAGE_KEY, language)
     } catch {
-      // Ignore storage failures; the language still applies this session.
+      // Ignore storage failures; the language still applies to this visit.
     }
   }, [language])
 

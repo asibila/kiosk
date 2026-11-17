@@ -4,13 +4,13 @@ import { LanguageProvider } from '../i18n.jsx'
 import { TEST_STRINGS } from '../test/strings.js'
 import EditListingView from './EditListingView.jsx'
 
-const session = { title: 'Bikes' }
+const interview = { title: 'Bikes' }
 
 function renderView(props = {}) {
   return render(
     <LanguageProvider initialStrings={TEST_STRINGS}>
       <EditListingView
-        session={session}
+        interview={interview}
         language="en"
         title="Bikes #33"
         titlePlaceholder="Bikes #33"
