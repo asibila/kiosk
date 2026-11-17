@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LanguageProvider } from '../i18n.jsx'
+import { TEST_STRINGS } from '../test/strings.js'
 import ListingPage from './ListingPage.jsx'
 
 const listing = {
@@ -68,7 +69,7 @@ const users = [
 
 function renderPage(props = {}) {
   return render(
-    <LanguageProvider>
+    <LanguageProvider initialStrings={TEST_STRINGS}>
       <MemoryRouter initialEntries={['/listing/28']}>
         <ListingPage
           listing={listing}

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LanguageProvider } from '../i18n.jsx'
+import { TEST_STRINGS } from '../test/strings.js'
 import SessionView from './SessionView.jsx'
 
 const session = {
@@ -46,7 +47,7 @@ const session = {
 
 function renderSession(props = {}) {
   return render(
-    <LanguageProvider>
+    <LanguageProvider initialStrings={TEST_STRINGS}>
       <SessionView
         session={session}
         answers={{}}

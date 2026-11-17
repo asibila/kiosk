@@ -1,91 +1,93 @@
-// Lightweight i18n for the kiosk UI. The backend `Description` table is the
-// source of truth for every interface string: descriptions with a `name` hold
-// one row per language, keyed by the same names used with `t()` below (for
-// example `common.close`). `en` is the default, `hr` is the second supported
-// language.
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+// React binding for the translation helpers in `strings.js`.
+//
+// The dictionaries are passed around explicitly instead of living in a module
+// variable: a Node process rendering pages for different visitors must not let
+// one request overwrite another's language. `createStrings()` builds the
+// dictionaries, `translate()` is pure, and `LanguageProvider` holds them for a
+// single browser tab.
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 import { loadDescriptions } from './api.js'
+import {
+  createStrings,
+  createTranslator,
+  DEFAULT_LANGUAGE,
+  hasStrings,
+  isSupportedLanguage,
+  languageCookie,
+  LANGUAGES,
+  readLanguageCookie,
+} from './strings.js'
 
-export const DEFAULT_LANGUAGE = 'en'
+export * from './strings.js'
 
-export const LANGUAGES = [
-  { code: 'en', name: 'English' },
-  { code: 'hr', name: 'Hrvatski' },
-]
-
+// Legacy key from before the cookie existed; still read to keep an existing
+// device's choice after the upgrade.
 const LANGUAGE_KEY = 'kiosk-language'
 
-// Filled from GET /descriptions before the app renders (or by tests).
-let STRINGS = {}
-
-/**
- * Turn the backend's grouped descriptions into dictionaries keyed by language
- * and i18n key. Descriptions without a name are category/facet text and are
- * ignored here; the view model keeps using them by id.
- */
-export function setStrings(descriptions) {
-  const next = {}
-
-  for (const description of descriptions ?? []) {
-    if (!description?.name) continue
-
-    for (const [language, text] of Object.entries(
-      description.translations ?? {},
-    )) {
-      if (typeof text !== 'string') continue
-      const dictionary = (next[language] ??= {})
-      dictionary[description.name] = text
-    }
-  }
-
-  STRINGS = next
-  return STRINGS
-}
-
-/** True once at least the default-language dictionary is available. */
-export function hasStrings() {
-  return Object.keys(STRINGS[DEFAULT_LANGUAGE] ?? {}).length > 0
-}
-
-export function translate(language, key, vars) {
-  const dict = STRINGS[language] ?? STRINGS[DEFAULT_LANGUAGE] ?? {}
-  let text = dict[key] ?? STRINGS[DEFAULT_LANGUAGE]?.[key] ?? key
-  if (vars) {
-    text = text.replace(/\{(\w+)\}/g, (_, name) =>
-      vars[name] == null ? '' : String(vars[name]),
-    )
-  }
-  return text
-}
-
-export function pluralKey(count, key) {
-  return `${key}.${count === 1 ? 'one' : 'many'}`
-}
-
+/** Resolve the language before the first render in a browser. */
 export function getInitialLanguage() {
   try {
+    const fromCookie = readLanguageCookie(document.cookie)
+    if (fromCookie) return fromCookie
+  } catch {
+    // Cookies can be unavailable; fall through to storage.
+  }
+
+  try {
     const stored = localStorage.getItem(LANGUAGE_KEY)
-    if (LANGUAGES.some((language) => language.code === stored)) return stored
+    if (isSupportedLanguage(stored)) return stored
   } catch {
     // localStorage can be unavailable (private mode, blocked storage).
   }
+
   return DEFAULT_LANGUAGE
 }
 
 const LanguageContext = createContext({
   language: DEFAULT_LANGUAGE,
   setLanguage: () => {},
+  strings: {},
+  refreshStrings: () => {},
   t: (key) => key,
   languages: LANGUAGES,
 })
 
-export function LanguageProvider({ children }) {
-  const [language, setLanguage] = useState(getInitialLanguage)
-  const [stringsReady, setStringsReady] = useState(hasStrings)
+/**
+ * Holds the selected language and its dictionaries.
+ *
+ * `initialLanguage` and `initialStrings` come from the server render; when they
+ * are absent (plain client-side rendering) the strings are fetched from
+ * `/descriptions` before the children mount.
+ */
+export function LanguageProvider({
+  children,
+  initialLanguage = null,
+  initialStrings = null,
+}) {
+  const [language, setLanguage] = useState(
+    () => initialLanguage ?? getInitialLanguage(),
+  )
+  const [strings, setStrings] = useState(() => initialStrings ?? {})
+  const [stringsReady, setStringsReady] = useState(() =>
+    hasStrings(initialStrings),
+  )
 
-  // Keep the document language and the stored preference in sync.
+  // Keep the document, the cookie and the stored preference in sync. The cookie
+  // is what lets the server render the right language on the next request.
   useEffect(() => {
     document.documentElement.lang = language
+    try {
+      document.cookie = languageCookie(language)
+    } catch {
+      // Cookies can be blocked; the language still applies this session.
+    }
     try {
       localStorage.setItem(LANGUAGE_KEY, language)
     } catch {
@@ -102,7 +104,7 @@ export function LanguageProvider({ children }) {
     loadDescriptions()
       .then((descriptions) => {
         if (cancelled) return
-        setStrings(descriptions)
+        setStrings(createStrings(descriptions))
         setStringsReady(true)
       })
       .catch(() => {
@@ -116,14 +118,30 @@ export function LanguageProvider({ children }) {
     }
   }, [stringsReady])
 
+  // Ask for the dictionaries again after a failed request. The data reload that
+  // follows an error uses this so a retry recovers the translations too. It does
+  // not clear `stringsReady`: the app stays mounted while the request is redone.
+  const refreshStrings = useCallback(() => {
+    loadDescriptions()
+      .then((descriptions) => {
+        setStrings(createStrings(descriptions))
+        setStringsReady(true)
+      })
+      .catch(() => {
+        // Keep rendering with the keys; the caller shows the bigger error.
+      })
+  }, [])
+
   const value = useMemo(
     () => ({
       language,
       setLanguage,
-      t: (key, vars) => translate(language, key, vars),
+      strings,
+      refreshStrings,
+      t: createTranslator(strings, language),
       languages: LANGUAGES,
     }),
-    [language],
+    [language, refreshStrings, strings],
   )
 
   if (!stringsReady) {

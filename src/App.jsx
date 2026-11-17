@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router'
 import { api, CHAT_EVENTS_URL, fetchKioskData, mediaUrl } from './api.js'
 import { buildViewModel, formatTime } from './viewModel.js'
-import { LANGUAGES, LanguageProvider, setStrings, useI18n } from './i18n.jsx'
+import { hasStrings, LANGUAGES, LanguageProvider, useI18n } from './i18n.jsx'
 import { AlertIcon, LayersIcon, XIcon } from './icons.jsx'
 import TopBar from './components/TopBar.jsx'
 import Drawer from './components/Drawer.jsx'
@@ -47,7 +47,10 @@ function getInitialTheme() {
   } catch {
     // localStorage can be unavailable (private mode, blocked storage).
   }
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  if (typeof window === 'undefined') return 'light'
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light'
 }
 
 function getLoggedInUserId() {
@@ -71,11 +74,32 @@ function clearSignedInUserId() {
   }
 }
 
-function KioskApp() {
+function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { id: listingRouteId } = useParams()
-  const { language, t } = useI18n()
+  const { language, refreshStrings, strings, t } = useI18n()
+
+  // The signed-in user normally comes from this device's storage. A server
+  // render cannot read that, so it passes `initialUserId: null` and the browser
+  // resolves the stored id after hydration. `undefined` keeps the plain
+  // client-side behaviour of reading storage on every render.
+  const [sessionUserId, setSessionUserId] = useState(() => initialUserId)
+  const loggedInUserId =
+    sessionUserId === undefined ? getLoggedInUserId() : sessionUserId
+  const isLoggedIn = loggedInUserId != null
+
+  // Seed the first render from a server payload. This is what lets the server
+  // emit real markup for /results and /listing/:id instead of a loading shell;
+  // the browser rebuilds the same view model, so hydration matches.
+  const initialViewRef = useRef(undefined)
+  if (initialViewRef.current === undefined) {
+    initialViewRef.current = initialData
+      ? buildViewModel(initialData, { userId: loggedInUserId, language, strings })
+      : null
+  }
+  const initialView = initialViewRef.current
+
   // The same shell (topbar, drawer, modals) hosts the listings screen, the
   // standalone /search form and the /results page; only the main area differs.
   const isSearchRoute = location.pathname === '/search'
@@ -86,34 +110,45 @@ function KioskApp() {
   const [selectedChatId, setSelectedChatId] = useState(null)
   const [modal, setModal] = useState(null) // 'browse' | 'messages' | 'settings' | 'profile' | null
   const [browseFor, setBrowseFor] = useState('listing') // 'listing' | 'search' | 'new'
-  const [theme, setTheme] = useState(getInitialTheme)
+  const [theme, setTheme] = useState(() =>
+    initialTheme === undefined ? getInitialTheme() : initialTheme,
+  )
 
   // /search keeps its structured query in the URL (category, direction, chips),
   // so the category picker reads and writes the URL instead of local state.
   const searchCategoryId = isSearchRoute ? getCategoryIdFromSearch(location.search) : ''
 
-  // Backend data.
-  const [dataStatus, setDataStatus] = useState('loading') // 'loading' | 'ready' | 'error'
+  // Backend data, seeded from the server render when there is one.
+  const [dataStatus, setDataStatus] = useState(initialView ? 'ready' : 'loading') // 'loading' | 'ready' | 'error'
   const [loadError, setLoadError] = useState('')
   const [reloadToken, setReloadToken] = useState(0)
-  const [user, setUser] = useState(null)
-  const [users, setUsers] = useState([])
-  const [languages, setLanguages] = useState(LANGUAGES)
-  const [sessions, setSessions] = useState([])
-  const [chats, setChats] = useState([])
-  const [inbox, setInbox] = useState([])
-  const [browseData, setBrowseData] = useState(() => ({
-    root: { path: [t('browse.home')], items: [] },
-  }))
-  const [answers, setAnswers] = useState({}) // facet schema id -> facet value option id
-  const [selections, setSelections] = useState([]) // raw facet-value-selections rows
-  const [optionSchema, setOptionSchema] = useState({}) // option id -> schema id
-  const [categoryListing, setCategoryListing] = useState({}) // category id -> first listing id
+  const [user, setUser] = useState(initialView?.user ?? null)
+  const [users, setUsers] = useState(initialView?.users ?? [])
+  const [languages, setLanguages] = useState(
+    initialView?.languages?.length ? initialView.languages : LANGUAGES,
+  )
+  const [sessions, setSessions] = useState(initialView?.sessions ?? [])
+  const [chats, setChats] = useState(initialView?.chats ?? [])
+  const [inbox, setInbox] = useState(initialView?.inbox ?? [])
+  const [browseData, setBrowseData] = useState(
+    () =>
+      initialView?.browseData ?? {
+        root: { path: [t('browse.home')], items: [] },
+      },
+  )
+  const [answers, setAnswers] = useState(initialView?.answers ?? {}) // facet schema id -> facet value option id
+  const [selections, setSelections] = useState(initialView?.selections ?? []) // raw facet-value-selections rows
+  const [optionSchema, setOptionSchema] = useState(
+    initialView?.optionSchema ?? {},
+  ) // option id -> schema id
+  const [categoryListing, setCategoryListing] = useState(
+    initialView?.categoryListing ?? {},
+  ) // category id -> first listing id
   const [savingQuestionId, setSavingQuestionId] = useState(null)
   const [notice, setNotice] = useState('')
   const [listingsModal, setListingsModal] = useState(null) // { title, listings } | null
   const [contactingListingId, setContactingListingId] = useState(null)
-  const [myListings, setMyListings] = useState([]) // listings owned by the logged-in user
+  const [myListings, setMyListings] = useState(initialView?.myListings ?? []) // listings owned by the logged-in user
   const [selectedListingId, setSelectedListingId] = useState(null)
   const [publishing, setPublishing] = useState(false)
   const [categoryDirty, setCategoryDirty] = useState(false) // category changed via browse OK
@@ -124,9 +159,13 @@ function KioskApp() {
   // Listing wizard: interview → edit (images) → preview → report.
   const [wizardStage, setWizardStage] = useState('interview') // 'interview' | 'edit' | 'preview'
   const [draftImages, setDraftImages] = useState([]) // { id, name, url, file, isPrimary } (new listings)
-  const [listingImages, setListingImages] = useState([]) // backend ListingImage rows
-  const [listingTranslations, setListingTranslations] = useState([])
-  const listingTranslationsRef = useRef([])
+  const [listingImages, setListingImages] = useState(
+    initialView?.listingImages ?? [],
+  ) // backend ListingImage rows
+  const [listingTranslations, setListingTranslations] = useState(
+    initialView?.listingTranslations ?? [],
+  )
+  const listingTranslationsRef = useRef(initialView?.listingTranslations ?? [])
   const [draftListingId, setDraftListingId] = useState(null) // inactive listing created on Next
   const [creatingDraft, setCreatingDraft] = useState(false)
   const [translationsOpen, setTranslationsOpen] = useState(false)
@@ -143,7 +182,13 @@ function KioskApp() {
   // Distinguishes a real data reload from a language-only rebuild, so switching
   // language does not discard the interview answers being edited.
   const loadKeyRef = useRef(null)
-  const initializedRef = useRef(false)
+  const initializedRef = useRef(Boolean(initialView))
+  // A server-rendered page already carries its data; skip the duplicate fetch on
+  // the first client pass and only refetch on a reload or language change.
+  const skipInitialFetchRef = useRef(Boolean(initialView))
+  // Which data load already asked for a dictionary retry, so a failed
+  // translation request is not retried on every render.
+  const stringsRetryRef = useRef(null)
   selectedChatIdRef.current = selectedChatId
   chatsRef.current = chats
   inboxRef.current = inbox
@@ -155,13 +200,21 @@ function KioskApp() {
   const modalChatIdRef = useRef(null)
   modalChatIdRef.current = modalChatId
 
-  // The user who signed in at the kiosk; drives inbox/chats, sent-vs-received
-  // messages, and the actor id used for writes.
-  const loggedInUserId = getLoggedInUserId()
-  const isLoggedIn = loggedInUserId != null
+  // After hydration, pick up the id this device signed in with. The server could
+  // not know it, so it rendered the public version of the page.
+  useEffect(() => {
+    if (initialUserId !== null) return
+    setSessionUserId(getLoggedInUserId())
+  }, [initialUserId])
 
   // Load every resource the UI needs, then map it onto the session/chat model.
   useEffect(() => {
+    if (skipInitialFetchRef.current) {
+      skipInitialFetchRef.current = false
+      loadKeyRef.current = `${reloadToken}|${loggedInUserId}`
+      return undefined
+    }
+
     let cancelled = false
     const loadKey = `${reloadToken}|${loggedInUserId}`
     const dataChanged = !initializedRef.current || loadKeyRef.current !== loadKey
@@ -175,10 +228,17 @@ function KioskApp() {
     fetchKioskData()
       .then((raw) => {
         if (cancelled) return
-        // The provider normally loads these before the app mounts; updating
-        // here covers a retry after a failed initial translation request.
-        setStrings(raw.descriptions)
-        const view = buildViewModel(raw, { userId: loggedInUserId, language })
+        // The provider normally loaded these before mount; retrying here covers
+        // a first request that failed along with the data.
+        if (!hasStrings(strings) && stringsRetryRef.current !== reloadToken) {
+          stringsRetryRef.current = reloadToken
+          refreshStrings()
+        }
+        const view = buildViewModel(raw, {
+          userId: loggedInUserId,
+          language,
+          strings,
+        })
         // The stored sign-in names a user that no longer exists (for example
         // after a database reset). Forget it and load again as a guest.
         if (loggedInUserId != null && !view.user && clearSignedInUserId()) {
@@ -214,7 +274,7 @@ function KioskApp() {
     return () => {
       cancelled = true
     }
-  }, [reloadToken, loggedInUserId, language])
+  }, [reloadToken, loggedInUserId, language, strings, refreshStrings])
 
   // Live chat: consume the backend's SSE stream. New messages for a known
   // thread are appended in place; messages for an unseen thread trigger a full
@@ -294,6 +354,13 @@ function KioskApp() {
 
   // Keep the document in sync with the chosen theme and remember it for next time.
   useEffect(() => {
+    if (theme == null) {
+      // The server could not read this device's preference, so it rendered the
+      // light version. Adopt the stored one after hydration; the inline script
+      // in index.html has already set the attribute, so leave it alone here.
+      setTheme(getInitialTheme())
+      return
+    }
     document.documentElement.dataset.theme = theme
     try {
       localStorage.setItem(THEME_KEY, theme)
@@ -1925,17 +1992,69 @@ function EmptyPlaceholder({ hasSessions, onBrowse }) {
   )
 }
 
-export default function App() {
+/**
+ * App shell.
+ *
+ * The optional props are filled by the server entry with a page's preloaded
+ * data and dictionaries. A plain client-side boot leaves them out, and the app
+ * fetches everything after mount like before.
+ */
+export default function App({
+  initialData = null,
+  initialStrings = null,
+  initialLanguage = null,
+  initialTheme,
+  initialUserId,
+}) {
   return (
-    <LanguageProvider>
+    <LanguageProvider
+      initialLanguage={initialLanguage}
+      initialStrings={initialStrings}
+    >
       <div className="app">
         <Routes>
           <Route path="/" element={<Navigate to="/search" replace />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/app" element={<KioskApp />} />
-          <Route path="/search" element={<KioskApp />} />
-          <Route path="/results" element={<KioskApp />} />
-          <Route path="/listing/:id" element={<KioskApp />} />
+          <Route
+            path="/app"
+            element={
+              <KioskApp
+                initialData={initialData}
+                initialTheme={initialTheme}
+                initialUserId={initialUserId}
+              />
+            }
+          />
+          <Route
+            path="/search"
+            element={
+              <KioskApp
+                initialData={initialData}
+                initialTheme={initialTheme}
+                initialUserId={initialUserId}
+              />
+            }
+          />
+          <Route
+            path="/results"
+            element={
+              <KioskApp
+                initialData={initialData}
+                initialTheme={initialTheme}
+                initialUserId={initialUserId}
+              />
+            }
+          />
+          <Route
+            path="/listing/:id"
+            element={
+              <KioskApp
+                initialData={initialData}
+                initialTheme={initialTheme}
+                initialUserId={initialUserId}
+              />
+            }
+          />
           <Route path="*" element={<Navigate to="/search" replace />} />
         </Routes>
       </div>

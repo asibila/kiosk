@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LanguageProvider } from '../i18n.jsx'
+import { TEST_STRINGS } from '../test/strings.js'
 import ResultsView from './ResultsView.jsx'
 
 const condition = {
@@ -67,7 +68,7 @@ const selections = [
 
 function renderResults(url, props = {}) {
   return render(
-    <LanguageProvider>
+    <LanguageProvider initialStrings={TEST_STRINGS}>
       <MemoryRouter initialEntries={[url]}>
         <ResultsView
           listings={listings}

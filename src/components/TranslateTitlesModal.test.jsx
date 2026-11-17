@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { LanguageProvider } from '../i18n.jsx'
+import { TEST_STRINGS } from '../test/strings.js'
 import TranslateTitlesModal from './TranslateTitlesModal.jsx'
 
 const languages = [
@@ -10,7 +11,7 @@ const languages = [
 
 function renderModal(props = {}) {
   return render(
-    <LanguageProvider>
+    <LanguageProvider initialStrings={TEST_STRINGS}>
       <TranslateTitlesModal
         languages={languages}
         titles={{ en: 'Bikes #33' }}

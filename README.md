@@ -61,7 +61,9 @@ overrides the defaults in the backend's `src/main.ts`.
 | --- | --- |
 | API client + resource loader | `src/api.js` |
 | Backend rows → sessions / chats / browse tree | `src/viewModel.js` |
-| UI translations + language provider (strings loaded from `GET /descriptions`) | `src/i18n.jsx` |
+| Pure translations: dictionaries, `translate()`, language cookie | `src/strings.js` |
+| React language provider (strings loaded from `GET /descriptions`) | `src/i18n.jsx` |
+| Server-side page data (catalog cache, `/results`, `/listing/:id`) | `src/data.server.js` |
 | Structured search input | `src/components/FacetChipInput.jsx` |
 | Suggestion fetch (debounce/abort/stale discard) | `src/useFacetSuggestions.js` |
 | Chip/suggestion JSDoc types + range formatting | `src/facetTypes.js` |
@@ -71,7 +73,7 @@ overrides the defaults in the backend's `src/main.ts`.
 | STATE (drawer, selection, answers, messages, modals) | `src/App.jsx` |
 | ICONS (inline SVG string → components) | `src/icons.jsx` |
 | RENDER functions (components) | `src/components/*.jsx` |
-| INIT (mount) | `src/main.jsx` |
+| INIT (mount) | `src/main.jsx` (hydrates when the server supplied `window.__KIOSK_BOOT__`) |
 | Legacy static seed (no longer rendered) | `src/data.js` |
 
 ## Backend mapping
@@ -89,6 +91,45 @@ overrides the defaults in the backend's `src/main.ts`.
 | `listing-chat-threads` | Maps each chat thread to its listing/category |
 | `listing-images` | Listing images metadata; the primary image is the search thumbnail |
 | `listings` | Browse listings; drawer child rows are the signed-in user's listings |
+
+## Server-side rendering
+
+The app is ready to be rendered on a Node server for `/results` and
+`/listing/:id`; the server entry itself is not written yet. What already works:
+
+- `App` accepts `initialData`, `initialStrings`, `initialLanguage` and
+  `initialUserId`. `KioskApp` seeds its state from them during the first render,
+  so the server emits real markup (listing cards, titles, prices) instead of the
+  loading placeholder, and hydration rebuilds the same tree without refetching.
+  `src/App.ssr.test.jsx` renders the app with `renderToString` and asserts this.
+- `src/data.server.js` loads the catalog for a page: it calls the existing
+  resource endpoints in parallel, caches the snapshot for 30 seconds, shares
+  in-flight requests, and exposes `loadResultsPage()` / `loadListingPage(id)`
+  (`null` for an unknown id or an unpublished draft, which the server should
+  turn into a 404).
+- `LanguageProvider` takes its dictionaries as props and `translate()` is pure,
+  so concurrent EN and HR renders cannot leak into each other. The selected
+  language is stored in the `kiosk-language` cookie.
+- `main.jsx` hydrates when `window.__KIOSK_BOOT__` exists and falls back to
+  `createRoot` otherwise.
+
+Page composition lives in `data.server.js`, not in a Nest endpoint: the API
+stays resource-oriented, and a new server-rendered page adds a function here
+rather than a `/pages/...` route to the backend.
+
+Still required for SSR:
+
+1. `src/entry-server.jsx` with `renderToString` + `StaticRouter`, and a
+   `server.js` that serves `dist/client` and calls it (Vite `ssrLoadModule` in
+   dev).
+2. A Node deployment instead of the static site, with `API_URL` pointing at the
+   backend's internal URL.
+3. `navigateFallbackDenylist` in the PWA config for `/results` and `/listing/`,
+   so a cached `index.html` cannot bypass the server render.
+4. Render the guest version on the server (`initialUserId: null`,
+   `initialTheme: null`); the signed-in id and the theme are resolved from
+   storage after hydration, so those widgets appear after the first paint
+   without a hydration mismatch.
 
 ## Facet chip input
 
@@ -135,10 +176,13 @@ removal is a real button with an aria-label, and result counts are announced via
   Settings live at the bottom of the drawer.
 - **Language** - the topbar switch changes the interface and every backend
   description (categories, facet questions and options) between English and
-  Croatian. English is the default; the choice is remembered in `localStorage`
-  (`kiosk-language`) and applied to `<html lang>`. Descriptions are fetched with
+  Croatian. English is the default; the choice is written to the
+  `kiosk-language` cookie (so a server render can read it) and mirrored in
+  `localStorage`, and applied to `<html lang>`. Descriptions are fetched with
   both translations (`{ en, hr }`) from `/descriptions`, so switching does not
-  lose the interview answers currently being edited.
+  lose the interview answers currently being edited. The dictionaries are
+  passed through React context, never held in a module variable, so two
+  requests with different languages cannot overwrite each other.
 - **Search screen** (`/search`) - the input is a structured **facet chip** field,
   not a free-text ad search. Committed chips are facet values (`valueId`) or
   numeric ranges; typing opens a grouped suggestion list from

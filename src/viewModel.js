@@ -1,6 +1,6 @@
 // Map the backend's normalized CRUD rows onto the UI's session/chat/browse model.
 // Backend reference: ../backend/API_ROUTES.md
-import { pluralKey, translate } from './i18n.jsx'
+import { createTranslator, pluralKey } from './strings.js'
 
 const byId = (rows) => new Map(rows.map((row) => [row.id, row]))
 
@@ -46,8 +46,18 @@ function descriptionTextFor(description, language) {
   return description.text ?? ''
 }
 
-export function buildViewModel(raw, { userId, language = 'en' } = {}) {
-  const t = (key, vars) => translate(language, key, vars)
+/**
+ * Map raw API rows onto the UI model.
+ *
+ * `strings` is the dictionary built by `createStrings()` from `/descriptions`.
+ * It is passed in rather than read from a module so a server rendering two
+ * languages at once cannot mix them up.
+ */
+export function buildViewModel(
+  raw,
+  { userId, language = 'en', strings = {} } = {},
+) {
+  const t = createTranslator(strings, language)
   const users = raw.users ?? []
   const descriptions = raw.descriptions ?? []
   const categories = raw.categories ?? []

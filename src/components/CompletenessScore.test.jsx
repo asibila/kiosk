@@ -1,11 +1,12 @@
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { LanguageProvider } from '../i18n.jsx'
+import { TEST_STRINGS } from '../test/strings.js'
 import CompletenessScore from './CompletenessScore.jsx'
 
 function renderScore(props = {}) {
   return render(
-    <LanguageProvider>
+    <LanguageProvider initialStrings={TEST_STRINGS}>
       <CompletenessScore answered={2} total={4} {...props} />
     </LanguageProvider>,
   )

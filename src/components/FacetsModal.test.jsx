@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LanguageProvider } from '../i18n.jsx'
+import { TEST_STRINGS } from '../test/strings.js'
 import FacetsModal from './FacetsModal.jsx'
 
 const conditionQuestion = {
@@ -52,7 +53,7 @@ const groups = [
 
 function renderModal(props = {}) {
   return render(
-    <LanguageProvider>
+    <LanguageProvider initialStrings={TEST_STRINGS}>
       <FacetsModal
         groups={groups}
         answers={{}}

@@ -1,13 +1,14 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { LanguageProvider } from '../i18n.jsx'
+import { TEST_STRINGS } from '../test/strings.js'
 import EditListingView from './EditListingView.jsx'
 
 const session = { title: 'Bikes' }
 
 function renderView(props = {}) {
   return render(
-    <LanguageProvider>
+    <LanguageProvider initialStrings={TEST_STRINGS}>
       <EditListingView
         session={session}
         language="en"

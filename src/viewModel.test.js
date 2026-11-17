@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildViewModel } from './viewModel.js'
+import { TEST_STRINGS } from './test/strings.js'
 
 const users = [
   { id: 1, name: 'Ana', email: 'ana@example.com', role: 'ADMIN', isActive: true },
@@ -17,7 +18,7 @@ const raw = { users, categories, listings }
 
 describe('buildViewModel current user', () => {
   it('has no current user when nobody is signed in', () => {
-    const view = buildViewModel(raw, { userId: null, language: 'en' })
+    const view = buildViewModel(raw, { userId: null, language: 'en', strings: TEST_STRINGS })
 
     expect(view.user).toBeNull()
     expect(view.myListings).toEqual([])
@@ -25,21 +26,21 @@ describe('buildViewModel current user', () => {
   })
 
   it('treats a stored id that matches no user as signed out', () => {
-    const view = buildViewModel(raw, { userId: 999, language: 'en' })
+    const view = buildViewModel(raw, { userId: 999, language: 'en', strings: TEST_STRINGS })
 
     expect(view.user).toBeNull()
     expect(view.myListings).toEqual([])
   })
 
   it('shows only the signed-in user listings', () => {
-    const view = buildViewModel(raw, { userId: 2, language: 'en' })
+    const view = buildViewModel(raw, { userId: 2, language: 'en', strings: TEST_STRINGS })
 
     expect(view.user.id).toBe(2)
     expect(view.myListings.map((listing) => listing.listingId)).toEqual([11])
   })
 
   it('still builds the catalog for guests', () => {
-    const view = buildViewModel(raw, { userId: null, language: 'en' })
+    const view = buildViewModel(raw, { userId: null, language: 'en', strings: TEST_STRINGS })
 
     expect(view.sessions.map((session) => session.id)).toEqual(['1'])
     expect(view.browseData.root.items).toHaveLength(1)
@@ -67,7 +68,7 @@ describe('buildViewModel category and listing counts', () => {
           },
         ],
       },
-      { userId: null, language: 'en' },
+      { userId: null, language: 'en', strings: TEST_STRINGS },
     )
 
     expect(view.sessions.map((session) => session.id)).toEqual(['0', '1'])
@@ -94,7 +95,7 @@ describe('buildViewModel category and listing counts', () => {
         ],
         listings: [{ ...listings[0], price: 199.99, year: 2024 }],
       },
-      { userId: null, language: 'en' },
+      { userId: null, language: 'en', strings: TEST_STRINGS },
     )
 
     expect(view.sessions[0].questions.map((question) => question.id)).toEqual([
@@ -123,7 +124,7 @@ describe('buildViewModel category and listing counts', () => {
         ],
         listings: [{ ...listings[0], facetsCount: 2 }],
       },
-      { userId: 1, language: 'en' },
+      { userId: 1, language: 'en', strings: TEST_STRINGS },
     )
 
     expect(view.myListings[0].facetsCount).toBe(2)
@@ -148,7 +149,7 @@ describe('buildViewModel category tree', () => {
           { id: 3, descriptionId: 1, parentCategoryId: 2 },
         ],
       },
-      { userId: null, language: 'en' },
+      { userId: null, language: 'en', strings: TEST_STRINGS },
     )
 
     expect(view.sessions.map((session) => session.id)).toEqual(['1', '2', '3'])
