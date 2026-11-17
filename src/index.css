@@ -646,17 +646,25 @@ button {
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
 }
 
+/* Every card's image box is the same 4:3 frame; photos are cropped to fill it.
+   min-height/overflow keep a tall portrait photo from stretching the flex item
+   past the aspect ratio (flex items default to min-height: auto). */
 .result-thumb {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
   aspect-ratio: 4 / 3;
+  min-height: 0;
+  overflow: hidden;
   background: var(--surface-2);
   color: var(--muted-2);
 }
 
 .result-thumb img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
