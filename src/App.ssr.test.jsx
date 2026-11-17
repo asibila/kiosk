@@ -63,7 +63,6 @@ function renderAt(url, { language = 'en' } = {}) {
           initialStrings={strings}
           initialLanguage={language}
           initialTheme={null}
-          initialUserId={null}
         />
       </StaticRouter>
     </StrictMode>,

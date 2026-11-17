@@ -30,7 +30,6 @@ const MODAL_TITLES = { settings: 'settings.title', profile: 'profile.title' }
 
 const THEME_KEY = 'kiosk-theme'
 const REGION_KEY = 'kiosk-region-id'
-const LOGGED_IN_USER_ID_KEY = 'kiosk-user-id'
 
 /** Replace the leading direction segment of a drawer listing description. */
 function withOrientationLabel(desc, orientation, t) {
@@ -66,41 +65,20 @@ function getStoredRegionId() {
   }
 }
 
-function getLoggedInUserId() {
-  try {
-    const stored = localStorage.getItem(LOGGED_IN_USER_ID_KEY)
-    const id = stored ? Number(stored) : NaN
-    return Number.isFinite(id) && id > 0 ? id : null
-  } catch {
-    return null
-  }
-}
-
-/** Forgets the signed-in user on this device. Returns false if storage refuses. */
-function clearSignedInUserId() {
-  try {
-    localStorage.removeItem(LOGGED_IN_USER_ID_KEY)
-    return true
-  } catch {
-    // Storage can be blocked; signing out still navigates away from the account.
-    return false
-  }
-}
-
-function KioskApp({ initialData = null, initialTheme, initialUserId }) {
+function KioskApp({ initialData = null, initialTheme }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { id: listingRouteId } = useParams()
   const { language, refreshStrings, strings, t } = useI18n()
 
-  // The signed-in user normally comes from this device's storage. A server
-  // render cannot read that, so it passes `initialUserId: null` and the browser
-  // resolves the stored id after hydration. `undefined` keeps the plain
-  // client-side behaviour of reading storage on every render.
-  const [authUserId, setAuthUserId] = useState(() => initialUserId)
-  const loggedInUserId =
-    authUserId === undefined ? getLoggedInUserId() : authUserId
+  // The session lives in an HTTP-only cookie and is resolved by the API. Until
+  // `/auth/me` has answered, no catalog load starts, so drafts and chats are
+  // fetched with the right identity on the first pass.
+  const [authUser, setAuthUser] = useState(null)
+  const [authChecked, setAuthChecked] = useState(false)
+  const loggedInUserId = authUser?.id ?? null
   const isLoggedIn = loggedInUserId != null
+  const user = authUser
 
   // Seed the first render from a server payload. This is what lets the server
   // emit real markup for /results and /listing/:id instead of a loading shell;
@@ -135,7 +113,6 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   const [dataStatus, setDataStatus] = useState(initialView ? 'ready' : 'loading') // 'loading' | 'ready' | 'error'
   const [loadError, setLoadError] = useState('')
   const [reloadToken, setReloadToken] = useState(0)
-  const [user, setUser] = useState(initialView?.user ?? null)
   const [users, setUsers] = useState(initialView?.users ?? [])
   const [languages, setLanguages] = useState(
     initialView?.languages?.length ? initialView.languages : LANGUAGES,
@@ -198,9 +175,6 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   // language does not discard the interview answers being edited.
   const loadKeyRef = useRef(null)
   const initializedRef = useRef(Boolean(initialView))
-  // A server-rendered page already carries its data; skip the duplicate fetch on
-  // the first client pass and only refetch on a reload or language change.
-  const skipInitialFetchRef = useRef(Boolean(initialView))
   // Which data load already asked for a dictionary retry, so a failed
   // translation request is not retried on every render.
   const stringsRetryRef = useRef(null)
@@ -215,20 +189,32 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   const modalChatIdRef = useRef(null)
   modalChatIdRef.current = modalChatId
 
-  // After hydration, pick up the id this device signed in with. The server could
-  // not know it, so it rendered the public version of the page.
+  // Resolve the session cookie once, then let the data load run with the
+  // signed-in identity (or as a guest when `/auth/me` answers 401).
   useEffect(() => {
-    if (initialUserId !== null) return
-    setAuthUserId(getLoggedInUserId())
-  }, [initialUserId])
+    let cancelled = false
+
+    api
+      .me()
+      .then((me) => {
+        if (cancelled) return
+        setAuthUser(me)
+        setAuthChecked(true)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setAuthUser(null)
+        setAuthChecked(true)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Load every resource the UI needs, then map it onto the interview/chat model.
   useEffect(() => {
-    if (skipInitialFetchRef.current) {
-      skipInitialFetchRef.current = false
-      loadKeyRef.current = `${reloadToken}|${loggedInUserId}`
-      return undefined
-    }
+    if (!authChecked) return undefined
 
     let cancelled = false
     const loadKey = `${reloadToken}|${loggedInUserId}`
@@ -240,7 +226,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
       setLoadError('')
     }
 
-    fetchKioskData()
+    fetchKioskData({ signedIn: loggedInUserId != null })
       .then((raw) => {
         if (cancelled) return
         // The provider normally loaded these before mount; retrying here covers
@@ -254,13 +240,6 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
           language,
           strings,
         })
-        // The stored sign-in names a user that no longer exists (for example
-        // after a database reset). Forget it and load again as a guest.
-        if (loggedInUserId != null && !view.user && clearSignedInUserId()) {
-          setReloadToken((n) => n + 1)
-          return
-        }
-        setUser(view.user)
         setUsers(view.users ?? [])
         setLanguages(view.languages?.length ? view.languages : LANGUAGES)
         setRegions(view.regions ?? [])
@@ -283,6 +262,14 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
       })
       .catch((err) => {
         if (cancelled) return
+        // The session expired between /auth/me and the catalog load: drop back
+        // to a guest and reload the public catalog once.
+        if (err.status === 401 && loggedInUserId != null) {
+          setAuthUser(null)
+          setAuthChecked(true)
+          setReloadToken((n) => n + 1)
+          return
+        }
         setLoadError(err.message)
         setDataStatus('error')
       })
@@ -290,7 +277,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
     return () => {
       cancelled = true
     }
-  }, [reloadToken, loggedInUserId, language, strings, refreshStrings])
+  }, [reloadToken, loggedInUserId, language, strings, refreshStrings, authChecked])
 
   // Search region: an explicit choice survives reloads; without one, ask the
   // API which region this IP belongs to (0 when it cannot be resolved).
@@ -332,7 +319,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   useEffect(() => {
     if (!user?.id) return undefined
 
-    const source = new EventSource(CHAT_EVENTS_URL)
+    const source = new EventSource(CHAT_EVENTS_URL, { withCredentials: true })
     let opened = false
     setLiveStatus('connecting')
 
@@ -760,7 +747,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   // Search results: start a conversation about a listing. A new chat thread is
   // linked to the listing and to the current user's inbox item.
   async function contactListing(listing) {
-    const actorId = getLoggedInUserId()
+    const actorId = user?.id
     if (!actorId || contactingListingId) return
     setContactingListingId(listing.id)
     try {
@@ -1577,12 +1564,19 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   }
 
   // Sign out: drop the stored kiosk user id and return to the login screen.
-  // KioskApp unmounts on /login, so user-scoped state and live streams are
-  // discarded; the language and theme preferences stay on the device.
-  function signOut() {
-    clearSignedInUserId()
+  // Sign out: revoke the server session; user-scoped state and live streams are
+  // discarded. The language and theme preferences stay on the device.
+  async function signOut() {
+    try {
+      await api.logout()
+    } catch {
+      // Signing out locally still works when the API is unreachable.
+    }
+    setAuthUser(null)
+    setAuthChecked(true)
     setDrawerOpen(false)
     setModal(null)
+    setReloadToken((n) => n + 1)
     navigate('/login', { replace: true })
   }
 

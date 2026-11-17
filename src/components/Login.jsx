@@ -1,10 +1,11 @@
-// Login screen: email + password sign-in (full screen).
+// Login screen: email + password sign-in (full screen). The API answers with an
+// HTTP-only session cookie; the app re-checks `/auth/me` after the navigation.
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { useI18n } from '../i18n.jsx'
-import { API_BASE } from '../api.js'
+import { api } from '../api.js'
 
-export default function Login() {
+export default function Login({ onLoggedIn }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -19,35 +20,15 @@ export default function Login() {
     setError('')
 
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      })
+      const user = await api.login(email, password)
+      onLoggedIn?.(user)
 
-      if (!res.ok) {
-        let message = t('login.invalid')
-        try {
-          const body = await res.json()
-          if (body?.message) message = Array.isArray(body.message) ? body.message[0] : body.message
-        } catch {
-          // Non-JSON error body; keep the default message.
-        }
-        throw new Error(message)
-      }
-
-      const data = await res.json()
-      try {
-        localStorage.setItem('kiosk-user-id', String(data.userId))
-      } catch {
-        // Ignore storage failures; the id still drives this visit via navigation state.
-      }
       // Return to the page that asked for sign-in (for example a listing detail
       // page), but never follow an external URL.
       const requested = location.state?.from
       const target =
         typeof requested === 'string' && requested.startsWith('/') ? requested : '/search'
-      navigate(target, { state: { userId: data.userId } })
+      navigate(target)
     } catch (err) {
       setError(err.message || t('login.failed'))
     } finally {

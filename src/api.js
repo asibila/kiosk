@@ -32,6 +32,8 @@ async function request(path, { headers, ...options } = {}) {
   try {
     res = await fetch(`${API_BASE}${path}`, {
       ...options,
+      // Sessions are carried in an HTTP-only cookie.
+      credentials: 'include',
       headers: {
         ...(isFormData ? {} : { 'content-type': 'application/json' }),
         ...headers,
@@ -50,14 +52,15 @@ async function request(path, { headers, ...options } = {}) {
     } catch {
       // Non-JSON error body; keep the HTTP status text.
     }
-    throw new Error(message)
+    const error = new Error(message)
+    error.status = res.status
+    throw error
   }
 
   if (res.status === 204) return null
-  return res.json()
+  const body = await res.text()
+  return body ? JSON.parse(body) : null
 }
-
-const actorHeader = (actorId) => (actorId ? { 'x-actor-id': String(actorId) } : {})
 
 /** Server-Sent Events stream that pushes new chat messages to the UI. */
 export const CHAT_EVENTS_URL = `${API_BASE}/chat-events/stream`
@@ -70,29 +73,32 @@ export const mediaUrl = (path) => (path ? `${API_BASE}${path}` : '')
 
 export const api = {
   list: (resource) => request(`/${resource}`),
-  create: (resource, body, actorId) =>
+  login: (email, password) =>
+    request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+  me: () => request('/auth/me'),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  create: (resource, body, _actorId) =>
     request(`/${resource}`, {
       method: 'POST',
       body: JSON.stringify(body),
-      headers: actorHeader(actorId),
     }),
   /** POST a `FormData` body (multipart upload) without JSON encoding. */
-  upload: (resource, formData, actorId) =>
+  upload: (resource, formData, _actorId) =>
     request(`/${resource}`, {
       method: 'POST',
       body: formData,
-      headers: actorHeader(actorId),
     }),
-  update: (resource, id, body, actorId) =>
+  update: (resource, id, body, _actorId) =>
     request(`/${resource}/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
-      headers: actorHeader(actorId),
     }),
-  remove: (resource, id, actorId) =>
+  remove: (resource, id, _actorId) =>
     request(`/${resource}/${id}`, {
       method: 'DELETE',
-      headers: actorHeader(actorId),
     }),
   /** Region for this visitor, resolved by the API from the request IP. */
   detectRegion: () => request('/regions/detect'),
@@ -131,14 +137,31 @@ const RESOURCES = [
   'listing-images',
 ]
 
-/** Fetch every resource the UI needs, in parallel. */
-export async function fetchKioskData() {
+/** Resources that only exist for a signed-in user; guests skip the requests. */
+const privateResources = new Set([
+  'chat-threads',
+  'chat-messages',
+  'inbox-items',
+  'listing-chat-threads',
+])
+
+/** Fetch every resource the UI needs, in parallel. Guests skip chat rows. */
+export async function fetchKioskData({ signedIn = false } = {}) {
+  const resources = signedIn
+    ? RESOURCES
+    : RESOURCES.filter((resource) => !privateResources.has(resource))
+
   const rows = await Promise.all(
-    RESOURCES.map((resource) =>
+    resources.map((resource) =>
       resource === 'descriptions'
         ? loadDescriptions()
         : api.list(resource),
     ),
   )
-  return Object.fromEntries(RESOURCES.map((resource, index) => [resource, rows[index]]))
+
+  const data = Object.fromEntries(RESOURCES.map((resource) => [resource, []]))
+  resources.forEach((resource, index) => {
+    data[resource] = rows[index]
+  })
+  return data
 }

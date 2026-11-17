@@ -33,9 +33,6 @@ const tree = (
         initialStrings={boot?.strings ?? null}
         initialLanguage={boot?.language ?? null}
         initialTheme={boot ? (boot.theme ?? null) : undefined}
-        // No boot payload: read the signed-in user from storage during render,
-        // as plain client-side rendering always did.
-        initialUserId={boot ? (boot.userId ?? null) : undefined}
       />
     </BrowserRouter>
   </React.StrictMode>

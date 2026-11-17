@@ -172,7 +172,11 @@ removal is a real button with an aria-label, and result counts are announced via
   share the same shell (`KioskApp`) with the usual topbar, drawer and modals; only
   the main area differs.
 - **Home** - `/` redirects straight to `/search`; `/login` renders the log-in form
-  (`src/components/Login.jsx`) and, after a successful sign-in, returns to `/search`.
+  (`src/components/Login.jsx`). Sign-in sets an HTTP-only `kiosk_session` cookie
+  via `POST /auth/login`; the app then resolves the user with `GET /auth/me` and
+  returns to `/search` (or the page that requested sign-in). No user id is kept
+  in `localStorage`; guests skip the private chat/inbox resources when loading
+  the catalog.
   `/results?...` renders the bookmarkable results page described below and
   `/listing/:id` renders one listing.
 - **Top bar** - centered title (a link back to `/search`); hamburger; on the
@@ -256,11 +260,12 @@ removal is a real button with an aria-label, and result counts are announced via
   screen. Each row has a delete button that asks "Are you sure?" before calling
   `DELETE /listings/:id`. The bottom of the drawer holds four full-width actions —
   **New listing** (+), **Messages** (envelope/message icon, with the unread badge),
-  **Settings** (gear) and **Sign out** (exit icon). Sign out removes
-  `localStorage['kiosk-user-id']`, closes the drawer/modal and returns to `/login`;
-  the language and theme preferences are kept. The **Profile** modal also has a
-  **Sign out** footer button. When nobody is signed in, the drawer shows a **Sign in**
-  button (linking to `/login`) instead of the listings and these actions.
+  **Settings** (gear) and **Sign out** (exit icon). Sign out calls
+  `POST /auth/logout` (revoking the HTTP-only session cookie), closes the
+  drawer/modal and returns to `/login`; the language and theme preferences are
+  kept. The **Profile** modal also has a **Sign out** footer button. When nobody
+  is signed in, the drawer shows a **Sign in** button (linking to `/login`)
+  instead of the listings and these actions.
 - **Interview view** - per-interview progress bar, priority-sorted product questions,
   wrapping chips (replace-only answers), green answered accents, and an action bar
   with right-aligned Search and a "Next >" button into the listing wizard. The
