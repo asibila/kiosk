@@ -1,12 +1,14 @@
-// Top bar: hamburger (left), centered "Kiosk" title, language/profile/theme (right).
-// Create-new-listing, Messages and Settings live at the bottom of the drawer.
+// Top bar: hamburger (left), centered "Kiosk" title, add-listing + language
+// dropdown + profile/theme (right). Create-new-listing, Messages and Settings
+// live at the bottom of the drawer.
 import { Link } from 'react-router'
-import { MenuIcon, UserIcon, MoonIcon, SunIcon } from '../icons.jsx'
+import { MenuIcon, PlusIcon, UserIcon, MoonIcon, SunIcon } from '../icons.jsx'
 import { LANGUAGES, useI18n } from '../i18n.jsx'
 
 export default function TopBar({
   onMenu,
   onOpenModal,
+  onAddListing,
   theme = 'light',
   onToggleTheme,
   languages = LANGUAGES,
@@ -34,20 +36,28 @@ export default function TopBar({
       </h1>
 
       <nav className="topbar-side right" aria-label={t('topbar.actions')}>
-        <div className="lang-switch" role="group" aria-label={t('topbar.language')}>
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label={t('topbar.addListing')}
+          title={t('topbar.addListing')}
+          onClick={onAddListing}
+        >
+          <PlusIcon size={20} />
+        </button>
+        <select
+          className="lang-select"
+          aria-label={t('topbar.language')}
+          title={t('topbar.language')}
+          value={language}
+          onChange={(event) => setLanguage(event.target.value)}
+        >
           {languages.map((option) => (
-            <button
-              key={option.code}
-              type="button"
-              className={option.code === language ? 'lang-btn active' : 'lang-btn'}
-              aria-pressed={option.code === language}
-              title={option.name}
-              onClick={() => setLanguage(option.code)}
-            >
+            <option key={option.code} value={option.code}>
               {option.code.toUpperCase()}
-            </button>
+            </option>
           ))}
-        </div>
+        </select>
         <button
           type="button"
           className="icon-btn"

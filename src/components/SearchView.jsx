@@ -3,7 +3,7 @@
 // every other interview question, is a facet in the filter.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import { ChevronDownIcon, LayersIcon, SearchIcon } from '../icons.jsx'
+import { CheckIcon, ChevronDownIcon, LayersIcon } from '../icons.jsx'
 import { pluralKey, useI18n } from '../i18n.jsx'
 import { isRangeChip, isValueChip } from '../facetTypes.js'
 import {
@@ -15,6 +15,7 @@ import {
 } from '../searchQuery.js'
 import FacetChipInput from './FacetChipInput.jsx'
 import FacetsModal from './FacetsModal.jsx'
+import SimpleModal from './SimpleModal.jsx'
 
 export default function SearchView({
   listings,
@@ -22,6 +23,9 @@ export default function SearchView({
   selections = [],
   categoryId = '',
   currentUserId = null,
+  regions = [],
+  regionId = 0,
+  onRegionChange,
   onOpenBrowse,
   onCommitText,
   onUnmatchedToken,
@@ -33,12 +37,34 @@ export default function SearchView({
   // It only seeds state; chips then live in this view.
   const [initialQuery] = useState(() => parseSearchQuery(location.search))
   const [facetsOpen, setFacetsOpen] = useState(false)
+  const [regionOpen, setRegionOpen] = useState(false)
   const [suggestionCount, setSuggestionCount] = useState(null)
   const previousCategoryRef = useRef(categoryId)
 
   const categoryLabel =
     categories.find((category) => String(category.categoryId) === String(categoryId))?.title ??
     t('search.allCategories')
+
+  // "Search <region>" title and its picker. Id 0 is the global "All regions"
+  // entry and always comes first; the rest follows the catalog order (by id).
+  const allRegionsName =
+    regions.find((region) => Number(region.id) === 0)?.name ?? t('region.all')
+  const regionOptions = useMemo(
+    () => [
+      { id: 0, name: allRegionsName },
+      ...regions
+        .filter((region) => Number(region.id) !== 0)
+        .map((region) => ({ id: Number(region.id), name: region.name })),
+    ],
+    [allRegionsName, regions],
+  )
+  const currentRegion = regions.find(
+    (region) => Number(region.id) === Number(regionId),
+  )
+  const regionTitle =
+    Number(regionId) === 0 || !currentRegion
+      ? t('search.allRegionsTitle')
+      : t('search.regionTitle', { region: currentRegion.name })
 
   const rangeFacets = useMemo(
     () => [
@@ -208,7 +234,7 @@ export default function SearchView({
   // The explicit submit: a GET-style /results URL that can be bookmarked,
   // shared or reloaded. The form URL stays in history as the entry before it.
   function submitSearch() {
-    const params = buildSearchParams({ categoryId, chips })
+    const params = buildSearchParams({ categoryId, chips, regionId })
     const search = params.toString()
     navigate({ pathname: '/results', search: search ? `?${search}` : '' })
   }
@@ -248,8 +274,9 @@ export default function SearchView({
   }
 
   // Live count for the current structured query. It uses the same filter as
-  // /results, so the number here and the results page agree.
-  const hasQuery = chips.length > 0 || !!categoryId
+  // /results, so the number here and the results page agree. A region alone
+  // also counts as a query.
+  const hasQuery = chips.length > 0 || !!categoryId || Number(regionId) > 0
   const resultCount = useMemo(
     () =>
       hasQuery
@@ -258,6 +285,7 @@ export default function SearchView({
             selections,
             categories,
             categoryId,
+            regionId,
             chips,
           }).filter(
             (listing) =>
@@ -273,6 +301,7 @@ export default function SearchView({
       currentUserId,
       hasQuery,
       listings,
+      regionId,
       selections,
     ],
   )
@@ -286,7 +315,18 @@ export default function SearchView({
   return (
     <section className="search-page" aria-label={t('search.aria')}>
       <div className="search-block">
-        <h2 className="search-title">{t('search.title')}</h2>
+        <h2 className="search-title">
+          <button
+            type="button"
+            className="search-region"
+            aria-haspopup="dialog"
+            title={t('region.choose')}
+            onClick={() => setRegionOpen(true)}
+          >
+            <span>{regionTitle}</span>
+            <ChevronDownIcon size={22} />
+          </button>
+        </h2>
 
         <FacetChipInput
           key={categoryId || 'all'}
@@ -297,6 +337,7 @@ export default function SearchView({
           onCommitText={onCommitText}
           onUnmatchedToken={onUnmatchedToken}
           onResultsCount={setSuggestionCount}
+          onSubmit={submitSearch}
         />
 
         <div className="search-controls">
@@ -323,11 +364,6 @@ export default function SearchView({
               {facetCount > 0 ? ` (${facetCount})` : ''}
             </span>
           </button>
-
-          <button type="button" className="btn primary search-submit" onClick={submitSearch}>
-            <SearchIcon size={16} />
-            {t('search.submit')}
-          </button>
         </div>
 
         {resultCount != null && (
@@ -349,6 +385,36 @@ export default function SearchView({
           onToggle={toggleFacet}
           onRangeChange={setRange}
           onClose={() => setFacetsOpen(false)}
+        />
+      )}
+
+      {regionOpen && (
+        <SimpleModal
+          title={t('region.choose')}
+          onClose={() => setRegionOpen(false)}
+          body={
+            <ul className="region-list">
+              {regionOptions.map((region) => {
+                const selected = Number(region.id) === Number(regionId)
+                return (
+                  <li key={region.id}>
+                    <button
+                      type="button"
+                      className={selected ? 'region-option selected' : 'region-option'}
+                      aria-pressed={selected}
+                      onClick={() => {
+                        onRegionChange?.(region.id)
+                        setRegionOpen(false)
+                      }}
+                    >
+                      <span className="region-option-name">{region.name}</span>
+                      {selected && <CheckIcon size={16} />}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          }
         />
       )}
     </section>

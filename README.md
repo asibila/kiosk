@@ -83,6 +83,7 @@ overrides the defaults in the backend's `src/main.ts`.
 | `users` | Profile modal (first user is the signed-in user) |
 | `categories` + `descriptions` | Drawer sessions and browse tree use descriptions by id; descriptions with a `name` are the UI translation dictionary loaded at startup |
 | `languages` | Codes/names for the topbar EN/HR switcher |
+| `regions` + `/regions/detect` | Search region title/picker; detection is resolved by the API from the visitor's IP |
 | `facet-schemas` + `facet-value-options` | Interview questions and answer chips |
 | `facet-value-selections` | Saved answers (on the category's first listing) |
 | `/suggest` (`GET /api/suggest`) | Facet-value autocomplete + counts for the search chip input |
@@ -174,10 +175,12 @@ removal is a real button with an aria-label, and result counts are announced via
   (`src/components/Login.jsx`) and, after a successful sign-in, returns to `/search`.
   `/results?...` renders the bookmarkable results page described below and
   `/listing/:id` renders one listing.
-- **Top bar** - centered title (a link back to `/search`); hamburger; **EN / HR** language switch; profile icon
-  and theme toggle (moon/sun) on the right. Create-new-listing, Messages and
-  Settings live at the bottom of the drawer.
-- **Language** - the topbar switch changes the interface and every backend
+- **Top bar** - centered title (a link back to `/search`); hamburger; on the
+  right a **+** button that starts a new listing, then the **EN / HR** language
+  dropdown, profile icon and theme toggle (moon/sun). Signed-in users get the
+  Browse modal to pick a category; guests get the drawer plus a "Please sign in
+  to publish" prompt. Messages and Settings live at the bottom of the drawer.
+- **Language** - the topbar dropdown changes the interface and every backend
   description (categories, facet questions and options) between English and
   Croatian. English is the default; the choice is written to the
   `kiosk-language` cookie (so a server render can read it) and mirrored in
@@ -186,7 +189,12 @@ removal is a real button with an aria-label, and result counts are announced via
   lose the interview answers currently being edited. The dictionaries are
   passed through React context, never held in a module variable, so two
   requests with different languages cannot overwrite each other.
-- **Search screen** (`/search`) - the input is a structured **facet chip** field,
+- **Search screen** (`/search`) - the title is a **Search \<region\>** button:
+  the region comes from `GET /regions/detect` (IP-based, `0` when unknown) and
+  the dialog lists **All regions** first plus every seeded country; the choice
+  is remembered in `localStorage`, limits the search to that region (a country
+  excludes global listings, "All regions" searches everything) and tags new
+  listings with `regionId`. The input is a structured **facet chip** field,
   not a free-text ad search. Committed chips are facet values (`valueId`) or
   numeric ranges; typing opens a grouped suggestion list from
   `GET /api/suggest` (scoped to language, category and existing chips).
@@ -201,20 +209,23 @@ removal is a real button with an aria-label, and result counts are announced via
   and **MOBILE PHONES** (screen size). A parent category's facets therefore apply
   to all of its subcategories. Suggestion counts update politely via an
   `aria-live` region; unmatched tokens are reported to the parent once (and
-  logged under `kiosk-unmatched-search-tokens`). The field wraps chips up to
-  ~120px, then scrolls vertically; the dropdown is anchored to the field's
-  bottom edge. The category button opens the shared **Browse** modal (reopening
-  at the current category); choosing "Home" and OK resets it to "All categories".
+  logged under `kiosk-unmatched-search-tokens`). The field has a fixed 52px
+  height: chips wrap and the rows scroll with the wheel or ↑/↓, and the blue
+  magnifier button inside it submits the search. The category button opens the
+  shared **Browse** modal (reopening at the current category); choosing "Home"
+  and OK resets it to "All categories".
   The **Filter** button shows the active chip count (values and ranges). The
   topbar's usual actions keep working, and choosing a listing from the drawer
   navigates back to `/app`. The form also mirrors its query into `/search`'s URL
   (`?category=&facet=&range=`) with `replace`, so the address bar is bookmarkable
   and Back from the results page restores the same form.
 - **Search results** (`/results`) - pressing **Search** opens a GET-style results
-  URL that serializes the whole query as `category`, `facet=<name>:<valueId>` and
-  `range=<facet>:<min>-<max>` parameters. Reloading, bookmarking or sharing that
+  URL that serializes the whole query as `category`, `region`, `facet=<name>:<valueId>`
+  and `range=<facet>:<min>-<max>` parameters. Reloading, bookmarking or sharing that
   URL reproduces the search; only ids are encoded, so labels are resolved again
-  from the catalog in the active language. The page shows the active filters, a
+  from the catalog in the active language. A `region` parameter keeps only
+  listings tagged with that region (global listings are excluded); without it
+  every region is searched. The page shows the active filters, a
   result count and responsive cards (primary image, title, matched facet summary,
   orientation badge). Clicking a card opens its listing page; cards also offer
   the same envelope action as the listings modal (disabled for the signed-in
@@ -229,11 +240,13 @@ removal is a real button with an aria-label, and result counts are announced via
   that returns to the same listing after login. Opened from results, the back
   link restores that exact `/results?…` query; a direct or bookmarked visit falls
   back to "Back to search". A deleted or unknown id shows a not-found state.
-- **New listing** - the drawer's **New listing** action opens the Browse modal to
-  choose a category; OK clears the selected category/listing and interview answers
-  locally and opens that category's interview. Cancel keeps the current screen
-  unchanged. Pressing **Next >** materialises an inactive draft (`isActive:
-  false`), creates its UI-language title and saves the interview answers on it.
+- **New listing** - the topbar **+** button (and the drawer's **New listing**
+  action) opens the Browse modal to choose a category; OK clears the selected
+  category/listing and interview answers locally and opens that category's
+  interview. Guests who press **+** see the drawer with a "Please sign in to
+  publish" prompt instead. Cancel keeps the current screen unchanged. Pressing
+  **Next >** materialises an inactive draft (`isActive: false`), creates its
+  UI-language title and saves the interview answers on it.
 - **Dark mode** — toggles between light and dark palettes, follows the OS preference on first
   visit, and remembers the choice in `localStorage` (`kiosk-theme`).
 - **Drawer** - overlay slide-in, 340px (full-width ≤600px), a flat list of the signed-in

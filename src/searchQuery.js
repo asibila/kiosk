@@ -3,7 +3,10 @@
 //
 // The URL is the serialized form of the query so results can be bookmarked:
 //
-//   /results?category=2&direction=buy&facet=condition:1&range=price:500-1000
+//   /results?category=2&region=4&direction=buy&facet=condition:1&range=price:500-1000
+//
+// A `region` > 0 keeps only listings tagged with that region (global listings
+// are excluded); without it the search covers every region.
 //
 // Only structured ids are encoded; labels are resolved from the catalog again
 // when the URL is parsed, so switching language never leaves stale labels in a
@@ -23,12 +26,20 @@ function formatBound(value) {
 }
 
 /**
- * Serialize a search query into URLSearchParams.
- * @param {{categoryId?: string|number, direction?: 'buy'|'sell'|null, chips?: import('./facetTypes.js').FacetChip[]}} query
+ * Serialize a search query into URLSearchParams. Region `0` (all regions) is
+ * omitted, so an old link without `region` keeps searching everything.
+ * @param {{categoryId?: string|number, regionId?: string|number, direction?: 'buy'|'sell'|null, chips?: import('./facetTypes.js').FacetChip[]}} query
  */
-export function buildSearchParams({ categoryId = '', direction = null, chips = [] } = {}) {
+export function buildSearchParams({
+  categoryId = '',
+  regionId = '',
+  direction = null,
+  chips = [],
+} = {}) {
   const params = new URLSearchParams()
   if (categoryId) params.set('category', String(categoryId))
+  const region = Number(regionId)
+  if (Number.isInteger(region) && region > 0) params.set('region', String(region))
   if (direction && DIRECTIONS.has(direction)) params.set('direction', direction)
 
   for (const chip of chips) {
@@ -50,14 +61,18 @@ export function buildSearchParams({ categoryId = '', direction = null, chips = [
  * Parse and validate a search query from a location search string.
  * Unknown facets, malformed ids and non-numeric ranges are dropped.
  * @param {string} [search]
- * @returns {{categoryId: string, direction: 'buy'|'sell'|null, chips: import('./facetTypes.js').FacetChip[]}}
+ * @returns {{categoryId: string, regionId: string, direction: 'buy'|'sell'|null, chips: import('./facetTypes.js').FacetChip[]}}
  */
 export function parseSearchQuery(search = '') {
   const params = new URLSearchParams(search ?? '')
-  const result = { categoryId: '', direction: null, chips: [] }
+  const result = { categoryId: '', regionId: '', direction: null, chips: [] }
 
   const category = Number(params.get('category'))
   if (Number.isInteger(category) && category > 0) result.categoryId = String(category)
+
+  // 0 / missing means "all regions" and applies no filter.
+  const region = Number(params.get('region'))
+  if (Number.isInteger(region) && region > 0) result.regionId = String(region)
 
   const direction = params.get('direction')
   if (direction && DIRECTIONS.has(direction)) result.direction = direction
@@ -181,6 +196,9 @@ export function categoryScope(categoryId, categories = []) {
  * are AND constraints, and price/year ranges filter the matching Listing
  * fields. Listings without the requested numeric field are excluded.
  *
+ * `regionId` > 0 keeps only listings tagged with that region; global listings
+ * (`regionId: 0`) are not included. `regionId` 0 or empty means all regions.
+ *
  * Orientation is also a value chip (`facet: "orientation"`); unlike the legacy
  * `direction` parameter it filters `Listing.orientation` directly.
  */
@@ -189,10 +207,13 @@ export function filterListings({
   selections = [],
   categories = [],
   categoryId = '',
+  regionId = '',
   direction = null,
   chips = [],
 } = {}) {
   const scope = categoryScope(categoryId, categories)
+  const region = Number(regionId)
+  const regionFilter = Number.isInteger(region) && region > 0 ? region : null
   const wantedOrientation =
     direction === 'buy' ? 'sell' : direction === 'sell' ? 'buy' : null
   const orientationValues = chips
@@ -206,6 +227,7 @@ export function filterListings({
 
   const rows = listings.filter((listing) => {
     if (scope && !scope.has(String(listing.categoryId))) return false
+    if (regionFilter != null && Number(listing.regionId) !== regionFilter) return false
     if (wantedOrientation && listing.orientation !== wantedOrientation) return false
     if (orientationValues.length > 0 && !orientationValues.includes(listing.orientation)) {
       return false

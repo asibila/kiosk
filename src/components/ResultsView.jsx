@@ -25,6 +25,7 @@ export default function ResultsView({
   listings = [],
   categories = [],
   selections = [],
+  regions = [],
   currentUserId = null,
   onContact = null,
   contactingId = null,
@@ -58,6 +59,12 @@ export default function ResultsView({
     (row) => String(row.categoryId) === String(query.categoryId),
   )
   const categoryId = category ? query.categoryId : ''
+  const activeRegion = regions.find(
+    (row) => String(row.id) === String(query.regionId),
+  )
+  // A `region` id that is not in the catalog is ignored instead of hiding
+  // every result (for example a stale or hand-edited link).
+  const regionFilterId = activeRegion ? query.regionId : ''
 
   const results = useMemo(
     () =>
@@ -66,6 +73,7 @@ export default function ResultsView({
         selections,
         categories,
         categoryId,
+        regionId: regionFilterId,
         direction: query.direction,
         chips,
       }).filter(
@@ -81,6 +89,7 @@ export default function ResultsView({
       currentUserId,
       listings,
       query.direction,
+      regionFilterId,
       selections,
     ],
   )
@@ -135,6 +144,7 @@ export default function ResultsView({
 
         <div className="results-summary" aria-label={t('results.filters')}>
           <span className="chip">{category?.title ?? t('search.allCategories')}</span>
+          {activeRegion && <span className="chip">{activeRegion.name}</span>}
           {directionLabel && <span className="chip selected">{directionLabel}</span>}
           {chips.map((chip) => (
             <button

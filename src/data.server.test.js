@@ -29,6 +29,10 @@ function catalogRows() {
     languages: [{ code: 'en', name: 'English' }],
     descriptions,
     categories: [{ id: 1, descriptionId: 2, parentCategoryId: null }],
+    regions: [
+      { id: 0, code: 'ALL', descriptionId: 0 },
+      { id: 4, code: 'HR', descriptionId: 2 },
+    ],
     listings,
     'listing-translations': [{ listingId: 10, language: 'en', title: 'Bike' }],
     'facet-schemas': [],

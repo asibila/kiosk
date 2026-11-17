@@ -29,6 +29,7 @@ import { getCategoryIdFromSearch } from './searchQuery.js'
 const MODAL_TITLES = { settings: 'settings.title', profile: 'profile.title' }
 
 const THEME_KEY = 'kiosk-theme'
+const REGION_KEY = 'kiosk-region-id'
 const LOGGED_IN_USER_ID_KEY = 'kiosk-user-id'
 
 /** Replace the leading direction segment of a drawer listing description. */
@@ -51,6 +52,18 @@ function getInitialTheme() {
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches
     ? 'dark'
     : 'light'
+}
+
+/** Region chosen on /search; `null` means "not detected or chosen yet". */
+function getStoredRegionId() {
+  try {
+    const stored = localStorage.getItem(REGION_KEY)
+    if (stored == null) return null
+    const id = Number(stored)
+    return Number.isInteger(id) && id >= 0 ? id : null
+  } catch {
+    return null
+  }
 }
 
 function getLoggedInUserId() {
@@ -127,6 +140,9 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   const [languages, setLanguages] = useState(
     initialView?.languages?.length ? initialView.languages : LANGUAGES,
   )
+  const [regions, setRegions] = useState(initialView?.regions ?? [])
+  // `null` until the stored choice or the IP detection resolves it.
+  const [regionId, setRegionId] = useState(() => getStoredRegionId())
   const [sessions, setSessions] = useState(initialView?.sessions ?? [])
   const [chats, setChats] = useState(initialView?.chats ?? [])
   const [inbox, setInbox] = useState(initialView?.inbox ?? [])
@@ -247,6 +263,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
         setUser(view.user)
         setUsers(view.users ?? [])
         setLanguages(view.languages?.length ? view.languages : LANGUAGES)
+        setRegions(view.regions ?? [])
         setSessions(view.sessions)
         setChats(view.chats)
         setInbox(view.inbox ?? [])
@@ -274,6 +291,40 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
       cancelled = true
     }
   }, [reloadToken, loggedInUserId, language, strings, refreshStrings])
+
+  // Search region: an explicit choice survives reloads; without one, ask the
+  // API which region this IP belongs to (0 when it cannot be resolved).
+  useEffect(() => {
+    if (regionId != null) return undefined
+    let cancelled = false
+
+    api
+      .detectRegion()
+      .then((result) => {
+        if (cancelled) return
+        const detected = Number(result?.regionId)
+        setRegionId(Number.isInteger(detected) && detected >= 0 ? detected : 0)
+      })
+      .catch(() => {
+        if (!cancelled) setRegionId(0)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [regionId])
+
+  /** Region picked from the "Search <region>" dialog. */
+  function changeRegion(nextId) {
+    const id = Number(nextId)
+    const value = Number.isInteger(id) && id >= 0 ? id : 0
+    setRegionId(value)
+    try {
+      localStorage.setItem(REGION_KEY, String(value))
+    } catch {
+      // Storage can be blocked; the choice still applies to this session.
+    }
+  }
 
   // Live chat: consume the backend's SSE stream. New messages for a known
   // thread are appended in place; messages for an unseen thread trigger a full
@@ -407,6 +458,17 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
     setDrawerOpen(false)
     setBrowseFor('new')
     setModal('browse')
+  }
+
+  // Top bar "+": signed-in users pick a category for a new listing; guests get
+  // the drawer and a "Please sign in to publish" prompt.
+  function addListing() {
+    if (isLoggedIn) {
+      browseNewListing()
+      return
+    }
+    setDrawerOpen(true)
+    setModal('signin')
   }
 
   // Start a fresh listing: clear the current category, listing, interview
@@ -772,6 +834,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
           'listings',
           {
             categoryId: selectedSession.categoryId,
+            regionId: regionId ?? 0,
             orientation,
             userId: user.id,
             isActive: true,
@@ -1187,6 +1250,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
           'listings',
           {
             categoryId: selectedSession.categoryId,
+            regionId: regionId ?? 0,
             orientation,
             userId: user.id,
             isActive: false,
@@ -1720,6 +1784,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
       <TopBar
         onMenu={toggleDrawer}
         onOpenModal={openModal}
+        onAddListing={addListing}
         theme={theme}
         onToggleTheme={toggleTheme}
         languages={languages}
@@ -1771,6 +1836,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
               listings={searchListings}
               categories={sessions}
               selections={selections}
+              regions={regions}
               currentUserId={isLoggedIn ? user?.id : null}
               onContact={isLoggedIn ? contactListing : null}
               contactingId={contactingListingId}
@@ -1794,6 +1860,9 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
               selections={selections}
               categoryId={searchCategoryId}
               currentUserId={isLoggedIn ? user?.id : null}
+              regions={regions}
+              regionId={regionId ?? 0}
+              onRegionChange={changeRegion}
               onCommitText={handleCommitSearchText}
               onUnmatchedToken={handleUnmatchedSearchToken}
               onOpenBrowse={() => {
@@ -1878,7 +1947,24 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
           }}
         />
       )}
-      {modal && modal !== 'browse' && modal !== 'messages' && modal !== 'report' && (
+      {modal === 'signin' && (
+        <SimpleModal
+          title={t('topbar.signInToPublish')}
+          body={<p className="signin-message">{t('topbar.signInToPublishBody')}</p>}
+          footer={
+            <>
+              <button type="button" className="btn secondary" onClick={() => setModal(null)}>
+                {t('common.cancel')}
+              </button>
+              <button type="button" className="btn primary" onClick={signIn}>
+                {t('drawer.signIn')}
+              </button>
+            </>
+          }
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal && !['browse', 'messages', 'report', 'signin'].includes(modal) && (
         <SimpleModal
           title={t(MODAL_TITLES[modal])}
           body={modal === 'profile' ? profileBody : t('settings.body')}

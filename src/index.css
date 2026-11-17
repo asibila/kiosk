@@ -201,6 +201,28 @@ button {
   letter-spacing: 0.2px;
 }
 
+/* The /search title is a button: clicking it picks the search region. */
+.search-region {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 -10px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  color: var(--text);
+  font: inherit;
+  transition: background 0.15s ease;
+}
+
+.search-region:hover {
+  background: var(--icon-hover);
+}
+
+.search-region svg {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
 .search-box-wrap {
   position: relative;
   width: 100%;
@@ -302,20 +324,20 @@ button {
   min-width: 0;
 }
 
+/* Fixed-height compose box: chips wrap inside a scroll area, so adding filters
+   never resizes the field. Wheel scrolling is native; arrow keys scroll it too
+   (see FacetChipInput). */
 .facet-field {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 8px;
-  min-height: 48px;
-  max-height: 120px;
-  padding: 8px 12px;
+  height: 52px;
+  padding: 8px 8px 8px 12px;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--surface);
   color: var(--muted);
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -325,9 +347,42 @@ button {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
 }
 
-.facet-field > svg {
+.facet-field-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.facet-search-submit {
   flex: 0 0 auto;
-  margin-top: 6px;
+  align-self: center;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 35%, transparent);
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.facet-search-submit:hover {
+  background: var(--primary-dark);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 40%, transparent);
+}
+
+.facet-search-submit:active {
+  transform: scale(0.95);
+}
+
+.facet-search-submit:focus-visible {
+  outline: 2px solid var(--primary-text);
+  outline-offset: 2px;
 }
 
 .facet-flow {
@@ -506,25 +561,6 @@ button {
   50% {
     opacity: 0.9;
   }
-}
-
-.search-submit {
-  min-height: 40px;
-  padding: 9px 22px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 30%, transparent);
-}
-
-.search-submit:hover {
-  box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 35%, transparent);
-  transform: translateY(-1px);
-}
-
-.search-submit:active {
-  transform: translateY(0);
 }
 
 /* /results: GET-style query summary + responsive listing cards. */
@@ -1353,38 +1389,29 @@ button {
   outline-offset: 2px;
 }
 
-/* Language switcher (EN / HR) in the top bar. */
-.lang-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  margin-right: 2px;
+/* Language dropdown (HR / EN) in the top bar. */
+.lang-select {
+  height: 36px;
+  padding: 0 8px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--icon-hover);
-}
-
-.lang-btn {
-  min-width: 34px;
-  height: 32px;
-  padding: 0 7px;
-  border-radius: 8px;
-  color: var(--muted);
+  color: var(--text);
+  font: inherit;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.4px;
-  transition: background 0.15s ease, color 0.15s ease;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.lang-btn:hover {
-  color: var(--text);
+.lang-select:hover {
+  background: var(--hover-strong);
 }
 
-.lang-btn.active {
-  background: var(--surface);
-  color: var(--text);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+.lang-select:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .icon-btn {
@@ -2870,6 +2897,55 @@ button {
   color: var(--text);
   font-size: 15px;
   font-weight: 600;
+}
+
+/* Guest prompt opened from the top bar "+" button. */
+.signin-message {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+}
+
+/* Region picker opened from the /search title. */
+.region-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.region-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.region-option:hover {
+  background: var(--hover);
+}
+
+.region-option.selected {
+  background: var(--primary-soft-bg);
+  color: var(--primary-text);
+  font-weight: 600;
+}
+
+.region-option-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Browse modal */

@@ -26,6 +26,7 @@ const t = (key, vars = {}) => {
     'facet.resultCount.one': '{count} suggestion',
     'facet.resultCount.many': '{count} suggestions',
     'common.cancel': 'Cancel',
+    'search.submit': 'Search',
   }
   return (strings[key] ?? key).replace(/\{(\w+)\}/g, (_, name) =>
     String(vars[name] ?? ''),
@@ -194,5 +195,33 @@ describe('FacetChipInput', () => {
       await screen.findByText('No matching filter for “golf dizel”'),
     ).toBeInTheDocument()
     expect(onUnmatchedToken).toHaveBeenCalledWith('golf dizel')
+  })
+
+  it('renders the search button inside the compose box and submits', () => {
+    const onSubmit = vi.fn()
+    render(<Harness onSubmit={onSubmit} />)
+
+    const button = screen.getByRole('button', { name: 'Search' })
+    expect(button.closest('.facet-field')).not.toBeNull()
+
+    fireEvent.click(button)
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+  })
+
+  it('scrolls the fixed-height box with arrow keys when no query is typed', () => {
+    render(<Harness initialChips={[samsungChip, fuelChip]} />)
+
+    const field = screen.getByTestId('facet-field')
+    Object.defineProperty(field, 'clientHeight', { value: 34, configurable: true })
+    Object.defineProperty(field, 'scrollHeight', { value: 150, configurable: true })
+    const scrollBy = vi.fn()
+    field.scrollBy = scrollBy
+
+    const input = screen.getByTestId('facet-chip-input')
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    expect(scrollBy).toHaveBeenLastCalledWith({ top: 40, behavior: 'smooth' })
+
+    fireEvent.keyDown(input, { key: 'ArrowUp' })
+    expect(scrollBy).toHaveBeenLastCalledWith({ top: -40, behavior: 'smooth' })
   })
 })

@@ -39,6 +39,7 @@ const listings = [
   {
     id: '1',
     categoryId: '2',
+    regionId: 4,
     orientation: 'sell',
     title: 'Mobile phones #28',
     price: 100,
@@ -48,6 +49,7 @@ const listings = [
   {
     id: '2',
     categoryId: '2',
+    regionId: 11,
     orientation: 'buy',
     title: 'Mobile phones #25',
     price: 250,
@@ -57,6 +59,7 @@ const listings = [
   {
     id: '3',
     categoryId: '1',
+    regionId: 4,
     orientation: 'sell',
     title: 'Electronics #30',
     price: 150,
@@ -66,6 +69,7 @@ const listings = [
   {
     id: '4',
     categoryId: '3',
+    regionId: 0,
     orientation: 'sell',
     title: 'Vehicles #31',
     price: null,
@@ -84,6 +88,7 @@ describe('buildSearchParams / parseSearchQuery', () => {
   it('round-trips a structured query', () => {
     const params = buildSearchParams({
       categoryId: '2',
+      regionId: '4',
       direction: 'buy',
       chips: [
         {
@@ -98,16 +103,23 @@ describe('buildSearchParams / parseSearchQuery', () => {
     })
 
     expect(params.toString()).toBe(
-      'category=2&direction=buy&facet=condition%3A8&range=price%3A500-',
+      'category=2&region=4&direction=buy&facet=condition%3A8&range=price%3A500-',
     )
     expect(parseSearchQuery(`?${params}`)).toEqual({
       categoryId: '2',
+      regionId: '4',
       direction: 'buy',
       chips: [
         { kind: 'value', facet: 'condition', valueId: '8' },
         { kind: 'range', facet: 'price', min: 500, max: null },
       ],
     })
+  })
+
+  it('omits region 0 so "all regions" is the same as no region parameter', () => {
+    expect(buildSearchParams({ regionId: 0 }).toString()).toBe('')
+    expect(parseSearchQuery('?region=0').regionId).toBe('')
+    expect(parseSearchQuery('?region=abc').regionId).toBe('')
   })
 
   it('drops malformed or unsupported parameters', () => {
@@ -117,6 +129,7 @@ describe('buildSearchParams / parseSearchQuery', () => {
     )
 
     expect(parsed.categoryId).toBe('')
+    expect(parsed.regionId).toBe('')
     expect(parsed.direction).toBeNull()
     expect(parsed.chips).toEqual([
       { kind: 'value', facet: 'brand', valueId: '4' },
@@ -140,6 +153,7 @@ describe('buildSearchParams / parseSearchQuery', () => {
     expect(params.toString()).toBe('facet=orientation%3Asell')
     expect(parseSearchQuery(`?${params}`)).toEqual({
       categoryId: '',
+      regionId: '',
       direction: null,
       chips: [{ kind: 'value', facet: 'orientation', valueId: 'sell' }],
     })
@@ -164,6 +178,32 @@ describe('categoryScope / filterListings', () => {
 
     // Category 1 includes Electronics + Mobile phones; Buy shows sell listings;
     // only listing 1 owns condition option 8.
+    expect(rows.map((row) => row.id)).toEqual(['1'])
+  })
+
+  it('filters by region and excludes global listings for a country', () => {
+    const croatia = filterListings({ listings, categories, regionId: '4' })
+    expect(croatia.map((row) => row.id)).toEqual(['3', '1'])
+
+    // Empty and 0 both mean "all regions": global listings are included.
+    const all = filterListings({ listings, categories, regionId: '' })
+    expect(all.map((row) => row.id)).toEqual(['4', '3', '2', '1'])
+    expect(
+      filterListings({ listings, categories, regionId: 0 }).map((row) => row.id),
+    ).toEqual(['4', '3', '2', '1'])
+  })
+
+  it('combines the region with the other filters', () => {
+    const rows = filterListings({
+      listings,
+      selections,
+      categories,
+      regionId: '4',
+      chips: [{ kind: 'value', facet: 'condition', valueId: '8' }],
+    })
+
+    // Listing 1 is in Croatia and owns option 8; listing 3 is Croatia but has
+    // option 9, and listing 2 (Germany) is excluded by the region.
     expect(rows.map((row) => row.id)).toEqual(['1'])
   })
 

@@ -168,3 +168,38 @@ describe('buildViewModel category tree', () => {
     expect(view.browseData['2'].path).toEqual(['Home', 'Category 3', 'Category 2'])
   })
 })
+
+describe('buildViewModel regions', () => {
+  it('resolves region names in the UI language and keeps id 0 first', () => {
+    const view = buildViewModel(
+      {
+        users,
+        categories,
+        listings: [],
+        regions: [
+          { id: 11, code: 'DE', descriptionId: 2 },
+          { id: 0, code: 'ALL', descriptionId: 1 },
+        ],
+        descriptions: [
+          { id: 1, name: null, translations: { en: 'All regions', hr: 'Sve regije' } },
+          { id: 2, name: null, translations: { en: 'Germany', hr: 'Njemačka' } },
+        ],
+      },
+      { userId: null, language: 'hr', strings: TEST_STRINGS },
+    )
+
+    expect(view.regions).toEqual([
+      { id: 0, code: 'ALL', name: 'Sve regije' },
+      { id: 11, code: 'DE', name: 'Njemačka' },
+    ])
+  })
+
+  it('falls back to the country code when a name is missing', () => {
+    const view = buildViewModel(
+      { users, categories, listings: [], regions: [{ id: 4, code: 'HR', descriptionId: 99 }] },
+      { userId: null, language: 'en', strings: TEST_STRINGS },
+    )
+
+    expect(view.regions).toEqual([{ id: 4, code: 'HR', name: 'HR' }])
+  })
+})

@@ -35,6 +35,7 @@ const listings = [
     id: '28',
     userId: 1,
     categoryId: '2',
+    regionId: 4,
     orientation: 'sell',
     title: 'Mobile phones #28',
     desc: 'For sale · New',
@@ -49,6 +50,7 @@ const listings = [
     id: '25',
     userId: 3,
     categoryId: '2',
+    regionId: 11,
     orientation: 'sell',
     title: 'Mobile phones #25',
     desc: 'For sale · Used',
@@ -59,6 +61,12 @@ const listings = [
     facetsCountMax: 3,
     facetsCountMaxAnswerable: 3,
   },
+]
+
+const regions = [
+  { id: 0, code: 'ALL', name: 'All regions' },
+  { id: 4, code: 'HR', name: 'Croatia' },
+  { id: 11, code: 'DE', name: 'Germany' },
 ]
 
 const selections = [
@@ -74,6 +82,7 @@ function renderResults(url, props = {}) {
           listings={listings}
           categories={categories}
           selections={selections}
+          regions={regions}
           currentUserId={1}
           onContact={vi.fn()}
           {...props}
@@ -123,5 +132,30 @@ describe('ResultsView', () => {
     expect(screen.getByText('No listings match the current filters.')).toBeInTheDocument()
     expect(screen.getByText('0 matching ads')).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'Edit search' })).toHaveLength(2)
+  })
+
+  it('keeps only listings of the selected region', () => {
+    renderResults('/results?region=4')
+
+    expect(screen.getByText('1 matching ad')).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Mobile phones #28' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Mobile phones #25')).not.toBeInTheDocument()
+    expect(
+      within(screen.getByLabelText('Active filters')).getByText('Croatia'),
+    ).toBeInTheDocument()
+  })
+
+  it('searches every region when the URL has no region', () => {
+    renderResults('/results')
+
+    expect(screen.getByText('2 matching ads')).toBeInTheDocument()
+  })
+
+  it('ignores a region id that is not in the catalog', () => {
+    renderResults('/results?region=999')
+
+    expect(screen.getByText('2 matching ads')).toBeInTheDocument()
   })
 })

@@ -21,6 +21,7 @@ export const CATALOG_RESOURCES = [
   'languages',
   'descriptions',
   'categories',
+  'regions',
   'listings',
   'listing-translations',
   'facet-schemas',

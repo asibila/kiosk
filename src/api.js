@@ -94,6 +94,8 @@ export const api = {
       method: 'DELETE',
       headers: actorHeader(actorId),
     }),
+  /** Region for this visitor, resolved by the API from the request IP. */
+  detectRegion: () => request('/regions/detect'),
 }
 
 let descriptionsPromise
@@ -116,6 +118,7 @@ const RESOURCES = [
   'languages',
   'descriptions',
   'categories',
+  'regions',
   'listings',
   'listing-translations',
   'facet-schemas',

@@ -61,6 +61,7 @@ export function buildViewModel(
   const users = raw.users ?? []
   const descriptions = raw.descriptions ?? []
   const categories = raw.categories ?? []
+  const regions = raw.regions ?? []
   const listings = raw.listings ?? []
   const facetSchemas = raw['facet-schemas'] ?? []
   const facetOptions = raw['facet-value-options'] ?? []
@@ -98,6 +99,15 @@ export function buildViewModel(
     return category ? descriptionText(category.descriptionId, `Category ${category.id}`) : `Category ${categoryId}`
   }
   const optionText = (option) => (option ? descriptionText(option.descriptionId, `Option ${option.id}`) : '')
+
+  // Regions are id-ordered; id 0 is the global "All regions" row.
+  const regionList = [...regions]
+    .sort((a, b) => Number(a.id) - Number(b.id))
+    .map((region) => ({
+      id: Number(region.id),
+      code: region.code,
+      name: descriptionText(region.descriptionId, region.code),
+    }))
 
   const listingsByCategory = new Map()
   for (const listing of listings) {
@@ -381,6 +391,7 @@ export function buildViewModel(
         listingId: listing.id,
         sessionId: String(listing.categoryId),
         categoryId: listing.categoryId,
+        regionId: listing.regionId ?? 0,
         orientation: listing.orientation,
         isActive: listing.isActive !== false,
         price: listing.price ?? null,
@@ -436,6 +447,7 @@ export function buildViewModel(
     thumb: 'box',
     imageUrl: primaryImageByListing.get(listing.id)?.url ?? null,
     categoryId: String(listing.categoryId),
+    regionId: listing.regionId ?? 0,
     orientation: listing.orientation,
     isActive: listing.isActive !== false,
     price: listing.price ?? null,
@@ -487,6 +499,7 @@ export function buildViewModel(
     user: currentUser,
     users: raw.users ?? [],
     languages: raw.languages ?? [],
+    regions: regionList,
     language,
     sessions,
     chats,

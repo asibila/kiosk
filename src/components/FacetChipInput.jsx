@@ -26,6 +26,7 @@ import { useFacetSuggestions } from '../useFacetSuggestions.js'
  * @param {(text: string) => void} [props.onCommitText]
  * @param {(text: string) => void} [props.onUnmatchedToken]
  * @param {(count: number|null) => void} [props.onResultsCount]
+ * @param {() => void} [props.onSubmit] Renders the in-box search button when set.
  * @param {(key: string, vars?: Record<string, unknown>) => string} [props.t]
  * @param {string} [props.placeholder]
  */
@@ -38,6 +39,7 @@ export default function FacetChipInput({
   onCommitText,
   onUnmatchedToken,
   onResultsCount,
+  onSubmit,
   t: tProp,
   placeholder,
 }) {
@@ -50,6 +52,7 @@ export default function FacetChipInput({
   const [selectedChipIndex, setSelectedChipIndex] = useState(null)
 
   const rootRef = useRef(null)
+  const fieldRef = useRef(null)
   const inputRef = useRef(null)
   const unmatchedRef = useRef(null)
   const listboxId = useId()
@@ -194,6 +197,20 @@ export default function FacetChipInput({
       return
     }
 
+    // The box has a fixed height; with no query typed, arrow keys scroll the
+    // chip rows instead of driving the suggestion list.
+    if (!hasText && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+      const field = fieldRef.current
+      if (field && field.scrollHeight - field.clientHeight > 1) {
+        event.preventDefault()
+        field.scrollBy({
+          top: (event.key === 'ArrowDown' ? 1 : -1) * 40,
+          behavior: 'smooth',
+        })
+        return
+      }
+    }
+
     if (event.key === 'ArrowDown') {
       if (visibleSuggestions.length === 0) return
       event.preventDefault()
@@ -287,10 +304,10 @@ export default function FacetChipInput({
               }
             }}
           >
-            <SearchIcon size={18} />
-
             <div
-              className="facet-flow"
+              className="facet-field-scroll"
+              ref={fieldRef}
+              data-testid="facet-field"
               onMouseDown={(event) => {
                 if (event.target === event.currentTarget) {
                   event.preventDefault()
@@ -298,75 +315,97 @@ export default function FacetChipInput({
                 }
               }}
             >
-              {chips.map((chip, index) => {
-                // The facet name is a category label; the value keeps its case.
-                const facetName = chip.facetLabel.toUpperCase()
-                const label = isValueChip(chip)
-                  ? `${facetName}: ${chip.label}`
-                  : `${facetName}: ${formatRange(chip, lang, t)}`
-                const removalLabel = isValueChip(chip)
-                  ? chip.label
-                  : formatRange(chip, lang, t)
-                return (
-                  <span
-                    key={chipKey(chip)}
-                    className={
-                      selectedChipIndex === index ? 'facet-chip selected' : 'facet-chip'
-                    }
-                    role="button"
-                    tabIndex={-1}
-                    title={label}
-                    onClick={() => selectChip(index)}
-                  >
-                    <span className="facet-chip-text">{label}</span>
-                    <button
-                      type="button"
-                      className="facet-chip-remove"
-                      aria-label={t('facet.remove', {
-                        facetLabel: chip.facetLabel,
-                        label: removalLabel,
-                      })}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        removeChip(index)
-                      }}
-                    >
-                      <XIcon size={12} />
-                    </button>
-                  </span>
-                )
-              })}
-
-              <input
-                ref={inputRef}
-                type="text"
-                className="facet-input"
-                value={currentText}
-                placeholder={chips.length === 0 ? placeholder ?? t('facet.placeholder') : undefined}
-                aria-label={t('facet.inputLabel')}
-                role="combobox"
-                aria-autocomplete="list"
-                aria-expanded={showDropdown}
-                aria-controls={listboxId}
-                aria-activedescendant={
-                  showDropdown && highlightedIndex != null
-                    ? `${listboxId}-option-${highlightedIndex}`
-                    : undefined
-                }
-                style={{
-                  width: currentText
-                    ? `${Math.max(currentText.length + 1, 4)}ch`
-                    : chips.length > 0
-                      ? '2ch'
-                      : '100%',
+              <div
+                className="facet-flow"
+                onMouseDown={(event) => {
+                  if (event.target === event.currentTarget) {
+                    event.preventDefault()
+                    focusInput()
+                  }
                 }}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                onBlur={handleBlur}
-                data-testid="facet-chip-input"
-              />
+              >
+                {chips.map((chip, index) => {
+                  // The facet name is a category label; the value keeps its case.
+                  const facetName = chip.facetLabel.toUpperCase()
+                  const label = isValueChip(chip)
+                    ? `${facetName}: ${chip.label}`
+                    : `${facetName}: ${formatRange(chip, lang, t)}`
+                  const removalLabel = isValueChip(chip)
+                    ? chip.label
+                    : formatRange(chip, lang, t)
+                  return (
+                    <span
+                      key={chipKey(chip)}
+                      className={
+                        selectedChipIndex === index ? 'facet-chip selected' : 'facet-chip'
+                      }
+                      role="button"
+                      tabIndex={-1}
+                      title={label}
+                      onClick={() => selectChip(index)}
+                    >
+                      <span className="facet-chip-text">{label}</span>
+                      <button
+                        type="button"
+                        className="facet-chip-remove"
+                        aria-label={t('facet.remove', {
+                          facetLabel: chip.facetLabel,
+                          label: removalLabel,
+                        })}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          removeChip(index)
+                        }}
+                      >
+                        <XIcon size={12} />
+                      </button>
+                    </span>
+                  )
+                })}
+
+                <input
+                  ref={inputRef}
+                  type="text"
+                  className="facet-input"
+                  value={currentText}
+                  placeholder={chips.length === 0 ? placeholder ?? t('facet.placeholder') : undefined}
+                  aria-label={t('facet.inputLabel')}
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded={showDropdown}
+                  aria-controls={listboxId}
+                  aria-activedescendant={
+                    showDropdown && highlightedIndex != null
+                      ? `${listboxId}-option-${highlightedIndex}`
+                      : undefined
+                  }
+                  style={{
+                    width: currentText
+                      ? `${Math.max(currentText.length + 1, 4)}ch`
+                      : chips.length > 0
+                        ? '2ch'
+                        : '100%',
+                  }}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  onBlur={handleBlur}
+                  data-testid="facet-chip-input"
+                />
+              </div>
             </div>
+
+            {onSubmit && (
+              <button
+                type="button"
+                className="facet-search-submit"
+                aria-label={t('search.submit')}
+                title={t('search.submit')}
+                onClick={onSubmit}
+              >
+                <SearchIcon size={16} />
+              </button>
+            )}
           </div>
 
           {showDropdown && (
