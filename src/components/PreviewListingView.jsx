@@ -22,7 +22,7 @@ export default function PreviewListingView({ session, title, answers, images, ac
               const value = answers[question.id]
               const option = question.options?.find((o) => o.id === value)
               const text =
-                question.kind === 'number'
+                question.type === 'numeric'
                   ? `${value}${question.unit ? ` ${question.unit}` : ''}`
                   : (option?.text ?? '—')
               return (

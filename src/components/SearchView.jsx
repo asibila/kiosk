@@ -1,5 +1,6 @@
-// Standalone search screen: title, structured facet chip input, direction
-// chips, a category picker (the Browse modal) and a "Filter" modal on one row.
+// Standalone search screen: title, structured facet chip input, a category
+// picker (the Browse modal) and a "Filter" modal on one row. Orientation, like
+// every other interview question, is a facet in the filter.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { ChevronDownIcon, LayersIcon, SearchIcon } from '../icons.jsx'
@@ -29,17 +30,11 @@ export default function SearchView({
   const location = useLocation()
   const navigate = useNavigate()
   // The query the form was opened with (Edit search / bookmarked /search URL).
-  // It only seeds state; chips and direction then live in this view.
+  // It only seeds state; chips then live in this view.
   const [initialQuery] = useState(() => parseSearchQuery(location.search))
-  const [direction, setDirection] = useState(initialQuery.direction) // 'buy' | 'sell' | null
   const [facetsOpen, setFacetsOpen] = useState(false)
   const [suggestionCount, setSuggestionCount] = useState(null)
   const previousCategoryRef = useRef(categoryId)
-
-  // A buy search shows listings on sale; a sell search shows wanted listings,
-  // mirroring the interview screen's Search action.
-  const wantedOrientation =
-    direction === 'buy' ? 'sell' : direction === 'sell' ? 'buy' : null
 
   const categoryLabel =
     categories.find((category) => String(category.categoryId) === String(categoryId))?.title ??
@@ -57,18 +52,38 @@ export default function SearchView({
   const optionIndex = useMemo(() => buildOptionIndex(categories), [categories])
 
   // Seed committed chips from the URL (Edit search / bookmark). Labels are
-  // resolved from the catalog, so the URL only has to carry ids.
-  const [chips, setChips] = useState(() =>
-    resolveChips(
+  // resolved from the catalog, so the URL only has to carry ids. The legacy
+  // `direction` (the searcher's intent) is converted to the equivalent listing
+  // orientation chip so old links keep filtering the same rows.
+  const [chips, setChips] = useState(() => {
+    const initial = resolveChips(
       initialQuery.chips,
       optionIndex,
       Object.fromEntries(rangeFacets.map((facet) => [facet.facet, facet.label])),
-    ),
-  )
+    )
+    if (initialQuery.direction) {
+      const valueId = initialQuery.direction === 'buy' ? 'sell' : 'buy'
+      const alreadySet = initial.some(
+        (chip) => isValueChip(chip) && chip.facet === 'orientation',
+      )
+      const match = optionIndex.get(valueId)
+      if (!alreadySet && match) {
+        initial.unshift({
+          kind: 'value',
+          facet: 'orientation',
+          facetLabel: match.question.text,
+          valueId,
+          label: match.option.text,
+        })
+      }
+    }
+    return initial
+  })
 
   // Facets from the selected category's ancestors apply to it. The generic
-  // ALL section always exists; with no category selected it only has the
-  // generic range facets (price + year).
+  // ALL PRODUCTS section always exists, and it always carries the same first
+  // questions as the interview: orientation and condition (plus any other
+  // generic option facets), followed by the price and year ranges.
   const facetGroups = useMemo(() => {
     const allGroup = {
       key: 'all',
@@ -76,7 +91,6 @@ export default function SearchView({
       questions: [],
       ranges: rangeFacets,
     }
-    if (!categoryId) return [allGroup]
 
     const genericQuestions = []
     const seen = new Set()
@@ -84,7 +98,7 @@ export default function SearchView({
       for (const question of session.questions ?? []) {
         if (
           !question.isGeneric ||
-          question.kind === 'number' ||
+          question.type === 'numeric' ||
           seen.has(question.id)
         ) {
           continue
@@ -93,6 +107,9 @@ export default function SearchView({
         genericQuestions.push(question)
       }
     }
+
+    const groups = [{ ...allGroup, questions: genericQuestions }]
+    if (!categoryId) return groups
 
     const byCategoryId = new Map(
       categories.map((session) => [String(session.categoryId), session]),
@@ -107,11 +124,10 @@ export default function SearchView({
           : undefined
     }
 
-    const groups = [{ ...allGroup, questions: genericQuestions }]
     for (const ancestor of chain) {
       const questions = (ancestor.questions ?? []).filter(
         (question) =>
-          question.kind !== 'number' &&
+          question.type !== 'numeric' &&
           !question.isGeneric &&
           String(question.categoryId) === String(ancestor.categoryId),
       )
@@ -182,21 +198,17 @@ export default function SearchView({
   // Mirror the form into /search's URL with replace, so the address bar is a
   // bookmarkable query and Back from /results restores the same form state.
   useEffect(() => {
-    const params = buildSearchParams({ categoryId, direction, chips })
+    const params = buildSearchParams({ categoryId, chips })
     const next = params.toString()
     const current = location.search.replace(/^\?/, '')
     if (next === current) return
     navigate({ pathname: '/search', search: next ? `?${next}` : '' }, { replace: true })
-  }, [categoryId, direction, chips, location.search, navigate])
-
-  function toggleDirection(value) {
-    setDirection((prev) => (prev === value ? null : value))
-  }
+  }, [categoryId, chips, location.search, navigate])
 
   // The explicit submit: a GET-style /results URL that can be bookmarked,
   // shared or reloaded. The form URL stays in history as the entry before it.
   function submitSearch() {
-    const params = buildSearchParams({ categoryId, direction, chips })
+    const params = buildSearchParams({ categoryId, chips })
     const search = params.toString()
     navigate({ pathname: '/results', search: search ? `?${search}` : '' })
   }
@@ -237,7 +249,7 @@ export default function SearchView({
 
   // Live count for the current structured query. It uses the same filter as
   // /results, so the number here and the results page agree.
-  const hasQuery = chips.length > 0 || !!categoryId || !!direction
+  const hasQuery = chips.length > 0 || !!categoryId
   const resultCount = useMemo(
     () =>
       hasQuery
@@ -246,7 +258,6 @@ export default function SearchView({
             selections,
             categories,
             categoryId,
-            direction,
             chips,
           }).filter(
             (listing) =>
@@ -260,7 +271,6 @@ export default function SearchView({
       categoryId,
       chips,
       currentUserId,
-      direction,
       hasQuery,
       listings,
       selections,
@@ -284,32 +294,12 @@ export default function SearchView({
           onChange={setChips}
           lang={language}
           categoryId={categoryId}
-          orientation={wantedOrientation}
           onCommitText={onCommitText}
           onUnmatchedToken={onUnmatchedToken}
           onResultsCount={setSuggestionCount}
         />
 
         <div className="search-controls">
-          <div className="action-chips" role="group" aria-label={t('interview.directionAria')}>
-            <button
-              type="button"
-              className={direction === 'buy' ? 'chip selected' : 'chip'}
-              aria-pressed={direction === 'buy'}
-              onClick={() => toggleDirection('buy')}
-            >
-              {t('direction.buyAction')}
-            </button>
-            <button
-              type="button"
-              className={direction === 'sell' ? 'chip selected' : 'chip'}
-              aria-pressed={direction === 'sell'}
-              onClick={() => toggleDirection('sell')}
-            >
-              {t('direction.sellAction')}
-            </button>
-          </div>
-
           <button
             type="button"
             className="search-category"

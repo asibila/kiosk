@@ -145,15 +145,18 @@ Internal state also tracks the typed token, suggestions, highlighted row and
 loading/error. Suggestions come from:
 
 ```text
-GET /api/suggest?q=<text>&lang=<en|hr>&category=<id>&orientation=<buy|sell>&chips=<JSON>
+GET /api/suggest?q=<text>&lang=<en|hr>&category=<id>&chips=<JSON>
 -> { suggestions: [{ facet, facetLabel, valueId, label, count }] }
 ```
 
-The request is debounced 250 ms, aborted when a newer token starts, and stale
-responses are discarded. The backend computes counts from `FacetValueSelection`
-rows, never from ad free text, and omits values with a zero count. Range chips are
-carried in the query but ignored by the backend until numeric facets exist; they
-are created from the **Filter** modal's ALL section.
+The legacy `orientation=<buy|sell>` parameter is still accepted, but the
+frontend sends an orientation value chip instead. The request is debounced
+250 ms, aborted when a newer token starts, and stale responses are discarded.
+The backend computes counts from `FacetValueSelection` rows, never from ad free
+text, and omits values with a zero count. Orientation chips filter
+`Listing.orientation`; range chips are carried in the query and applied to the
+listing's price/year fields. Range chips are created from the **Filter** modal's
+ALL section.
 
 Accessibility: the input is a `combobox` with `aria-expanded`,
 `aria-controls`, `aria-autocomplete="list"` and `aria-activedescendant`; the
@@ -186,40 +189,39 @@ removal is a real button with an aria-label, and result counts are announced via
 - **Search screen** (`/search`) - the input is a structured **facet chip** field,
   not a free-text ad search. Committed chips are facet values (`valueId`) or
   numeric ranges; typing opens a grouped suggestion list from
-  `GET /api/suggest` (scoped to language, category, direction and existing chips).
+  `GET /api/suggest` (scoped to language, category and existing chips).
   Keyboard: arrows move the highlight, Enter selects/chips the token, Escape
   closes, Tab selects the first suggestion, Backspace on empty removes the last
   chip. Each chip has a 32px ✕ target; the same chip set is edited by the
-  **Filter** modal. The modal starts with an **ALL** section holding the generic
-  **Price** and **Year** ranges plus generic value facets (condition). Facets are
-  then grouped by the selected category's ancestor chain, root first: selecting
-  **Mobile phones** shows **ALL** (price/year/condition), **ELECTRONICS**
-  (brand) and **MOBILE PHONES** (screen size). With **All categories** selected,
-  the modal shows only the generic Price and Year ranges. A parent category's
-  facets therefore apply to all of its subcategories. Suggestion counts
-  update politely via an `aria-live` region; unmatched tokens are reported to the
-  parent once (and logged under `kiosk-unmatched-search-tokens`). The field wraps
-  chips up to ~120px, then scrolls vertically; the dropdown is anchored to the
-  field's bottom edge. The category button opens the shared **Browse** modal
-  (reopening at the current category); choosing "Home" and OK resets it to
-  "All categories". Buy/Sell chips remain beside the field, and the
-  **Filter** button shows the active chip count (values and ranges). The topbar's
-  usual actions keep working, and choosing a listing from the drawer navigates
-  back to `/app`. The form also mirrors its query into `/search`'s URL
-  (`?category=&direction=&facet=&range=`) with `replace`, so the address bar is
-  bookmarkable and Back from the results page restores the same form.
+  **Filter** modal. The modal starts with an **ALL** section holding the shared
+  interview questions in order: **For Sale / Wanted**, **Condition**, **Price**
+  and **Year**, plus any other generic value facets. Facets are then grouped by
+  the selected category's ancestor chain, root first: selecting **Mobile phones**
+  shows **ALL** (orientation, condition, price, year), **ELECTRONICS** (brand)
+  and **MOBILE PHONES** (screen size). A parent category's facets therefore apply
+  to all of its subcategories. Suggestion counts update politely via an
+  `aria-live` region; unmatched tokens are reported to the parent once (and
+  logged under `kiosk-unmatched-search-tokens`). The field wraps chips up to
+  ~120px, then scrolls vertically; the dropdown is anchored to the field's
+  bottom edge. The category button opens the shared **Browse** modal (reopening
+  at the current category); choosing "Home" and OK resets it to "All categories".
+  The **Filter** button shows the active chip count (values and ranges). The
+  topbar's usual actions keep working, and choosing a listing from the drawer
+  navigates back to `/app`. The form also mirrors its query into `/search`'s URL
+  (`?category=&facet=&range=`) with `replace`, so the address bar is bookmarkable
+  and Back from the results page restores the same form.
 - **Search results** (`/results`) - pressing **Search** opens a GET-style results
-  URL that serializes the whole query as `category`, `direction`,
-  `facet=<name>:<valueId>` and `range=<facet>:<min>-<max>` parameters. Reloading,
-  bookmarking or sharing that URL reproduces the search; only ids are encoded, so
-  labels are resolved again from the catalog in the active language. The page
-  shows the active filters, a result count and responsive cards (primary image,
-  title, matched facet summary, orientation badge). Clicking a card opens its
-  listing page; cards also offer the same envelope action as the listings modal
-  (disabled for the signed-in user's own listings). A category filter includes
-  its subcategories. **Edit search** carries the same query back to `/search`.
-  Range chips are preserved in the URL but not applied until numeric facet values
-  exist in the catalog.
+  URL that serializes the whole query as `category`, `facet=<name>:<valueId>` and
+  `range=<facet>:<min>-<max>` parameters. Reloading, bookmarking or sharing that
+  URL reproduces the search; only ids are encoded, so labels are resolved again
+  from the catalog in the active language. The page shows the active filters, a
+  result count and responsive cards (primary image, title, matched facet summary,
+  orientation badge). Clicking a card opens its listing page; cards also offer
+  the same envelope action as the listings modal (disabled for the signed-in
+  user's own listings). A category filter includes its subcategories. **Edit
+  search** carries the same query back to `/search`. Range chips filter the
+  listing's price/year fields; an orientation chip filters `Listing.orientation`
+  directly. The legacy `direction` parameter is still read for old bookmarks.
 - **Listing page** (`/listing/:id`) - bookmarkable detail page for one listing:
   primary image with a thumbnail gallery, orientation/category badges, the
   listing's facet values, category, seller, listed date and the contact action.
@@ -247,15 +249,16 @@ removal is a real button with an aria-label, and result counts are announced via
   **Sign out** footer button. When nobody is signed in, the drawer shows a **Sign in**
   button (linking to `/login`) instead of the listings and these actions.
 - **Session view** — per-session progress bar, priority-sorted product questions,
-  wrapping chips (replace-only answers), green answered accents, and an action bar with
-  left-aligned, mutually exclusive Buy/Sell chips plus right-aligned Search and a
-  "Next >" button into the listing wizard. A category's questions are its own facets,
-  the facets of its ancestors and the generic facets (such as condition), so every
-  category asks the generic questions and parent facets apply to subcategories.
-  The Buy/Sell chips write
-  `Listing.orientation` (`buy` / `sell`) on the same listing that receives the answers,
-  opening a drawer listing preselects its stored orientation, and both Search and
-  "Next >" stay disabled until Buy or Sell is chosen. Answers are saved to
+  wrapping chips (replace-only answers), green answered accents, and an action bar
+  with right-aligned Search and a "Next >" button into the listing wizard. The
+  first four shared questions are **For Sale / Wanted**, **Condition**, **Price**
+  and **Year**; orientation, condition, price and year questions come from the
+  generic (ALL PRODUCTS) section, followed by the category's own facets and its
+  ancestors' facets. **For Sale / Wanted** and **Condition** are required, shown
+  with a Required badge, and "Next >"/Publish stay disabled until they are
+  answered. The orientation answer writes `Listing.orientation` (`buy` / `sell`)
+  on the same listing that receives the answers; opening a drawer listing
+  preselects its stored orientation. Other answers are saved to
   `facet-value-selections` on the selected drawer listing or the draft created by
   **Next >**; before that draft exists they stay in component state and are
   flushed when the draft is created. After the draft exists, answers save
@@ -288,7 +291,7 @@ removal is a real button with an aria-label, and result counts are announced via
   (`ListingChatThread.hasUnread`). Opening a conversation clears the flags
   through `PATCH` on both entities.
 - **Browse modal** — breadcrumbs, categories first with ">" navigation, listings after,
-  2-line clamped descriptions, single-select toggle, Buy/Sell with alerts.
+  2-line clamped descriptions, single-select toggle and orientation badges.
 - **Messages modal** — one row per `inbox-items` entry, showing the linked listing's
   name and description like the drawer; opening one slides in its chat thread inside
   the modal, with a "<" back arrow left of the "Messages" title.

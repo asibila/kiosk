@@ -4,11 +4,24 @@ import { LanguageProvider } from '../i18n.jsx'
 import { TEST_STRINGS } from '../test/strings.js'
 import FacetsModal from './FacetsModal.jsx'
 
+const orientationQuestion = {
+  id: 'orientation',
+  facet: 'orientation',
+  text: 'For Sale / Wanted',
+  isGeneric: true,
+  required: true,
+  options: [
+    { id: 'sell', text: 'For Sale' },
+    { id: 'buy', text: 'Wanted' },
+  ],
+}
+
 const conditionQuestion = {
   id: '1',
   facet: 'condition',
   text: 'Condition',
   isGeneric: true,
+  required: true,
   options: [
     { id: '8', text: 'New' },
     { id: '9', text: 'Used' },
@@ -45,7 +58,7 @@ const groups = [
       { facet: 'price', label: 'Price', unit: '€' },
       { facet: 'year', label: 'Year' },
     ],
-    questions: [conditionQuestion],
+    questions: [orientationQuestion, conditionQuestion],
   },
   { key: 'category-1', title: 'Electronics', questions: [brandQuestion] },
   { key: 'category-2', title: 'Mobile phones', questions: [screenQuestion] },
@@ -79,9 +92,24 @@ describe('FacetsModal', () => {
       .getAllByRole('heading', { level: 3 })
       .map((heading) => heading.textContent)
     expect(titles).toEqual(['All', 'Electronics', 'Mobile phones'])
+    expect(screen.getByRole('button', { name: 'For Sale' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'New' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Samsung' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Under 6″' })).toBeInTheDocument()
+  })
+
+  it('shows the shared questions before the price and year ranges', () => {
+    renderModal()
+
+    const labels = [...document.querySelectorAll('.facet-q, .facets-range .facet-q')].map(
+      (node) => node.textContent,
+    )
+    expect(labels.slice(0, 4)).toEqual([
+      'For Sale / Wanted',
+      'Condition',
+      'Price',
+      'Year',
+    ])
   })
 
   it('adds a range chip from the ALL section', async () => {

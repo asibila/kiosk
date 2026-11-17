@@ -154,7 +154,6 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   const [categoryDirty, setCategoryDirty] = useState(false) // category changed via browse OK
   const [pendingDelete, setPendingDelete] = useState(null) // listing awaiting confirmation
   const [deleting, setDeleting] = useState(false)
-  const [listingDirection, setListingDirection] = useState(null) // 'buy' | 'sell' | null
 
   // Listing wizard: interview → edit (images) → preview → report.
   const [wizardStage, setWizardStage] = useState('interview') // 'interview' | 'edit' | 'preview'
@@ -426,7 +425,6 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
     setDraftListingId(null)
     setTranslationsOpen(false)
     setAnswers({})
-    setListingDirection(null)
     setWizardStage('interview')
     resetDraft()
     setNotice('')
@@ -635,15 +633,14 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
       for (const question of targetSession.questions ?? []) delete next[question.id]
       return next
     })
-    setListingDirection(null)
 
     selectSession(String(targetSession.id))
     // Re-picking the category the session already has is not a change.
     setCategoryDirty(!alreadyCurrent)
   }
 
-  // Listings for a direction, filtered by the answered questions (facets) of
-  // each listing's own category. No direction means every orientation.
+  // Listings for an orientation, filtered by the answered questions (facets)
+  // of each listing's own category. No orientation means every orientation.
   function openListings(direction) {
     const wanted = direction ? (direction === 'buy' ? 'sell' : 'buy') : null
     // A question applies to a listing when it is generic or when it is defined
@@ -674,7 +671,9 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
 
       const relevant = Object.keys(answers ?? {}).filter((qid) => {
         const question = questionById[qid]
-        if (!question || question.kind === 'number') return false
+        if (!question || question.type === 'numeric' || question.facet === 'orientation') {
+          return false
+        }
         return question.isGeneric || categoryChain.has(String(question.categoryId))
       })
       return relevant.every((qid) => {
@@ -725,65 +724,20 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
     }
   }
 
-  // Buy/Sell chips are mutually exclusive: choosing one clears the other.
-  // Buy/Sell chips write Listing.orientation. The choice is persisted at once on
-  // the listing the interview targets (same target as the facet answers); a
-  // brand-new listing keeps it locally and Publish writes it.
-  async function selectListingDirection(direction) {
-    if (!selectedSession || listingDirection === direction) return
-
-    const previous = listingDirection
-    setListingDirection(direction)
-
-    const listingId = interviewTargetListingId(selectedSession)
-    if (!listingId) return
-
-    try {
-      const updated = await api.update(
-        'listings',
-        listingId,
-        { orientation: direction },
-        user?.id,
-      )
-      setMyListings((prev) =>
-        prev.map((listing) =>
-          String(listing.listingId) === String(listingId)
-            ? {
-                ...listing,
-                orientation: updated.orientation,
-                desc: withOrientationLabel(listing.desc, updated.orientation, t),
-              }
-            : listing,
-        ),
-      )
-      setBrowseData((prev) => {
-        const next = {}
-        for (const [key, node] of Object.entries(prev)) {
-          next[key] = {
-            ...node,
-            items: node.items.map((item) =>
-              item.type === 'listing' && item.id === String(listingId)
-                ? { ...item, orientation: updated.orientation }
-                : item,
-            ),
-          }
-        }
-        return next
-      })
-    } catch (err) {
-      setListingDirection(previous)
-      setNotice(t('notice.directionFailed', { message: err.message }))
-    }
-  }
-
   // Publish: when a drawer listing of the open category is selected, update that
   // listing (PATCH) and reconcile its facet selections; otherwise create a new
   // listing owned by the signed-in user. Either way the answered facets become
   // facet-value-selections on the listing that was written.
   async function publish() {
     if (!selectedSession || !user || publishing || savingQuestionId != null) return
+    if (requiredQuestionsMissing(selectedSession).length > 0) {
+      setNotice(t('interview.requiredMissing'))
+      return
+    }
     const answered = selectedSession.questions.filter((q) => answers[q.id] != null)
-    const answeredFacets = answered.filter((q) => q.kind !== 'number')
+    const answeredFacets = answered.filter(
+      (q) => q.type !== 'numeric' && q.facet !== 'orientation',
+    )
     const price = answers.price != null ? Number(answers.price) : null
     const year = answers.year != null ? Number(answers.year) : null
 
@@ -795,11 +749,10 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
     try {
       let listingId
       let savedListing
-      let orientation = listingDirection ?? 'sell'
+      let orientation = answers.orientation ?? target?.orientation ?? 'sell'
       if (target) {
-        // Keep the listing's category and owner; apply the chosen direction and
-        // publish the draft.
-        orientation = listingDirection ?? target.orientation
+        // Keep the listing's category and owner; apply the chosen orientation
+        // and publish the draft.
         savedListing = await api.update(
           'listings',
           target.listingId,
@@ -875,8 +828,9 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
       setSelections(nextSelections)
 
       const answerTexts = answered
+        .filter((question) => question.facet !== 'orientation')
         .map((question) =>
-          question.kind === 'number'
+          question.type === 'numeric'
             ? `${question.text}: ${answers[question.id]}${question.unit ? ` ${question.unit}` : ''}`
             : question.options.find((option) => option.id === answers[question.id])?.text,
         )
@@ -884,7 +838,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
       const listingAnswers = Object.fromEntries(
         answered.map((question) => [
           question.id,
-          question.kind === 'number' ? answers[question.id] : String(answers[question.id]),
+          question.type === 'numeric' ? answers[question.id] : String(answers[question.id]),
         ]),
       )
       const nextListing = {
@@ -951,7 +905,6 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
     navigate('/app')
     selectSession(listing.sessionId, { keepDrawerOpen: true })
     setSelectedListingId(listing.id)
-    setListingDirection(listing.orientation ?? null)
     // Show exactly this listing's answers: clear answers for the session's
     // questions that this listing has no selection for.
     const session = sessions.find((s) => s.id === listing.sessionId)
@@ -1084,7 +1037,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
     }
   }
 
-  // The listing that receives interview answers and the buy/sell orientation:
+  // The listing that receives interview answers and the listing orientation:
   // the selected drawer listing, otherwise the draft created on Next. Before a
   // draft exists the answers stay in local state and are flushed when Next
   // creates the inactive listing.
@@ -1103,6 +1056,14 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
         )
       : null
     return draft?.listingId ?? null
+  }
+
+  // Required facet questions gate Next/Publish. Orientation and condition are
+  // always required; the backend can mark more facets as required.
+  function requiredQuestionsMissing(session = selectedSession) {
+    return (session?.questions ?? []).filter(
+      (question) => question.required && answers[question.id] == null,
+    )
   }
 
   // Per-language titles: the UI language's title, then English, then any.
@@ -1210,12 +1171,16 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   // Pressing Next again reuses that draft instead of creating another one.
   async function openEditStage() {
     if (!selectedSession || !user || creatingDraft || publishing) return
+    if (requiredQuestionsMissing(selectedSession).length > 0) {
+      setNotice(t('interview.requiredMissing'))
+      return
+    }
 
     let target = wizardTargetListing()
     if (!target) {
       setCreatingDraft(true)
       try {
-        const orientation = listingDirection ?? 'sell'
+        const orientation = answers.orientation ?? 'sell'
         const price = answers.price != null ? Number(answers.price) : null
         const year = answers.year != null ? Number(answers.year) : null
         const created = await api.create(
@@ -1251,7 +1216,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
         // Persist the answers chosen during the interview on the new draft.
         const createdSelections = []
         for (const question of selectedSession.questions ?? []) {
-          if (question.kind === 'number') continue
+          if (question.type === 'numeric' || question.facet === 'orientation') continue
           const optionId = Number(answers[question.id])
           if (!Number.isFinite(optionId)) continue
           try {
@@ -1274,8 +1239,9 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
           (question) => answers[question.id] != null,
         )
         const answerTexts = answered
+          .filter((question) => question.facet !== 'orientation')
           .map((question) =>
-            question.kind === 'number'
+            question.type === 'numeric'
               ? `${question.text}: ${answers[question.id]}${question.unit ? ` ${question.unit}` : ''}`
               : question.options.find(
                   (option) => option.id === String(answers[question.id]),
@@ -1285,7 +1251,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
         const listingAnswers = Object.fromEntries(
           answered.map((question) => [
             question.id,
-            question.kind === 'number'
+            question.type === 'numeric'
               ? answers[question.id]
               : String(answers[question.id]),
           ]),
@@ -1353,7 +1319,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
 
     setSavingQuestionId(questionId)
     try {
-      if (question?.kind === 'number') {
+      if (question?.type === 'numeric') {
         const field = question.facet === 'year' ? 'year' : 'price'
         const fieldValue = value == null ? null : Number(value)
         const updated = await api.update(
@@ -1388,6 +1354,48 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
                       ...item,
                       [field]: fieldValue,
                       facetsCount: updated.facetsCount,
+                    }
+                  : item,
+              ),
+            }
+          }
+          return next
+        })
+      } else if (question?.facet === 'orientation') {
+        // Orientation is a facet in the UI but is stored on the listing itself.
+        const updated = await api.update(
+          'listings',
+          listingId,
+          { orientation: value },
+          user?.id,
+        )
+
+        setMyListings((prev) =>
+          prev.map((item) =>
+            Number(item.listingId) === Number(listingId)
+              ? {
+                  ...item,
+                  orientation: updated.orientation,
+                  desc: withOrientationLabel(item.desc, updated.orientation, t),
+                  answers: {
+                    ...(item.answers ?? {}),
+                    orientation: updated.orientation,
+                  },
+                }
+              : item,
+          ),
+        )
+        setBrowseData((prev) => {
+          const next = {}
+          for (const [key, node] of Object.entries(prev)) {
+            next[key] = {
+              ...node,
+              items: node.items.map((item) =>
+                item.type === 'listing' && String(item.id) === String(listingId)
+                  ? {
+                      ...item,
+                      orientation: updated.orientation,
+                      desc: withOrientationLabel(item.desc, updated.orientation, t),
                     }
                   : item,
               ),
@@ -1588,41 +1596,26 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
   const answeredCount = selectedSession
     ? selectedSession.questions.filter((q) => answers[q.id] != null).length
     : 0
+  const missingRequired = requiredQuestionsMissing(selectedSession)
+  const orientationAnswer = answers.orientation ?? null
   const canPublish =
     !!user &&
     !!selectedSession &&
-    listingDirection != null &&
+    missingRequired.length === 0 &&
     (categoryDirty || answeredCount > 0)
 
-  // Interview step actions: Buy/Sell chips + Search on the right; "Next >"
-  // continues to the wizard's edit step.
+  // Interview step actions: Search on the left; "Next >" continues to the
+  // wizard's edit step. Orientation is answered by the first facet card, not by
+  // a separate pair of chips.
   const interviewActions = (
     <div className="action-row">
-      <div className="action-chips" role="group" aria-label={t('interview.directionAria')}>
-        <button
-          type="button"
-          className={listingDirection === 'buy' ? 'chip selected' : 'chip'}
-          aria-pressed={listingDirection === 'buy'}
-          onClick={() => selectListingDirection('buy')}
-        >
-          {t('direction.buyAction')}
-        </button>
-        <button
-          type="button"
-          className={listingDirection === 'sell' ? 'chip selected' : 'chip'}
-          aria-pressed={listingDirection === 'sell'}
-          onClick={() => selectListingDirection('sell')}
-        >
-          {t('direction.sellAction')}
-        </button>
-      </div>
       <div className="action-buttons">
         <button
           type="button"
           className="btn secondary"
-          onClick={() => openListings(listingDirection)}
-          disabled={listingDirection == null}
-          title={listingDirection == null ? t('interview.chooseDirection') : undefined}
+          onClick={() => openListings(orientationAnswer)}
+          disabled={orientationAnswer == null}
+          title={orientationAnswer == null ? t('interview.chooseDirection') : undefined}
         >
           {t('interview.search')}
         </button>
@@ -1641,6 +1634,7 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
             savingQuestionId != null ||
             creatingDraft
           }
+          title={missingRequired.length > 0 ? t('interview.requiredMissing') : undefined}
         >
           {creatingDraft ? t('interview.creatingDraft') : t('interview.next')}
         </button>
@@ -1679,7 +1673,8 @@ function KioskApp({ initialData = null, initialTheme, initialUserId }) {
           type="button"
           className="btn success"
           onClick={publish}
-          disabled={publishing || listingDirection == null || savingTitle}
+          disabled={publishing || !canPublish || savingTitle}
+          title={missingRequired.length > 0 ? t('interview.requiredMissing') : undefined}
         >
           {publishing ? t('interview.publishing') : t('interview.publish')}
         </button>

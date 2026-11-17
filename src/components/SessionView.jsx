@@ -1,6 +1,6 @@
 // Interview session view: progress bar, question cards with wrapping chips,
-// numeric questions for price/year, and an action bar (buy/sell chips, search,
-// publish) at the bottom.
+// numeric questions for price/year, and an action bar (search, publish) at the
+// bottom.
 import { useEffect, useState } from 'react'
 import { CheckIcon, SessionGlyph } from '../icons.jsx'
 import { useI18n } from '../i18n.jsx'
@@ -100,6 +100,11 @@ export default function SessionView({ session, answers, onAnswer, actions }) {
               <article key={q.id} className={isAnswered ? 'q-card answered' : 'q-card'}>
                 <header className="q-head">
                   <h3 className="q-text">{q.text}</h3>
+                  {q.required && (
+                    <span className="q-required" title={t('interview.required')}>
+                      {t('interview.required')}
+                    </span>
+                  )}
                   {isAnswered && (
                     <span className="check-badge" title={t('session.answeredTitle')}>
                       <CheckIcon size={13} />
@@ -107,7 +112,7 @@ export default function SessionView({ session, answers, onAnswer, actions }) {
                   )}
                 </header>
                 <p className="q-hint">{q.hint}</p>
-                {q.kind === 'number' ? (
+                {q.type === 'numeric' ? (
                   <NumberQuestion question={q} value={chosen} onAnswer={onAnswer} />
                 ) : (
                   <div className="chips">
@@ -130,7 +135,7 @@ export default function SessionView({ session, answers, onAnswer, actions }) {
         )}
       </div>
 
-      {/* Action bar (buy/sell chips + search/publish) when provided by the parent. */}
+      {/* Action bar (search/publish) when provided by the parent. */}
       {actions ? (
         <footer className="session-footer">{actions}</footer>
       ) : (

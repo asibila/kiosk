@@ -85,7 +85,7 @@ describe('buildViewModel category and listing counts', () => {
     expect(view.myListings).toEqual([])
   })
 
-  it('adds price and year numeric questions to every session', () => {
+  it('starts every session with orientation, then price and year', () => {
     const view = buildViewModel(
       {
         users,
@@ -99,16 +99,28 @@ describe('buildViewModel category and listing counts', () => {
     )
 
     expect(view.sessions[0].questions.map((question) => question.id)).toEqual([
+      'orientation',
       '1',
       'price',
       'year',
     ])
-    expect(view.sessions[0].questions[1]).toMatchObject({
-      kind: 'number',
+    expect(view.sessions[0].questions[0]).toMatchObject({
+      facet: 'orientation',
+      type: 'option',
+      required: true,
+      options: [
+        { id: 'sell', text: 'For Sale' },
+        { id: 'buy', text: 'Wanted' },
+      ],
+    })
+    expect(view.sessions[0].questions[2]).toMatchObject({
+      type: 'numeric',
       facet: 'price',
       unit: '€',
     })
-    expect(view.sessions[0].facetsCountMax).toBe(3)
+    expect(view.sessions[0].facetsCountMax).toBe(4)
+    expect(view.sessions[0].facetsCountMaxAnswerable).toBe(2)
+    expect(view.answers.orientation).toBe('sell')
     expect(view.answers.price).toBe(199.99)
     expect(view.answers.year).toBe(2024)
   })
@@ -128,12 +140,12 @@ describe('buildViewModel category and listing counts', () => {
     )
 
     expect(view.myListings[0].facetsCount).toBe(2)
-    expect(view.myListings[0].facetsCountMax).toBe(4)
-    expect(view.myListings[0].facetsCountMaxAnswerable).toBe(2)
+    expect(view.myListings[0].facetsCountMax).toBe(5)
+    expect(view.myListings[0].facetsCountMaxAnswerable).toBe(3)
     expect(view.browseData.root.items[0].items).toBeUndefined()
     expect(view.browseData['1'].items[0].facetsCount).toBe(2)
-    expect(view.browseData['1'].items[0].facetsCountMax).toBe(4)
-    expect(view.browseData['1'].items[0].facetsCountMaxAnswerable).toBe(2)
+    expect(view.browseData['1'].items[0].facetsCountMax).toBe(5)
+    expect(view.browseData['1'].items[0].facetsCountMaxAnswerable).toBe(3)
   })
 })
 

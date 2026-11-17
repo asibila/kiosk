@@ -101,7 +101,7 @@ describe('ResultsView', () => {
 
     const filters = within(screen.getByLabelText('Active filters'))
     expect(filters.getByText('Mobile phones')).toBeInTheDocument()
-    expect(filters.getByText('Buy')).toBeInTheDocument()
+    expect(filters.getByText('Wanted')).toBeInTheDocument()
     expect(filters.getByText('Condition: New')).toBeInTheDocument()
 
     const envelope = screen.getByRole('button', {

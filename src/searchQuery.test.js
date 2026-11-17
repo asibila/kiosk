@@ -15,6 +15,15 @@ const categories = [
     title: 'Electronics',
     questions: [
       {
+        id: 'orientation',
+        facet: 'orientation',
+        text: 'For Sale / Wanted',
+        options: [
+          { id: 'sell', text: 'For Sale' },
+          { id: 'buy', text: 'Wanted' },
+        ],
+      },
+      {
         id: '1',
         facet: 'condition',
         text: 'Condition',
@@ -104,7 +113,7 @@ describe('buildSearchParams / parseSearchQuery', () => {
   it('drops malformed or unsupported parameters', () => {
     const parsed = parseSearchQuery(
       '?category=abc&direction=maybe&facet=bad&facet=brand:x&facet=brand:4' +
-        '&range=weight:1-2&range=price:200-100&range=year:-',
+        '&facet=orientation:maybe&range=weight:1-2&range=price:200-100&range=year:-',
     )
 
     expect(parsed.categoryId).toBe('')
@@ -113,6 +122,27 @@ describe('buildSearchParams / parseSearchQuery', () => {
       { kind: 'value', facet: 'brand', valueId: '4' },
       { kind: 'range', facet: 'price', min: 100, max: 200 },
     ])
+  })
+
+  it('round-trips an orientation facet chip', () => {
+    const params = buildSearchParams({
+      chips: [
+        {
+          kind: 'value',
+          facet: 'orientation',
+          facetLabel: 'For Sale / Wanted',
+          valueId: 'sell',
+          label: 'For Sale',
+        },
+      ],
+    })
+
+    expect(params.toString()).toBe('facet=orientation%3Asell')
+    expect(parseSearchQuery(`?${params}`)).toEqual({
+      categoryId: '',
+      direction: null,
+      chips: [{ kind: 'value', facet: 'orientation', valueId: 'sell' }],
+    })
   })
 })
 
@@ -135,6 +165,19 @@ describe('categoryScope / filterListings', () => {
     // Category 1 includes Electronics + Mobile phones; Buy shows sell listings;
     // only listing 1 owns condition option 8.
     expect(rows.map((row) => row.id)).toEqual(['1'])
+  })
+
+  it('filters by the orientation facet directly', () => {
+    const rows = filterListings({
+      listings,
+      selections,
+      categories,
+      chips: [{ kind: 'value', facet: 'orientation', valueId: 'sell' }],
+    })
+
+    // For Sale means the listing orientation, unlike the legacy "direction"
+    // parameter (which described the searcher's intent).
+    expect(rows.map((row) => row.id)).toEqual(['4', '3', '1'])
   })
 
   it('filters price and year ranges and excludes listings without the field', () => {
@@ -183,6 +226,24 @@ describe('resolveChips', () => {
         label: 'New',
       },
       { kind: 'range', facet: 'price', min: null, max: 100, facetLabel: 'Price' },
+    ])
+  })
+
+  it('resolves the orientation facet from the synthetic options', () => {
+    const index = buildOptionIndex(categories)
+    const resolved = resolveChips(
+      [{ kind: 'value', facet: 'orientation', valueId: 'buy' }],
+      index,
+    )
+
+    expect(resolved).toEqual([
+      {
+        kind: 'value',
+        facet: 'orientation',
+        facetLabel: 'For Sale / Wanted',
+        valueId: 'buy',
+        label: 'Wanted',
+      },
     ])
   })
 })

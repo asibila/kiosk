@@ -14,6 +14,10 @@ import { isRangeChip, isValueChip } from './facetTypes.js'
 const RANGE_FACETS = new Set(['price', 'year'])
 const DIRECTIONS = new Set(['buy', 'sell'])
 
+/** Orientation is a facet, but its values are the Listing.orientation enum. */
+export const ORIENTATION_FACET = 'orientation'
+export const ORIENTATION_VALUES = new Set(['buy', 'sell'])
+
 function formatBound(value) {
   return value == null ? '' : String(value)
 }
@@ -65,7 +69,11 @@ export function parseSearchQuery(search = '') {
     const facet = raw.slice(0, separator).trim()
     const valueId = raw.slice(separator + 1).trim()
     if (!/^[a-z0-9_]+$/i.test(facet)) continue
-    if (!/^\d+$/.test(valueId) || Number(valueId) <= 0) continue
+    if (facet === ORIENTATION_FACET) {
+      if (!ORIENTATION_VALUES.has(valueId)) continue
+    } else if (!/^\d+$/.test(valueId) || Number(valueId) <= 0) {
+      continue
+    }
 
     const key = `${facet}:${valueId}`
     if (seenValues.has(key)) continue
@@ -172,6 +180,9 @@ export function categoryScope(categoryId, categories = []) {
  * descendants, a buy search shows sell listings (and vice versa), value chips
  * are AND constraints, and price/year ranges filter the matching Listing
  * fields. Listings without the requested numeric field are excluded.
+ *
+ * Orientation is also a value chip (`facet: "orientation"`); unlike the legacy
+ * `direction` parameter it filters `Listing.orientation` directly.
  */
 export function filterListings({
   listings = [],
@@ -184,12 +195,21 @@ export function filterListings({
   const scope = categoryScope(categoryId, categories)
   const wantedOrientation =
     direction === 'buy' ? 'sell' : direction === 'sell' ? 'buy' : null
-  const valueIds = chips.filter(isValueChip).map((chip) => String(chip.valueId))
+  const orientationValues = chips
+    .filter((chip) => isValueChip(chip) && chip.facet === ORIENTATION_FACET)
+    .map((chip) => String(chip.valueId))
+    .filter((valueId) => ORIENTATION_VALUES.has(valueId))
+  const valueIds = chips
+    .filter((chip) => isValueChip(chip) && chip.facet !== ORIENTATION_FACET)
+    .map((chip) => String(chip.valueId))
   const rangeChips = chips.filter(isRangeChip)
 
   const rows = listings.filter((listing) => {
     if (scope && !scope.has(String(listing.categoryId))) return false
     if (wantedOrientation && listing.orientation !== wantedOrientation) return false
+    if (orientationValues.length > 0 && !orientationValues.includes(listing.orientation)) {
+      return false
+    }
 
     for (const chip of rangeChips) {
       const value =

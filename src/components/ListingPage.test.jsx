@@ -96,7 +96,7 @@ describe('ListingPage', () => {
     renderPage()
 
     expect(screen.getByRole('heading', { name: 'Mobile phones #28' })).toBeInTheDocument()
-    expect(screen.getAllByText('For sale').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('For Sale').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Mobile phones').length).toBeGreaterThan(0)
     expect(screen.getByText('pero')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Details' })).toBeInTheDocument()

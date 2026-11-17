@@ -104,49 +104,6 @@ export function buildViewModel(
     if (!listingsByCategory.has(listing.categoryId)) listingsByCategory.set(listing.categoryId, listing)
   }
 
-  // Completion score denominator: the facets that can actually be answered with
-  // a FacetValueSelection (price/year ranges are not selections). The backend
-  // sends this as facetsCountMaxAnswerable; recompute it when older cached data
-  // does not have the key yet.
-  const answerableMaxFor = (category) => {
-    if (!category) return 0
-    if (category.id === ALL_CATEGORY_ID) {
-      return new Set(
-        facetSchemas.filter((schema) => schema.isGeneric === true).map((schema) => schema.id),
-      ).size
-    }
-
-    const ancestorIds = new Set()
-    let current = category
-    while (current && !ancestorIds.has(current.id)) {
-      ancestorIds.add(current.id)
-      current =
-        current.parentCategoryId != null
-          ? categoriesById.get(current.parentCategoryId)
-          : undefined
-    }
-
-    return new Set(
-      facetSchemas
-        .filter(
-          (schema) =>
-            schema.isGeneric === true || ancestorIds.has(schema.categoryId),
-        )
-        .map((schema) => schema.id),
-    ).size
-  }
-
-  const answerableMaxByCategory = new Map(
-    categories.map((category) => [category.id, answerableMaxFor(category)]),
-  )
-  const facetsCountMaxByCategory = new Map(
-    categories.map((category) => [
-      category.id,
-      category.facetsCountMax ??
-        Math.max(3, (answerableMaxByCategory.get(category.id) ?? 0) + 2),
-    ]),
-  )
-
   // Titles come from ListingTranslation. Missing languages fall back to the UI
   // language, then English, then any available title, then the generated label.
   const titlesByListing = new Map()
@@ -245,6 +202,16 @@ export function buildViewModel(
   // the category and on its ancestors, so parent-category facets apply to every
   // subcategory (for example Electronics/brand on Mobile phones), plus generic
   // facets such as condition, which apply to products in every category.
+  //
+  // Orientation, price and year are special facets stored on the listing
+  // itself. They are always part of the session, even when a database has no
+  // matching FacetSchema rows, so every listing can answer the same first four
+  // questions: For Sale / Wanted, condition, price, year.
+  const SPECIAL_FACET_NAMES = new Set(['orientation', 'price', 'year'])
+  const orientationSchema = facetSchemas.find((schema) => schema.name === 'orientation')
+  const priceSchema = facetSchemas.find((schema) => schema.name === 'price')
+  const yearSchema = facetSchemas.find((schema) => schema.name === 'year')
+
   const sessions = categories.map((category) => {
     const title = categoryTitle(category.id)
     const ancestorIds = new Set()
@@ -259,59 +226,103 @@ export function buildViewModel(
 
     const facetQuestions = facetSchemas
       .filter(
-        (schema) => schema.isGeneric === true || ancestorIds.has(schema.categoryId),
+        (schema) =>
+          !SPECIAL_FACET_NAMES.has(schema.name) &&
+          // Price and year are the only numeric fields on Listing today.
+          schema.type !== 'numeric' &&
+          (schema.isGeneric === true || ancestorIds.has(schema.categoryId)),
       )
-      .map((schema, index) => {
-        const text = descriptionText(schema.descriptionId, schema.name)
-        return {
-          id: String(schema.id),
-          facet: schema.name,
-          categoryId: schema.categoryId,
-          categoryTitle: categoryTitle(schema.categoryId),
-          isGeneric: schema.isGeneric === true,
-          priority: index + 1,
-          text,
-          hint: t('interview.choose'),
-          options: facetOptions
-            .filter((option) => option.schemaId === schema.id)
-            .map((option) => ({ id: String(option.id), text: optionText(option) })),
-        }
-      })
+      .map((schema) => ({
+        id: String(schema.id),
+        facet: schema.name,
+        categoryId: schema.categoryId,
+        categoryTitle: categoryTitle(schema.categoryId),
+        isGeneric: schema.isGeneric === true,
+        type: 'option',
+        required: schema.required === true || schema.name === 'condition',
+        text: descriptionText(schema.descriptionId, schema.name),
+        hint: t('interview.choose'),
+        options: facetOptions
+          .filter((option) => option.schemaId === schema.id)
+          .map((option) => ({ id: String(option.id), text: optionText(option) })),
+      }))
 
-    // Price and year are numeric questions stored directly on Listing. They are
-    // part of facetsCountMax, so include them in every interview session.
-    const numberQuestions = [
-      {
-        id: 'price',
-        facet: 'price',
-        kind: 'number',
-        categoryId: ALL_CATEGORY_ID,
-        categoryTitle: t('search.allCategories'),
-        isGeneric: true,
-        priority: facetQuestions.length + 1,
-        text: t('facet.price'),
-        hint: t('interview.priceHint'),
-        unit: '€',
-        min: 0,
-        step: 0.01,
-        options: [],
-      },
-      {
-        id: 'year',
-        facet: 'year',
-        kind: 'number',
-        categoryId: ALL_CATEGORY_ID,
-        categoryTitle: t('search.allCategories'),
-        isGeneric: true,
-        priority: facetQuestions.length + 2,
-        text: t('facet.year'),
-        hint: t('interview.yearHint'),
-        min: 0,
-        step: 1,
-        options: [],
-      },
-    ]
-    const questions = [...facetQuestions, ...numberQuestions]
+    const byId = (a, b) => Number(a.id) - Number(b.id)
+    const requiredGeneric = facetQuestions
+      .filter((question) => question.isGeneric && question.required)
+      .sort(byId)
+    const optionalGeneric = facetQuestions
+      .filter((question) => question.isGeneric && !question.required)
+      .sort(byId)
+    const categoryQuestions = facetQuestions
+      .filter((question) => !question.isGeneric)
+      .sort(byId)
+
+    const orientationQuestion = {
+      id: 'orientation',
+      facet: 'orientation',
+      categoryId: ALL_CATEGORY_ID,
+      categoryTitle: t('search.allCategories'),
+      isGeneric: true,
+      type: 'option',
+      required: true,
+      text: orientationSchema
+        ? descriptionText(orientationSchema.descriptionId, t('facet.orientation'))
+        : t('facet.orientation'),
+      hint: t('interview.choose'),
+      options: [
+        { id: 'sell', text: t('direction.sell') },
+        { id: 'buy', text: t('direction.buy') },
+      ],
+    }
+
+    // Price and year are numeric questions stored directly on Listing.
+    const priceQuestion = {
+      id: 'price',
+      facet: 'price',
+      categoryId: ALL_CATEGORY_ID,
+      categoryTitle: t('search.allCategories'),
+      isGeneric: true,
+      type: 'numeric',
+      required: false,
+      text: priceSchema
+        ? descriptionText(priceSchema.descriptionId, t('facet.price'))
+        : t('facet.price'),
+      hint: t('interview.priceHint'),
+      unit: '€',
+      min: 0,
+      step: 0.01,
+      options: [],
+    }
+    const yearQuestion = {
+      id: 'year',
+      facet: 'year',
+      categoryId: ALL_CATEGORY_ID,
+      categoryTitle: t('search.allCategories'),
+      isGeneric: true,
+      type: 'numeric',
+      required: false,
+      text: yearSchema
+        ? descriptionText(yearSchema.descriptionId, t('facet.year'))
+        : t('facet.year'),
+      hint: t('interview.yearHint'),
+      min: 0,
+      step: 1,
+      options: [],
+    }
+
+    // The four shared questions come first, in a fixed order. Category facets
+    // follow, with the parent categories' facets before the category's own.
+    const questions = [
+      orientationQuestion,
+      ...requiredGeneric,
+      priceQuestion,
+      yearQuestion,
+      ...optionalGeneric,
+      ...categoryQuestions,
+    ].map((question, index) => ({ ...question, priority: index + 1 }))
+
+    const answerable = questions.filter((question) => question.type === 'option').length
 
     return {
       id: String(category.id),
@@ -321,15 +332,22 @@ export function buildViewModel(
       icon: iconForCategory(title),
       listingId: listingsByCategory.get(category.id)?.id ?? null,
       questions,
-      // Price and year are included in `questions`; keep the fallbacks for
-      // older cached responses that predate the backend counters.
-      facetsCountMax: category.facetsCountMax ?? questions.length,
-      facetsCountMaxAnswerable:
-        category.facetsCountMaxAnswerable ??
-        answerableMaxByCategory.get(category.id) ??
-        facetQuestions.length,
+      // The questions are the source of truth for the progress UI. Backend
+      // counters are kept when they are larger, so older data stays valid.
+      facetsCountMax: Math.max(category.facetsCountMax ?? 0, questions.length),
+      facetsCountMaxAnswerable: Math.max(
+        category.facetsCountMaxAnswerable ?? 0,
+        answerable,
+      ),
     }
   })
+
+  const facetsCountMaxByCategory = new Map(
+    sessions.map((session) => [session.categoryId, session.facetsCountMax]),
+  )
+  const facetsCountMaxAnswerableByCategory = new Map(
+    sessions.map((session) => [session.categoryId, session.facetsCountMaxAnswerable]),
+  )
 
   // Existing selections on each category's first listing pre-fill the
   // interview answers (schema id → option id).
@@ -341,6 +359,7 @@ export function buildViewModel(
       const option = optionsById.get(selection.facetValueOptionId)
       if (option) answers[String(option.schemaId)] = String(option.id)
     }
+    answers.orientation = listing.orientation
     if (listing.price != null) answers.price = listing.price
     if (listing.year != null) answers.year = listing.year
   }
@@ -354,6 +373,7 @@ export function buildViewModel(
         const option = optionsById.get(selection.facetValueOptionId)
         if (option) listingAnswers[String(option.schemaId)] = String(option.id)
       }
+      listingAnswers.orientation = listing.orientation
       if (listing.price != null) listingAnswers.price = listing.price
       if (listing.year != null) listingAnswers.year = listing.year
       return {
@@ -372,12 +392,13 @@ export function buildViewModel(
         facetsCount:
           listing.facetsCount ??
           facetSelections.filter((row) => row.listingId === listing.id).length +
+            (listing.orientation != null ? 1 : 0) +
             (listing.price != null ? 1 : 0) +
             (listing.year != null ? 1 : 0),
         facetsCountMax:
           facetsCountMaxByCategory.get(listing.categoryId) ?? 0,
         facetsCountMaxAnswerable:
-          answerableMaxByCategory.get(listing.categoryId) ?? 0,
+          facetsCountMaxAnswerableByCategory.get(listing.categoryId) ?? 0,
       }
     })
 
@@ -422,12 +443,13 @@ export function buildViewModel(
     facetsCount:
       listing.facetsCount ??
       facetSelections.filter((row) => row.listingId === listing.id).length +
+        (listing.orientation != null ? 1 : 0) +
         (listing.price != null ? 1 : 0) +
         (listing.year != null ? 1 : 0),
     facetsCountMax:
       facetsCountMaxByCategory.get(listing.categoryId) ?? 0,
     facetsCountMaxAnswerable:
-      answerableMaxByCategory.get(listing.categoryId) ?? 0,
+      facetsCountMaxAnswerableByCategory.get(listing.categoryId) ?? 0,
   })
 
   const pathForCategory = (category) => {

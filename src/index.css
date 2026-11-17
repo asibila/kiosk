@@ -1954,6 +1954,19 @@ button {
   animation: pop 0.2s ease;
 }
 
+.q-required {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--primary-soft-bg);
+  color: var(--primary-text);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
 @keyframes pop {
   from {
     transform: scale(0.4);

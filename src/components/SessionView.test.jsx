@@ -11,8 +11,10 @@ const session = {
     {
       id: '1',
       facet: 'condition',
+      type: 'option',
       text: 'Condition',
       hint: 'Choose one of the options.',
+      required: true,
       priority: 1,
       options: [
         { id: '8', text: 'New' },
@@ -22,7 +24,7 @@ const session = {
     {
       id: 'price',
       facet: 'price',
-      kind: 'number',
+      type: 'numeric',
       text: 'Price',
       hint: 'Enter the asking price.',
       unit: '€',
@@ -34,7 +36,7 @@ const session = {
     {
       id: 'year',
       facet: 'year',
-      kind: 'number',
+      type: 'numeric',
       text: 'Year',
       hint: 'Enter the model year.',
       min: 0,
@@ -68,6 +70,7 @@ describe('SessionView numeric questions', () => {
     renderSession()
 
     expect(screen.getByRole('button', { name: 'New' })).toBeInTheDocument()
+    expect(screen.getByText('Required')).toBeInTheDocument()
     expect(screen.getByRole('form', { name: 'Price' })).toBeInTheDocument()
     expect(screen.getByRole('form', { name: 'Year' })).toBeInTheDocument()
   })

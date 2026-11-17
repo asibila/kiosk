@@ -107,6 +107,30 @@ export default function FacetsModal({
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // Required questions come first, then the numeric ranges, then the optional
+  // questions. This keeps the shared first four in a fixed order even when a
+  // category adds more generic facets: orientation, condition, price, year.
+  function renderQuestion(question) {
+    return (
+      <div key={question.id} className="facets-question">
+        <span className="facet-q">{question.text}</span>
+        <div className="chips" role="group" aria-label={question.text}>
+          {question.options.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              className={answers[question.id] === option.id ? 'chip selected' : 'chip'}
+              aria-pressed={answers[question.id] === option.id}
+              onClick={() => onToggle(question.id, option.id)}
+            >
+              {option.text}
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div
       className="modal-overlay"
@@ -126,40 +150,31 @@ export default function FacetsModal({
           <p className="facets-empty">{t('facets.empty')}</p>
         ) : (
           <div className="facets-list scrollable">
-            {groups.map((group) => (
-              <section key={group.key} className="facets-group">
-                <h3 className="facets-group-title">{group.title}</h3>
+            {groups.map((group) => {
+              const questions = group.questions ?? []
+              const requiredQuestions = questions.filter((question) => question.required)
+              const optionalQuestions = questions.filter((question) => !question.required)
 
-                {(group.ranges ?? []).map((facet) => (
-                  <RangeFacetField
-                    key={facet.facet}
-                    facet={facet}
-                    value={rangeChips.find((chip) => chip.facet === facet.facet)}
-                    lang={language}
-                    onChange={onRangeChange}
-                  />
-                ))}
+              return (
+                <section key={group.key} className="facets-group">
+                  <h3 className="facets-group-title">{group.title}</h3>
 
-                {(group.questions ?? []).map((question) => (
-                  <div key={question.id} className="facets-question">
-                    <span className="facet-q">{question.text}</span>
-                    <div className="chips" role="group" aria-label={question.text}>
-                      {question.options.map((option) => (
-                        <button
-                          key={option.id}
-                          type="button"
-                          className={answers[question.id] === option.id ? 'chip selected' : 'chip'}
-                          aria-pressed={answers[question.id] === option.id}
-                          onClick={() => onToggle(question.id, option.id)}
-                        >
-                          {option.text}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </section>
-            ))}
+                  {requiredQuestions.map(renderQuestion)}
+
+                  {(group.ranges ?? []).map((facet) => (
+                    <RangeFacetField
+                      key={facet.facet}
+                      facet={facet}
+                      value={rangeChips.find((chip) => chip.facet === facet.facet)}
+                      lang={language}
+                      onChange={onRangeChange}
+                    />
+                  ))}
+
+                  {optionalQuestions.map(renderQuestion)}
+                </section>
+              )
+            })}
           </div>
         )}
 
