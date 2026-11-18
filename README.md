@@ -218,8 +218,8 @@ removal is a real button with an aria-label, and result counts are announced via
   (`src/components/Signup.jsx`). Sign-in sets an HTTP-only `kiosk_session`
   cookie via `POST /auth/login`; signup does the same through
   `POST /auth/register`, so the account is signed in immediately. The app then
-  resolves the user with `GET /auth/me` and returns to the page that requested
-  sign-in. `/terms` and `/privacy` render the plain-language terms and privacy
+  returns to the page that requested sign-in (or to `/app`, the seller
+  overview, when nothing specific was requested). `/terms` and `/privacy` render the plain-language terms and privacy
   notice, linked from the signup checkbox. No user id is kept in
   `localStorage`; guests skip the private chat/inbox resources when loading
   the catalog.
@@ -375,7 +375,11 @@ removal is a real button with an aria-label, and result counts are announced via
   Search results show the listing's primary image as a small
   thumbnail (the glyph remains when a listing has no image).
 - **Post-publish** (`/app`, right after Publish) - replaces the old starting
-  screen and its "Listing created" dialog. It shows the newly published card
+  screen and its "Listing created" dialog. The same view is also the **seller
+  overview** for a signed-in visitor: with no ad just published it is titled
+  **Your seller overview** and features the newest active ad (or newest draft);
+  without any listings `/app` shows a "Publish your first ad" placeholder. It
+  shows the featured listing's card
   (primary image, title, category, price, completeness score) with **View
   listing** (the bookmarkable `/listing/:id`) and **Publish another** (back to
   category Browse), then the seller's own numbers: **Views** (last 14 days, from

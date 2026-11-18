@@ -19,6 +19,7 @@ function renderLogin(entry = '/login') {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/search" element={<p>marketplace</p>} />
+          <Route path="/app" element={<p>seller dashboard</p>} />
           <Route path="/listing/1" element={<p>listing page</p>} />
         </Routes>
       </MemoryRouter>
@@ -54,6 +55,20 @@ describe('Login', () => {
 
     expect(await screen.findByText('listing page')).toBeInTheDocument()
     expect(api.login).toHaveBeenCalledWith('ana@example.com', 'super-secret')
+  })
+
+  it('lands on the seller dashboard when nothing else was requested', async () => {
+    renderLogin('/login')
+
+    fireEvent.change(screen.getByLabelText('Email'), {
+      target: { value: 'ana@example.com' },
+    })
+    fireEvent.change(screen.getByLabelText('Password'), {
+      target: { value: 'super-secret' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Log in' }))
+
+    expect(await screen.findByText('seller dashboard')).toBeInTheDocument()
   })
 
   it('shows the Google error returned by the callback', () => {

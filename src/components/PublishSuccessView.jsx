@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { fetchListingStats, mediaUrl } from '../api.js'
 import { localeFor } from '../facetTypes.js'
-import { CheckIcon, ThumbGlyph } from '../icons.jsx'
+import { CheckIcon, LayersIcon, ThumbGlyph } from '../icons.jsx'
 import { pluralKey, useI18n } from '../i18n.jsx'
 import CompletenessScore from './CompletenessScore.jsx'
 
@@ -40,6 +40,7 @@ function DayBars({ days, max }) {
 }
 
 export default function PublishSuccessView({
+  variant = 'published',
   listing,
   categoryTitle = '',
   imageUrl = null,
@@ -51,6 +52,7 @@ export default function PublishSuccessView({
   onEditListing,
 }) {
   const { language, t } = useI18n()
+  const isPublished = variant === 'published'
 
   // Views come from the API (they are not in the catalog snapshot); the owner is
   // signed in on this screen, so the request carries the session.
@@ -102,11 +104,11 @@ export default function PublishSuccessView({
       <div className="publish-inner">
         <header className="publish-hero">
           <span className="publish-hero-icon" aria-hidden="true">
-            <CheckIcon size={24} />
+            {isPublished ? <CheckIcon size={24} /> : <LayersIcon size={24} />}
           </span>
           <div>
-            <h2>{t('publish.title')}</h2>
-            <p>{t('publish.subtitle')}</p>
+            <h2>{t(isPublished ? 'publish.title' : 'dashboard.title')}</h2>
+            <p>{t(isPublished ? 'publish.subtitle' : 'dashboard.subtitle')}</p>
           </div>
         </header>
 

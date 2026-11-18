@@ -18,7 +18,7 @@ export default function Login({ onLoggedIn }) {
   const params = new URLSearchParams(location.search)
   const requested = location.state?.from ?? params.get('from')
   const target =
-    typeof requested === 'string' && requested.startsWith('/') ? requested : '/search'
+    typeof requested === 'string' && requested.startsWith('/') ? requested : '/app'
 
   async function onSubmit(event) {
     event.preventDefault()

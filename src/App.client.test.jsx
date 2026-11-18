@@ -262,6 +262,22 @@ describe('client rendering', () => {
     )
   })
 
+  it('shows the seller overview on /app instead of the empty placeholder', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+
+    render(
+      <MemoryRouter initialEntries={['/app']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: 'Your seller overview' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Trek bike' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Browse' })).not.toBeInTheDocument()
+  })
+
   it('shows the post-publish screen after the wizard publishes', async () => {
     apiMock.me.mockResolvedValueOnce(signedIn)
     apiMock.update.mockImplementation(async (_resource, id, body) => ({
@@ -280,7 +296,9 @@ describe('client rendering', () => {
     fireEvent.click(
       await screen.findByRole('button', { name: 'Toggle my listings drawer' }),
     )
-    fireEvent.click(await screen.findByText('Trek bike'))
+    // Scope to the drawer: the overview behind it also shows the title.
+    const drawer = document.querySelector('.drawer')
+    fireEvent.click(await within(drawer).findByText('Trek bike'))
     expect(
       await screen.findByRole('heading', { name: 'Cars' }),
     ).toBeInTheDocument()

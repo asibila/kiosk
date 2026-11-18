@@ -172,6 +172,18 @@ describe('PublishSuccessView', () => {
     expect(onImproveQuestions).toHaveBeenCalledTimes(1)
   })
 
+  it('labels the dashboard variant without claiming a fresh publish', () => {
+    renderView({ variant: 'dashboard' })
+
+    expect(
+      screen.getByRole('heading', { name: 'Your seller overview' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: 'Your ad is live' }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Novi mobitel' })).toBeInTheDocument()
+  })
+
   it('shows a hint when the new listing has no views yet', async () => {
     fetchListingStats.mockResolvedValueOnce({
       listingId: 42,

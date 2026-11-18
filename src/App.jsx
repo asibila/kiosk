@@ -1728,51 +1728,63 @@ function KioskApp({ initialData = null, initialTheme }) {
     ? (searchListings.find((item) => String(item.id) === String(listingRouteId)) ?? null)
     : null
 
-  // Post-publish screen. The published listing is read back from `myListings`
-  // so it picks up the refreshed catalog data (completeness, images, titles);
-  // every statistic below is derived from data the app already has.
+  // Seller overview: the screen shown on /app when nothing else is open. It
+  // prefers the listing that was just published, then the newest active ad (or
+  // the newest draft). Statistics are derived from data the app already has.
+  const newestOwnListing = (() => {
+    if (!user || myListings.length === 0) return null
+    const rows = [...myListings]
+    rows.sort((a, b) => {
+      const activeDelta =
+        Number(b.isActive !== false) - Number(a.isActive !== false)
+      if (activeDelta !== 0) return activeDelta
+      return Number(b.listingId) - Number(a.listingId)
+    })
+    return rows[0]
+  })()
   const publishedListing =
     publishedListingId != null
       ? (myListings.find(
           (listing) => String(listing.listingId) === String(publishedListingId),
         ) ?? null)
       : null
-  const publishedCategoryTitle = publishedListing
+  const featuredListing = publishedListing ?? newestOwnListing
+  const featuredCategoryTitle = featuredListing
     ? (interviews.find(
         (interview) =>
-          String(interview.categoryId) === String(publishedListing.categoryId),
+          String(interview.categoryId) === String(featuredListing.categoryId),
       )?.title ?? '')
     : ''
-  const publishedImage =
-    publishedListing != null
+  const featuredImage =
+    featuredListing != null
       ? (listingImages.find(
           (image) =>
-            String(image.listingId) === String(publishedListing.listingId) &&
+            String(image.listingId) === String(featuredListing.listingId) &&
             image.primaryImage,
         ) ??
         listingImages.find(
-          (image) => String(image.listingId) === String(publishedListing.listingId),
+          (image) => String(image.listingId) === String(featuredListing.listingId),
         ) ??
         null)
       : null
-  const sellerStats = publishedListing ? buildSellerStats({ myListings, chats }) : null
-  const publishedPriceStats = publishedListing
-    ? pricePosition({ listing: publishedListing, catalog: searchListings })
+  const sellerStats = featuredListing ? buildSellerStats({ myListings, chats }) : null
+  const featuredPriceStats = featuredListing
+    ? pricePosition({ listing: featuredListing, catalog: searchListings })
     : null
-  const publishedChecklist = publishedListing
+  const featuredChecklist = featuredListing
     ? listingChecklist({
-        listing: publishedListing,
+        listing: featuredListing,
         imageCount: listingImages.filter(
-          (image) => String(image.listingId) === String(publishedListing.listingId),
+          (image) => String(image.listingId) === String(featuredListing.listingId),
         ).length,
-        titles: titlesForListing(publishedListing.listingId),
+        titles: titlesForListing(featuredListing.listingId),
         languages: languages.map((row) => row.code),
       })
     : []
-  // The post-publish screen owns the main area only when no other screen is
-  // active; it also keeps the background reload from flashing a placeholder.
-  const showsPublishedListing =
-    publishedListing != null &&
+  // The overview owns the main area only when no other screen is active; it also
+  // keeps the background reload from flashing a placeholder.
+  const showsSellerOverview =
+    featuredListing != null &&
     !selectedInterview &&
     !selectedChat &&
     !isSearchRoute &&
@@ -1966,7 +1978,7 @@ function KioskApp({ initialData = null, initialTheme }) {
         <main className="main" onMouseDown={drawerOpen ? () => setDrawerOpen(false) : undefined}>
           {/* A reload after publishing refreshes the catalog in the background;
               the post-publish screen already has everything it needs. */}
-          {dataStatus === 'loading' && !showsPublishedListing ? (
+          {dataStatus === 'loading' && !showsSellerOverview ? (
             <LoadingPlaceholder />
           ) : dataStatus === 'error' ? (
             <ErrorPlaceholder message={loadError} onRetry={() => setReloadToken((n) => n + 1)} />
@@ -2039,24 +2051,26 @@ function KioskApp({ initialData = null, initialTheme }) {
             />
           ) : selectedInterview ? (
             <InterviewView interview={selectedInterview} answers={answers} onAnswer={(questionId, optionId) => answerQuestion(selectedInterview, questionId, optionId)} actions={interviewActions} />
-          ) : showsPublishedListing ? (
+          ) : showsSellerOverview ? (
             <PublishSuccessView
-              listing={publishedListing}
-              categoryTitle={publishedCategoryTitle}
-              imageUrl={publishedImage?.url ?? null}
+              variant={publishedListing ? 'published' : 'dashboard'}
+              listing={featuredListing}
+              categoryTitle={featuredCategoryTitle}
+              imageUrl={featuredImage?.url ?? null}
               stats={sellerStats}
-              priceStats={publishedPriceStats}
-              checklist={publishedChecklist}
+              priceStats={featuredPriceStats}
+              checklist={featuredChecklist}
               onPublishAnother={browseNewListing}
-              onImproveQuestions={() => openListing(publishedListing)}
+              onImproveQuestions={() => openListing(featuredListing)}
               onEditListing={() => {
-                openListing(publishedListing)
+                openListing(featuredListing)
                 setWizardStage('edit')
               }}
             />
           ) : (
             <EmptyPlaceholder
               hasInterviews={interviews.length > 0}
+              signedIn={isLoggedIn}
               onBrowse={() => {
                 setBrowseFor('listing')
                 setModal('browse')
@@ -2197,7 +2211,7 @@ function ErrorPlaceholder({ message, onRetry }) {
   )
 }
 
-function EmptyPlaceholder({ hasInterviews, onBrowse }) {
+function EmptyPlaceholder({ hasInterviews, onBrowse, signedIn = false }) {
   const { t } = useI18n()
   return (
     <div className="placeholder">
@@ -2205,9 +2219,17 @@ function EmptyPlaceholder({ hasInterviews, onBrowse }) {
         <LayersIcon size={56} />
       </span>
       {hasInterviews ? (
-        <button type="button" className="btn primary" onClick={onBrowse}>
-          {t('empty.browse')}
-        </button>
+        <>
+          {signedIn && (
+            <>
+              <h2>{t('empty.signedInTitle')}</h2>
+              <p>{t('empty.signedInBody')}</p>
+            </>
+          )}
+          <button type="button" className="btn primary" onClick={onBrowse}>
+            {t(signedIn ? 'empty.publishFirst' : 'empty.browse')}
+          </button>
+        </>
       ) : (
         <p>{t('empty.noCategories')}</p>
       )}
