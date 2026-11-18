@@ -125,6 +125,65 @@ export function getCategoryIdFromSearch(search = '') {
   return parseSearchQuery(search).categoryId
 }
 
+/**
+ * A single numeric answer for a price/year range chip. A range does not name a
+ * value, so the middle of the range is used when both bounds exist (a range
+ * "2015–2020" answers the year question with 2018); an open range uses its one
+ * bound.
+ */
+function rangeAnswer(chip, isYear) {
+  const value =
+    chip.min != null && chip.max != null ? (chip.min + chip.max) / 2 : (chip.min ?? chip.max)
+  if (value == null) return null
+  return isYear ? Math.round(value) : Math.round(value * 100) / 100
+}
+
+/**
+ * Interview answers implied by a structured search query, shaped exactly like
+ * the `answers` map the interview view uses (question id → option id, plus the
+ * special `orientation`, `price` and `year` keys).
+ *
+ * Only values that belong to the given interview's questions survive, so a
+ * filter set on another category cannot leak into the new listing; generic
+ * facets (condition, orientation, …) apply to every category. The legacy
+ * `direction` parameter is honoured the same way the results page reads it: a
+ * "looking to buy" search describes a listing that is for sale.
+ *
+ * @param {{chips?: import('./facetTypes.js').FacetChip[], direction?: 'buy'|'sell'|null}} query
+ * @param {{questions?: any[]}} [interview]
+ */
+export function answersFromSearchQuery(query = {}, { questions = [] } = {}) {
+  const answers = {}
+  const questionIds = new Set(questions.map((question) => String(question.id)))
+  const questionByOption = new Map()
+  for (const question of questions) {
+    for (const option of question.options ?? []) {
+      questionByOption.set(String(option.id), String(question.id))
+    }
+  }
+
+  for (const chip of query.chips ?? []) {
+    if (isValueChip(chip)) {
+      const questionId = questionByOption.get(String(chip.valueId))
+      if (questionId) answers[questionId] = String(chip.valueId)
+      continue
+    }
+    if (!isRangeChip(chip)) continue
+    if (chip.facet !== 'price' && chip.facet !== 'year') continue
+    if (!questionIds.has(chip.facet)) continue
+    const value = rangeAnswer(chip, chip.facet === 'year')
+    if (value != null) answers[chip.facet] = value
+  }
+
+  if (query.direction === 'buy' || query.direction === 'sell') {
+    const orientation = query.direction === 'buy' ? 'sell' : 'buy'
+    const questionId = questionByOption.get(orientation)
+    if (questionId && answers[questionId] == null) answers[questionId] = orientation
+  }
+
+  return answers
+}
+
 /** Flat option id -> { question, option } index over every category interview. */
 export function buildOptionIndex(categories = []) {
   const index = new Map()

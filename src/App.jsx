@@ -24,7 +24,17 @@ import SearchView from './components/SearchView.jsx'
 import ResultsView from './components/ResultsView.jsx'
 import ListingPage from './components/ListingPage.jsx'
 import TranslateTitlesModal from './components/TranslateTitlesModal.jsx'
-import { getCategoryIdFromSearch } from './searchQuery.js'
+import PublishSuccessView from './components/PublishSuccessView.jsx'
+import {
+  answersFromSearchQuery,
+  getCategoryIdFromSearch,
+  parseSearchQuery,
+} from './searchQuery.js'
+import {
+  buildSellerStats,
+  listingChecklist,
+  pricePosition,
+} from './sellerStats.js'
 
 const MODAL_TITLES = { settings: 'settings.title', profile: 'profile.title' }
 
@@ -147,8 +157,10 @@ function KioskApp({ initialData = null, initialTheme }) {
   const [categoryDirty, setCategoryDirty] = useState(false) // category changed via browse OK
   const [pendingDelete, setPendingDelete] = useState(null) // listing awaiting confirmation
   const [deleting, setDeleting] = useState(false)
+  // Listing that was just published; drives the post-publish screen on /app.
+  const [publishedListingId, setPublishedListingId] = useState(null)
 
-  // Listing wizard: interview → edit (images) → preview → report.
+  // Listing wizard: interview → edit (images) → preview → published.
   const [wizardStage, setWizardStage] = useState('interview') // 'interview' | 'edit' | 'preview'
   const [draftImages, setDraftImages] = useState([]) // { id, name, url, file, isPrimary } (new listings)
   const [listingImages, setListingImages] = useState(
@@ -439,16 +451,50 @@ function KioskApp({ initialData = null, initialTheme }) {
     setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
   }
 
-  // Drawer "New listing": pick a category in the Browse modal first; OK leaves
-  // this on the interview screen, Cancel just closes the modal.
+  // The structured query of the search screen currently shown, or null when the
+  // main area is not a search screen. Both /search and /results keep the whole
+  // query in the URL (category, facets, ranges).
+  function currentSearchQuery() {
+    if (!isSearchRoute && !isResultsRoute) return null
+    return parseSearchQuery(location.search)
+  }
+
+  // Answers a new listing inherits from the search that was just run: the
+  // selected facet values (condition included) and the price/year ranges.
+  function searchAnswers(interview) {
+    const query = currentSearchQuery()
+    if (!query || !interview) return {}
+    return answersFromSearchQuery(query, { questions: interview.questions ?? [] })
+  }
+
+  // Drawer "New listing" and the topbar "+" both land here. On the search
+  // screen the category chosen in the search box and the active filters already
+  // describe the new listing, so that category is used as-is with its questions
+  // pre-answered instead of asking for a category again. A search over
+  // "All categories" (category 0 / no category) still opens the Browse modal.
   function browseNewListing() {
     setDrawerOpen(false)
+    const query = currentSearchQuery()
+    const impliedInterview = query?.categoryId
+      ? interviews.find(
+          (interview) => String(interview.categoryId) === String(query.categoryId),
+        )
+      : null
+    if (impliedInterview) {
+      const prefill = searchAnswers(impliedInterview)
+      startNewListing()
+      setCategoryDirty(true)
+      setSelectedInterviewId(String(impliedInterview.id))
+      setAnswers(prefill)
+      return
+    }
     setBrowseFor('new')
     setModal('browse')
   }
 
-  // Top bar "+": signed-in users pick a category for a new listing; guests get
-  // the drawer and a "Please sign in to publish" prompt.
+  // Top bar "+": signed-in users start a new listing (the Browse modal only when
+  // the current search has no category); guests get the drawer and a "Please
+  // sign in to publish" prompt.
   function addListing() {
     if (isLoggedIn) {
       browseNewListing()
@@ -471,6 +517,7 @@ function KioskApp({ initialData = null, initialTheme }) {
     setSelectedChatId(null)
     setSelectedInterviewId(null)
     setCategoryDirty(false)
+    setPublishedListingId(null)
     setDraftListingId(null)
     setTranslationsOpen(false)
     setAnswers({})
@@ -667,11 +714,14 @@ function KioskApp({ initialData = null, initialTheme }) {
     if (!targetInterview) return
 
     // Opened from the drawer's "New listing": start a fresh wizard in the
-    // chosen category (no listing is written until Publish).
+    // chosen category (no listing is written until Publish). Facets already
+    // selected in the search filter carry over to the interview questions.
     if (browseFor === 'new') {
+      const prefill = searchAnswers(targetInterview)
       startNewListing()
       setCategoryDirty(true)
       setSelectedInterviewId(String(targetInterview.id))
+      setAnswers(prefill)
       return
     }
     const alreadyCurrent = selectedInterviewId === String(targetInterview.id)
@@ -935,11 +985,11 @@ function KioskApp({ initialData = null, initialTheme }) {
         }
       }
 
-      // The wizard's last step: clear the interview and show the report dialog
-      // over the "No category selected" screen, then refresh the catalog so the
-      // now-active listing appears in search/results.
+      // The wizard's last step: clear the interview and show the post-publish
+      // screen (published card, seller statistics, next steps) on /app, then
+      // refresh the catalog so the now-active listing appears in search.
       startNewListing()
-      setModal('report')
+      setPublishedListingId(listingId)
       setReloadToken((n) => n + 1)
     } catch (err) {
       setNotice(t('notice.publishFailed', { message: err.message }))
@@ -956,7 +1006,9 @@ function KioskApp({ initialData = null, initialTheme }) {
     setSelectedListingId(listing.id)
     // Show exactly this listing's answers: clear answers for the interview's
     // questions that this listing has no selection for.
-    const interview = interviews.find((s) => s.id === listing.categoryId)
+    const interview = interviews.find(
+      (s) => String(s.id) === String(listing.categoryId),
+    )
     const ownAnswers = listing.answers ?? {}
     setAnswers((prev) => {
       const next = { ...prev }
@@ -1638,6 +1690,57 @@ function KioskApp({ initialData = null, initialTheme }) {
     ? (searchListings.find((item) => String(item.id) === String(listingRouteId)) ?? null)
     : null
 
+  // Post-publish screen. The published listing is read back from `myListings`
+  // so it picks up the refreshed catalog data (completeness, images, titles);
+  // every statistic below is derived from data the app already has.
+  const publishedListing =
+    publishedListingId != null
+      ? (myListings.find(
+          (listing) => String(listing.listingId) === String(publishedListingId),
+        ) ?? null)
+      : null
+  const publishedCategoryTitle = publishedListing
+    ? (interviews.find(
+        (interview) =>
+          String(interview.categoryId) === String(publishedListing.categoryId),
+      )?.title ?? '')
+    : ''
+  const publishedImage =
+    publishedListing != null
+      ? (listingImages.find(
+          (image) =>
+            String(image.listingId) === String(publishedListing.listingId) &&
+            image.primaryImage,
+        ) ??
+        listingImages.find(
+          (image) => String(image.listingId) === String(publishedListing.listingId),
+        ) ??
+        null)
+      : null
+  const sellerStats = publishedListing ? buildSellerStats({ myListings, chats }) : null
+  const publishedPriceStats = publishedListing
+    ? pricePosition({ listing: publishedListing, catalog: searchListings })
+    : null
+  const publishedChecklist = publishedListing
+    ? listingChecklist({
+        listing: publishedListing,
+        imageCount: listingImages.filter(
+          (image) => String(image.listingId) === String(publishedListing.listingId),
+        ).length,
+        titles: titlesForListing(publishedListing.listingId),
+        languages: languages.map((row) => row.code),
+      })
+    : []
+  // The post-publish screen owns the main area only when no other screen is
+  // active; it also keeps the background reload from flashing a placeholder.
+  const showsPublishedListing =
+    publishedListing != null &&
+    !selectedInterview &&
+    !selectedChat &&
+    !isSearchRoute &&
+    !isResultsRoute &&
+    !isListingRoute
+
   // Aggregate unread count for the topbar's message icon. Count conversations
   // the signed-in user can actually see: their own listings' chat threads and
   // the threads sitting in their inbox.
@@ -1821,7 +1924,9 @@ function KioskApp({ initialData = null, initialTheme }) {
 
         {/* Clicking the main content (outside the drawer) closes it. */}
         <main className="main" onMouseDown={drawerOpen ? () => setDrawerOpen(false) : undefined}>
-          {dataStatus === 'loading' ? (
+          {/* A reload after publishing refreshes the catalog in the background;
+              the post-publish screen already has everything it needs. */}
+          {dataStatus === 'loading' && !showsPublishedListing ? (
             <LoadingPlaceholder />
           ) : dataStatus === 'error' ? (
             <ErrorPlaceholder message={loadError} onRetry={() => setReloadToken((n) => n + 1)} />
@@ -1894,6 +1999,21 @@ function KioskApp({ initialData = null, initialTheme }) {
             />
           ) : selectedInterview ? (
             <InterviewView interview={selectedInterview} answers={answers} onAnswer={(questionId, optionId) => answerQuestion(selectedInterview, questionId, optionId)} actions={interviewActions} />
+          ) : showsPublishedListing ? (
+            <PublishSuccessView
+              listing={publishedListing}
+              categoryTitle={publishedCategoryTitle}
+              imageUrl={publishedImage?.url ?? null}
+              stats={sellerStats}
+              priceStats={publishedPriceStats}
+              checklist={publishedChecklist}
+              onPublishAnother={browseNewListing}
+              onImproveQuestions={() => openListing(publishedListing)}
+              onEditListing={() => {
+                openListing(publishedListing)
+                setWizardStage('edit')
+              }}
+            />
           ) : (
             <EmptyPlaceholder
               hasInterviews={interviews.length > 0}
@@ -1958,7 +2078,7 @@ function KioskApp({ initialData = null, initialTheme }) {
           onClose={() => setModal(null)}
         />
       )}
-      {modal && !['browse', 'messages', 'report', 'signin'].includes(modal) && (
+      {modal && !['browse', 'messages', 'signin'].includes(modal) && (
         <SimpleModal
           title={t(MODAL_TITLES[modal])}
           body={modal === 'profile' ? profileBody : t('settings.body')}
@@ -1972,19 +2092,6 @@ function KioskApp({ initialData = null, initialTheme }) {
                 {t('drawer.signIn')}
               </button>
             ) : undefined
-          }
-          onClose={() => setModal(null)}
-        />
-      )}
-
-      {modal === 'report' && (
-        <SimpleModal
-          title={t('report.title')}
-          body={<p className="report-message">{t('report.body')}</p>}
-          footer={
-            <button type="button" className="btn primary" onClick={() => setModal(null)}>
-              {t('common.close')}
-            </button>
           }
           onClose={() => setModal(null)}
         />

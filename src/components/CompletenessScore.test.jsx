@@ -26,9 +26,12 @@ describe('CompletenessScore', () => {
     ).toBeInTheDocument()
   })
 
-  it('rounds to at most two decimal places and trims trailing zeros', () => {
+  it('rounds to the nearest whole percent', () => {
     renderScore({ answered: 2, total: 3 })
-    expect(screen.getByText('(66.67)')).toBeInTheDocument()
+    expect(screen.getByText('(67)')).toBeInTheDocument()
+
+    renderScore({ answered: 1, total: 3 })
+    expect(screen.getByText('(33)')).toBeInTheDocument()
   })
 
   it('shows 100 only when every question is answered', () => {
@@ -41,7 +44,7 @@ describe('CompletenessScore', () => {
   it('does not round a nearly complete score up to 100', () => {
     renderScore({ answered: 9999, total: 10000 })
 
-    expect(screen.getByText('(99.99)')).toBeInTheDocument()
+    expect(screen.getByText('(99)')).toBeInTheDocument()
   })
 
   it('shows zero when nothing is answered', () => {

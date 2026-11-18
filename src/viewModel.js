@@ -171,6 +171,8 @@ export function buildViewModel(
         listingId: listing.id,
         listingChatThreadId: link?.id ?? null,
         categoryId: String(listing.categoryId),
+        // Raw timestamps let the seller statistics bucket contacts per day.
+        createdAt: thread.createdAt ?? null,
         title: listingTitle(listing),
         desc: listingDescription(listing),
         partnerName: partner?.name ?? null,

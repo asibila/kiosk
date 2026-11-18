@@ -181,9 +181,11 @@ removal is a real button with an aria-label, and result counts are announced via
   `/listing/:id` renders one listing.
 - **Top bar** - centered title (a link back to `/search`); hamburger; on the
   right a **+** button that starts a new listing, then the **EN / HR** language
-  dropdown, profile icon and theme toggle (moon/sun). Signed-in users get the
-  Browse modal to pick a category; guests get the drawer plus a "Please sign in
-  to publish" prompt. Messages and Settings live at the bottom of the drawer.
+  dropdown, profile icon and theme toggle (moon/sun). Signed-in users start a
+  new listing right away when the current search already has a category;
+  otherwise they get the Browse modal to pick one. Guests get the drawer plus a
+  "Please sign in to publish" prompt. Messages and Settings live at the bottom
+  of the drawer.
 - **Language** - the topbar dropdown changes the interface and every backend
   description (categories, facet questions and options) between English and
   Croatian. English is the default; the choice is written to the
@@ -237,6 +239,8 @@ removal is a real button with an aria-label, and result counts are announced via
   search** carries the same query back to `/search`. Range chips filter the
   listing's price/year fields; an orientation chip filters `Listing.orientation`
   directly. The legacy `direction` parameter is still read for old bookmarks.
+  The topbar **+** starts a new listing in the searched category with the active
+  filters already answered (see **New listing**).
 - **Listing page** (`/listing/:id`) - bookmarkable detail page for one listing:
   primary image with a thumbnail gallery, orientation/category badges, the
   listing's facet values, category, seller, listed date and the contact action.
@@ -245,12 +249,20 @@ removal is a real button with an aria-label, and result counts are announced via
   link restores that exact `/results?…` query; a direct or bookmarked visit falls
   back to "Back to search". A deleted or unknown id shows a not-found state.
 - **New listing** - the topbar **+** button (and the drawer's **New listing**
-  action) opens the Browse modal to choose a category; OK clears the selected
-  category/listing and interview answers locally and opens that category's
-  interview. Guests who press **+** see the drawer with a "Please sign in to
-  publish" prompt instead. Cancel keeps the current screen unchanged. Pressing
-  **Next >** materialises an inactive draft (`isActive: false`), creates its
-  UI-language title and saves the interview answers on it.
+  action) start a listing. On `/search` and `/results` the query already
+  describes it: when the search has a category (`category>0`), that category's
+  interview opens directly and the selected filters pre-answer its questions
+  (condition, orientation, the category facets, and price/year - a range answers
+  with the middle of the range, or with its one open bound). Options that do not
+  belong to the interview are dropped. Only an "all categories" search
+  (`category=0` or no category) asks for a category in the Browse modal; a
+  category picked there still inherits the generic filter answers. From `/app`
+  the Browse modal is always used. OK clears the selected category/listing and
+  interview answers locally before applying the new ones. Guests who press **+**
+  see the drawer with a "Please sign in to publish" prompt instead. Cancel keeps
+  the current screen unchanged. Pressing **Next >** materialises an inactive
+  draft (`isActive: false`), creates its UI-language title and saves the
+  interview answers on it.
 - **Dark mode** — toggles between light and dark palettes, follows the OS preference on first
   visit, and remembers the choice in `localStorage` (`kiosk-theme`).
 - **Drawer** - overlay slide-in, 340px (full-width ≤600px), a flat list of the signed-in
@@ -286,8 +298,8 @@ removal is a real button with an aria-label, and result counts are announced via
   signed-in user's inbox. The envelope is grayed out and disabled on the user's own listings.
 - **Listing wizard** - after the interview: **Edit** (per-language title with
   **Translate**, image grid with upload, remove and "make primary"), **Preview**
-  (answered facets, title, images) with **Publish**, then a report dialog
-  ("Listing created, thank you for using kiosk.") over the starting screen.
+  (answered facets, title, images) with **Publish**, then the post-publish screen
+  (see **Post-publish** below).
   "< Previous" moves back a step at every stage.
   The **Next >** step creates the listing as an inactive draft; **Publish** sets
   `isActive: true`. Drafts are private to their owner in search/listing pages and
@@ -299,6 +311,21 @@ removal is a real button with an aria-label, and result counts are announced via
   images immediately; a draft keeps earlier picks local until Publish.
   Search results show the listing's primary image as a small
   thumbnail (the glyph remains when a listing has no image).
+- **Post-publish** (`/app`, right after Publish) - replaces the old starting
+  screen and its "Listing created" dialog. It shows the newly published card
+  (primary image, title, category, price, completeness score) with **View
+  listing** (the bookmarkable `/listing/:id`) and **Publish another** (back to
+  category Browse), then the seller's own numbers derived from data that is
+  already loaded — no click tracking exists yet: **Active ads**, **Contacts**
+  (chat threads on the user's listings) and **Unread**, a 14-day contacts bar
+  chart from `ChatThread.createdAt` (falling back to a "no contacts yet" hint),
+  a price-position track that places the listing's price between the cheapest
+  and dearest active ad in its category (with the median), and a **Make it stand
+  out** checklist for photos, title translations and unanswered questions. The
+  checklist's **Finish** buttons reopen the interview
+  (`App.openListing`) or its **Edit** step for that listing. The publish reload
+  runs in the background so the screen does not flash a loading placeholder
+  (`src/components/PublishSuccessView.jsx`, `src/sellerStats.js`).
 - **Chat view** - WhatsApp-style bubbles with timestamps, paperclip popover
   (Image / YouTube / GPS placeholders), Enter-to-send. Text messages are POSTed
   to `chat-messages`; attachment placeholders stay local. The conversation header

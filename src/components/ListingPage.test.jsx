@@ -103,7 +103,7 @@ describe('ListingPage', () => {
     expect(screen.getByText('Condition')).toBeInTheDocument()
     expect(screen.getByText('Brand')).toBeInTheDocument()
     expect(screen.getByText('Samsung')).toBeInTheDocument()
-    expect(screen.getByText('(66.67)')).toBeInTheDocument()
+    expect(screen.getByText('(67)')).toBeInTheDocument()
   })
 
   it('notifies the contact handler', () => {

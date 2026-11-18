@@ -106,7 +106,7 @@ describe('ResultsView', () => {
       screen.getByRole('heading', { name: 'Mobile phones #28' }),
     ).toBeInTheDocument()
     expect(screen.queryByText('Mobile phones #25')).not.toBeInTheDocument()
-    expect(screen.getByText('(66.67)')).toBeInTheDocument()
+    expect(screen.getByText('(67)')).toBeInTheDocument()
 
     const filters = within(screen.getByLabelText('Active filters'))
     expect(filters.getByText('Mobile phones')).toBeInTheDocument()

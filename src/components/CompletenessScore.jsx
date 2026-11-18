@@ -1,5 +1,5 @@
 // Listing completeness score: facetsCount / facetsCountMax as a percentage.
-// Shown inline with the title as "(95)" or "(100)"; at most two decimals.
+// Shown inline with the title as "(95)" or "(100)"; whole percent only.
 import { useI18n } from '../i18n.jsx'
 
 const asCount = (value) => {
@@ -14,9 +14,9 @@ export default function CompletenessScore({ answered = 0, total = 0 }) {
 
   const count = Math.min(asCount(answered), max)
   const ratio = count / max
-  // Never round a value below 1 up to 100; only a full ratio is 100.
-  const percent =
-    ratio >= 1 ? 100 : Math.min(99.99, Math.round(ratio * 10000) / 100)
+  // Round to the nearest integer, but never round a value below 1 up to 100:
+  // only a full ratio is 100.
+  const percent = ratio >= 1 ? 100 : Math.min(99, Math.round(ratio * 100))
   const label = t('completeness.aria', { answered: count, total: max })
 
   return (

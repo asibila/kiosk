@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  answersFromSearchQuery,
   buildOptionIndex,
   buildSearchParams,
   categoryScope,
@@ -285,5 +286,84 @@ describe('resolveChips', () => {
         label: 'Wanted',
       },
     ])
+  })
+})
+
+describe('answersFromSearchQuery', () => {
+  const interview = {
+    questions: [
+      {
+        id: 'orientation',
+        facet: 'orientation',
+        type: 'option',
+        options: [
+          { id: 'sell', text: 'For Sale' },
+          { id: 'buy', text: 'Wanted' },
+        ],
+      },
+      {
+        id: '1',
+        facet: 'condition',
+        type: 'option',
+        options: [
+          { id: '8', text: 'New' },
+          { id: '9', text: 'Used' },
+        ],
+      },
+      { id: 'price', facet: 'price', type: 'numeric', options: [] },
+      { id: 'year', facet: 'year', type: 'numeric', options: [] },
+      {
+        id: '5',
+        facet: 'brand',
+        type: 'option',
+        options: [{ id: '20', text: 'Acer' }],
+      },
+    ],
+  }
+
+  it('answers the facet questions the search filtered on', () => {
+    const query = parseSearchQuery(
+      '?facet=condition:8&facet=orientation:sell&facet=brand:20',
+    )
+
+    expect(answersFromSearchQuery(query, interview)).toEqual({
+      '1': '8',
+      orientation: 'sell',
+      '5': '20',
+    })
+  })
+
+  it('uses the middle of a selected range for price and year', () => {
+    const query = parseSearchQuery('?range=price:500-1000&range=year:2014-2019')
+
+    expect(answersFromSearchQuery(query, interview)).toEqual({
+      price: 750,
+      year: 2017,
+    })
+  })
+
+  it('uses the one bound of an open range', () => {
+    const query = parseSearchQuery('?range=price:500-&range=year:-2020')
+
+    expect(answersFromSearchQuery(query, interview)).toEqual({
+      price: 500,
+      year: 2020,
+    })
+  })
+
+  it('drops values that belong to another category', () => {
+    const query = parseSearchQuery('?facet=brand:77&facet=condition:8')
+
+    // Brand option 77 is not one of this interview's options.
+    expect(answersFromSearchQuery(query, interview)).toEqual({ '1': '8' })
+    expect(
+      answersFromSearchQuery(query, { questions: interview.questions.slice(0, 1) }),
+    ).toEqual({})
+  })
+
+  it('reads the legacy direction parameter as a listing orientation', () => {
+    const query = parseSearchQuery('?direction=buy')
+
+    expect(answersFromSearchQuery(query, interview)).toEqual({ orientation: 'sell' })
   })
 })

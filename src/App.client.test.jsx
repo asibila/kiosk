@@ -29,6 +29,18 @@ const { fetchKioskData, loadDescriptions } = await import('./api.js')
 const { api: apiMock } = await import('./api.js')
 const { default: App } = await import('./App.jsx')
 
+// jsdom has no EventSource; the signed-in live-chat effect only needs a stub it
+// can close again.
+vi.stubGlobal(
+  'EventSource',
+  class {
+    constructor(url) {
+      this.url = url
+    }
+    close() {}
+  },
+)
+
 const categoryDescription = {
   id: 9001,
   name: null,
@@ -39,6 +51,19 @@ const regionDescriptions = [
   { id: 9500, name: null, translations: { en: 'All regions', hr: 'Sve regije' } },
   { id: 9501, name: null, translations: { en: 'Germany', hr: 'Njemačka' } },
 ]
+
+// A generic "Condition" facet, so the interview has an answerable question that
+// the search filter can pre-populate.
+const conditionDescription = {
+  id: 9600,
+  name: null,
+  translations: { en: 'Condition', hr: 'Stanje' },
+}
+const newDescription = {
+  id: 9601,
+  name: null,
+  translations: { en: 'New', hr: 'Novo' },
+}
 
 const raw = {
   users: [{ id: 1, name: 'Ana', email: 'ana@example.com', isActive: true }],
@@ -67,6 +92,28 @@ const raw = {
   'facet-value-selections': [],
   'listing-images': [],
 }
+
+// Same catalog plus a generic "Condition" facet, so a search can pre-answer the
+// interview: condition option 8 belongs to schema 1, and listing 10 owns it.
+const rawWithCondition = {
+  ...raw,
+  descriptions: [...raw.descriptions, conditionDescription, newDescription],
+  'facet-schemas': [
+    {
+      id: 1,
+      descriptionId: 9600,
+      name: 'condition',
+      categoryId: 0,
+      isGeneric: true,
+      type: 'option',
+      required: true,
+    },
+  ],
+  'facet-value-options': [{ id: 8, descriptionId: 9601, schemaId: 1 }],
+  'facet-value-selections': [{ id: 70, listingId: 10, facetValueOptionId: 8 }],
+}
+
+const signedIn = { id: 1, name: 'Ana', email: 'ana@example.com' }
 
 describe('client rendering', () => {
   beforeEach(() => {
@@ -126,5 +173,112 @@ describe('client rendering', () => {
       ),
     ).toBeInTheDocument()
     expect(document.querySelector('.drawer')).toHaveClass('open')
+  })
+
+  it('opens the searched category with its facet answers already filled in', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+    fetchKioskData.mockResolvedValue(rawWithCondition)
+
+    render(
+      <MemoryRouter initialEntries={['/results?category=1&facet=condition:8']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    await screen.findByRole('heading', { name: 'Trek bike' })
+    fireEvent.click(screen.getByRole('button', { name: 'Add listing' }))
+
+    // The category comes from the search, so the Browse modal is skipped and
+    // the interview shows the chosen condition as an answer.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Cars' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  })
+
+  it('does the same from the search form', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+    fetchKioskData.mockResolvedValue(rawWithCondition)
+
+    render(
+      <MemoryRouter initialEntries={['/search?category=1&facet=condition:8']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    await screen.findByRole('button', { name: 'Search all regions' })
+    fireEvent.click(screen.getByRole('button', { name: 'Add listing' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Cars' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  })
+
+  it('asks for a category when the search covers all categories', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+
+    render(
+      <MemoryRouter initialEntries={['/results?category=0']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    await screen.findByRole('heading', { name: 'Trek bike' })
+    fireEvent.click(screen.getByRole('button', { name: 'Add listing' }))
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Browse marketplace' }),
+    ).toBeInTheDocument()
+  })
+
+  it('shows the post-publish screen after the wizard publishes', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+    apiMock.update.mockImplementation(async (_resource, id, body) => ({
+      id,
+      ...body,
+      facetsCount: 3,
+    }))
+
+    render(
+      <MemoryRouter initialEntries={['/app']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    // Open the owned listing from the drawer: its category interview opens.
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Toggle my listings drawer' }),
+    )
+    fireEvent.click(await screen.findByText('Trek bike'))
+    expect(
+      await screen.findByRole('heading', { name: 'Cars' }),
+    ).toBeInTheDocument()
+
+    // Interview → edit → preview → publish.
+    fireEvent.click(screen.getByRole('button', { name: 'Next >' }))
+    expect(
+      await screen.findByRole('region', { name: 'Edit listing' }),
+    ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Next >' }))
+    expect(
+      await screen.findByRole('region', { name: 'Preview listing' }),
+    ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }))
+
+    // The empty placeholder is replaced by the published card and statistics.
+    expect(
+      await screen.findByRole('heading', { name: 'Your ad is live' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'View listing' })).toHaveAttribute(
+      'href',
+      '/listing/10',
+    )
+    expect(screen.getByRole('heading', { name: 'Trek bike' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })
