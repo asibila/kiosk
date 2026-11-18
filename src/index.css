@@ -2957,6 +2957,36 @@ a.btn {
   overflow-wrap: anywhere;
 }
 
+/* Delete dialog: optional outcome questions revealed by "Details". */
+.confirm-details {
+  margin-right: auto;
+}
+
+.delete-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.delete-details .field-label {
+  margin: 0;
+}
+
+.delete-sold-price {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.delete-sold-price-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* Profile modal: label/value rows from the backend user row. */
 .profile-details dl {
   margin: 0;
@@ -3103,6 +3133,51 @@ a.btn {
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+/* The wizard and the dashboard's question editor share this modal shell. The
+   modal header carries the "step X of 3" title, so the stage heads are hidden. */
+.modal-card.wizard-modal {
+  max-width: 720px;
+  height: min(780px, 94vh);
+}
+
+.wizard-modal-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.wizard-modal .wizard-head {
+  display: none;
+}
+
+/* Wizard step 1: two centered prompts with their chips underneath. */
+.wizard-questions {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 34px;
+}
+
+.wizard-question {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.wizard-question-text {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.wizard-question .chips {
+  justify-content: center;
 }
 
 .wizard-head {

@@ -42,6 +42,26 @@ import {
 
 const MODAL_TITLES = { settings: 'settings.title', profile: 'profile.title' }
 
+/** Delete-dialog outcomes, split by what the listing was looking for. */
+const DELETE_OUTCOMES = {
+  sell: ['sold', 'sale_fell_through', 'kept', 'gave_away'],
+  buy: ['purchased', 'purchase_fell_through', 'no_longer_needed', 'bought_elsewhere'],
+}
+
+const DELETE_OUTCOME_LABELS = {
+  sold: 'delete.outcomeSold',
+  sale_fell_through: 'delete.outcomeSaleFellThrough',
+  kept: 'delete.outcomeKept',
+  gave_away: 'delete.outcomeGaveAway',
+  purchased: 'delete.outcomePurchased',
+  purchase_fell_through: 'delete.outcomePurchaseFellThrough',
+  no_longer_needed: 'delete.outcomeNoLongerNeeded',
+  bought_elsewhere: 'delete.outcomeBoughtElsewhere',
+}
+
+/** Outcomes that ask for the price actually paid. */
+const PRICED_OUTCOMES = new Set(['sold', 'purchased'])
+
 /** `?google=` results from the profile link flow → banner message keys. */
 const GOOGLE_RESULT_KEYS = {
   connected: 'auth.googleConnected',
@@ -174,12 +194,20 @@ function KioskApp({ initialData = null, initialTheme }) {
   const [publishing, setPublishing] = useState(false)
   const [categoryDirty, setCategoryDirty] = useState(false) // category changed via browse OK
   const [pendingDelete, setPendingDelete] = useState(null) // listing awaiting confirmation
+  const [deleteDetailsOpen, setDeleteDetailsOpen] = useState(false)
+  const [deleteOutcome, setDeleteOutcome] = useState(null) // 'sold' | 'kept' | null
+  const [deleteFinalPrice, setDeleteFinalPrice] = useState('')
   const [deleting, setDeleting] = useState(false)
   // Listing that was just published; drives the post-publish screen on /app.
   const [publishedListingId, setPublishedListingId] = useState(null)
 
   // Listing wizard: interview → edit (images) → preview → published.
   const [wizardStage, setWizardStage] = useState('interview') // 'interview' | 'edit' | 'preview'
+  // The wizard and the dashboard's "Answer questions" editor live in modals so
+  // the dashboard stays behind them.
+  const [wizardOpen, setWizardOpen] = useState(false)
+  const [answerModal, setAnswerModal] = useState(null) // { listingId, interview, baseline, draft } | null
+  const [savingAnswers, setSavingAnswers] = useState(false)
   const [draftImages, setDraftImages] = useState([]) // { id, name, url, file, isPrimary } (new listings)
   const [listingImages, setListingImages] = useState(
     initialView?.listingImages ?? [],
@@ -475,7 +503,12 @@ function KioskApp({ initialData = null, initialTheme }) {
     const onKey = (e) => {
       if (e.key !== 'Escape') return
       if (pendingDelete) {
-        if (!deleting) setPendingDelete(null)
+        if (!deleting) {
+          setPendingDelete(null)
+          setDeleteDetailsOpen(false)
+          setDeleteOutcome(null)
+          setDeleteFinalPrice('')
+        }
         return
       }
       if (modal) {
@@ -530,6 +563,7 @@ function KioskApp({ initialData = null, initialTheme }) {
       startNewListing()
       setCategoryDirty(true)
       setSelectedInterviewId(String(impliedInterview.id))
+      setWizardOpen(true)
       setAnswers(prefill)
       return
     }
@@ -566,6 +600,8 @@ function KioskApp({ initialData = null, initialTheme }) {
     setTranslationsOpen(false)
     setAnswers({})
     setWizardStage('interview')
+    setWizardOpen(false)
+    setAnswerModal(null)
     resetDraft()
     setNotice('')
   }
@@ -765,6 +801,7 @@ function KioskApp({ initialData = null, initialTheme }) {
       startNewListing()
       setCategoryDirty(true)
       setSelectedInterviewId(String(targetInterview.id))
+      setWizardOpen(true)
       setAnswers(prefill)
       return
     }
@@ -1000,16 +1037,16 @@ function KioskApp({ initialData = null, initialTheme }) {
     setPublishedListingId(null)
     setWizardStage('interview')
     setDraftListingId(null)
+    setWizardOpen(false)
+    setAnswerModal(null)
     resetDraft()
   }
 
-  // Open the category interview for a listing, prefilled with that listing's
-  // own answers. Reached from the stats page ("Answer questions", "Finish" on
-  // the checklist) and from its edit action.
-  function openInterviewForListing(listing) {
+  // Open the wizard modal for an existing listing (edit step by default).
+  function openWizardForListing(listing, stage = 'edit') {
     if (!listing) return
     navigate('/app')
-    selectInterview(listing.categoryId, { keepDrawerOpen: true })
+    selectInterview(listing.categoryId)
     setSelectedListingId(listing.id)
     // Show exactly this listing's answers: clear answers for the interview's
     // questions that this listing has no selection for.
@@ -1025,11 +1062,149 @@ function KioskApp({ initialData = null, initialTheme }) {
       }
       return next
     })
+    setWizardStage(stage)
   }
 
-  // Drawer delete: ask first, then remove the listing from the backend.
+  // Dashboard "Answer questions": edit the full interview in a modal, with
+  // Apply/Cancel. Nothing is written until Apply, so Cancel always discards.
+  function openAnswerQuestions(listing) {
+    if (!listing) return
+    const interview = interviews.find(
+      (s) => String(s.categoryId) === String(listing.categoryId),
+    )
+    if (!interview) return
+
+    const baseline = {}
+    for (const question of interview.questions ?? []) {
+      const value = listing.answers?.[question.id]
+      if (value != null) baseline[question.id] = String(value)
+    }
+
+    navigate('/app')
+    setWizardOpen(false)
+    setSelectedChatId(null)
+    setSelectedInterviewId(null)
+    setWizardStage('interview')
+    setDrawerOpen(false)
+    setAnswerModal({
+      listingId: listing.listingId,
+      interview,
+      baseline,
+      draft: { ...baseline },
+    })
+  }
+
+  function closeAnswerQuestions() {
+    if (savingAnswers) return
+    setAnswerModal(null)
+  }
+
+  /** `null` and `''` are both "no answer"; numbers and option ids compare by text. */
+  function sameAnswer(a, b) {
+    return (a == null ? '' : String(a)) === (b == null ? '' : String(b))
+  }
+
+  const answerChanges =
+    answerModal?.interview.questions.filter(
+      (question) =>
+        !sameAnswer(
+          answerModal.draft[question.id],
+          answerModal.baseline[question.id],
+        ),
+    ) ?? []
+
+  // Write one answer for a saved listing. Used by Apply; the background reload
+  // after it refreshes counts, selections and the listing page.
+  async function persistAnswerOnListing(listingId, question, value) {
+    const actorId = user?.id
+    if (question?.type === 'numeric') {
+      const field = question.facet === 'year' ? 'year' : 'price'
+      await api.update(
+        'listings',
+        listingId,
+        { [field]: value == null ? null : Number(value) },
+        actorId,
+      )
+      return
+    }
+
+    if (question?.facet === 'orientation') {
+      await api.update('listings', listingId, { orientation: value }, actorId)
+      return
+    }
+
+    const existing = selections.find(
+      (selection) =>
+        selection.listingId === listingId &&
+        optionSchema[selection.facetValueOptionId] === Number(question.id),
+    )
+
+    if (value == null || value === '') {
+      if (existing) await api.remove('facet-value-selections', existing.id, actorId)
+      return
+    }
+
+    if (existing) {
+      await api.update(
+        'facet-value-selections',
+        existing.id,
+        { facetValueOptionId: Number(value) },
+        actorId,
+      )
+    } else {
+      await api.create(
+        'facet-value-selections',
+        { facetValueOptionId: Number(value), listingId },
+        actorId,
+      )
+    }
+  }
+
+  async function applyAnswerChanges() {
+    if (!answerModal || savingAnswers || answerChanges.length === 0) return
+    setSavingAnswers(true)
+    try {
+      for (const question of answerChanges) {
+        await persistAnswerOnListing(
+          answerModal.listingId,
+          question,
+          answerModal.draft[question.id] ?? null,
+        )
+      }
+      setAnswerModal(null)
+      setReloadToken((n) => n + 1)
+    } catch (err) {
+      setNotice(t('notice.answerFailed', { message: err.message }))
+    } finally {
+      setSavingAnswers(false)
+    }
+  }
+
+  // Close the wizard without publishing. A draft created by "Next" stays in the
+  // drawer as an inactive listing; unsaved image picks are released.
+  function closeWizard() {
+    setWizardOpen(false)
+    setSelectedInterviewId(null)
+    setWizardStage('interview')
+    setDraftListingId(null)
+    resetDraft()
+  }
+
+  // Drawer delete: ask first, then remove the listing from the backend. The
+  // optional details (outcome, sale price) are recorded just before deleting.
   function askDeleteListing(listing) {
     setPendingDelete(listing)
+    setDeleteDetailsOpen(false)
+    setDeleteOutcome(null)
+    setDeleteFinalPrice('')
+  }
+
+  function closeDeleteDialog() {
+    if (deleting) return
+    setPendingDelete(null)
+    setDeleteDetailsOpen(false)
+    setDeleteOutcome(null)
+    setDeleteFinalPrice('')
   }
 
   async function confirmDeleteListing() {
@@ -1037,6 +1212,27 @@ function KioskApp({ initialData = null, initialTheme }) {
     if (!listing || deleting) return
     setDeleting(true)
     try {
+      // Best-effort outcome analytics: a failure here must not keep the listing.
+      if (deleteOutcome) {
+        const finalPrice =
+          PRICED_OUTCOMES.has(deleteOutcome) && deleteFinalPrice.trim() !== ''
+            ? Number(deleteFinalPrice)
+            : null
+        try {
+          await api.create(
+            'listing-outcomes',
+            {
+              listingId: listing.listingId,
+              outcome: deleteOutcome,
+              finalPrice: Number.isFinite(finalPrice) ? finalPrice : null,
+            },
+            user?.id,
+          )
+        } catch {
+          // Ignore: deleting the listing is what the seller asked for.
+        }
+      }
+
       await api.remove('listings', listing.listingId, user?.id)
 
       setMyListings((prev) =>
@@ -1081,6 +1277,9 @@ function KioskApp({ initialData = null, initialTheme }) {
         setWizardStage('interview')
       }
       setPendingDelete(null)
+      setDeleteDetailsOpen(false)
+      setDeleteOutcome(null)
+      setDeleteFinalPrice('')
       setNotice(t('notice.deleted', { title: listing.title }))
     } catch (err) {
       setNotice(t('notice.deleteFailed', { message: err.message }))
@@ -1089,7 +1288,7 @@ function KioskApp({ initialData = null, initialTheme }) {
     }
   }
 
-  // Open a category interview as the main view. Switching categories abandons
+  // Open a category interview in the wizard modal. Switching categories abandons
   // the wizard's edit/preview draft for the previous category.
   function selectInterview(interviewId, { keepDrawerOpen = false } = {}) {
     setCategoryDirty(false) // a plain category pick is not a browse change
@@ -1098,6 +1297,8 @@ function KioskApp({ initialData = null, initialTheme }) {
     setSelectedInterviewId(interviewId == null ? null : String(interviewId))
     setDraftListingId(null)
     setTranslationsOpen(false)
+    setAnswerModal(null)
+    setWizardOpen(interviewId != null)
     if (!keepDrawerOpen) setDrawerOpen(false)
     setWizardStage('interview')
     resetDraft()
@@ -1280,7 +1481,22 @@ function KioskApp({ initialData = null, initialTheme }) {
   // Pressing Next again reuses that draft instead of creating another one.
   async function openEditStage() {
     if (!selectedInterview || !user || creatingDraft || publishing) return
-    if (requiredQuestionsMissing(selectedInterview).length > 0) {
+    // Step 1 asks only these two questions; other required facets are answered
+    // later from the dashboard and still gate Publish on the last step.
+    const orientationQuestion = selectedInterview.questions.find(
+      (question) => question.facet === 'orientation',
+    )
+    const conditionQuestion = selectedInterview.questions.find(
+      (question) => question.facet === 'condition',
+    )
+    if (
+      orientationQuestion &&
+      answers[orientationQuestion.id] == null
+    ) {
+      setNotice(t('interview.requiredMissing'))
+      return
+    }
+    if (conditionQuestion && answers[conditionQuestion.id] == null) {
       setNotice(t('interview.requiredMissing'))
       return
     }
@@ -1649,6 +1865,9 @@ function KioskApp({ initialData = null, initialTheme }) {
   const selectedInterview =
     interviews.find((s) => String(s.id) === String(selectedInterviewId)) || null
   const selectedChat = chats.find((c) => c.id === selectedChatId) || null
+  const wizardStepNumber =
+    wizardStage === 'preview' ? 3 : wizardStage === 'edit' ? 2 : 1
+  const wizardModalTitle = t('wizard.modalTitle', { step: wizardStepNumber })
 
   // Images shown by the wizard: saved rows for the edited listing plus the
   // browser-local picks for a listing that has not been published yet.
@@ -1754,11 +1973,10 @@ function KioskApp({ initialData = null, initialTheme }) {
         languages: languages.map((row) => row.code),
       })
     : []
-  // The overview owns the main area only when no other screen is active; it also
-  // keeps the background reload from flashing a placeholder.
+  // The overview owns the main area while no other screen is active. The wizard
+  // is a modal, so it does not hide the dashboard behind it.
   const showsSellerOverview =
     featuredListing != null &&
-    !selectedInterview &&
     !selectedChat &&
     !isSearchRoute &&
     !isResultsRoute &&
@@ -1787,10 +2005,18 @@ function KioskApp({ initialData = null, initialTheme }) {
     missingRequired.length === 0 &&
     (categoryDirty || answeredCount > 0)
 
-  // Interview step actions: "Next >" continues to the wizard's edit step.
-  // Orientation is answered by the first facet card, not by a separate pair of
-  // chips.
-  const interviewActions = (
+  // Step 1 asks exactly two questions: orientation and condition. Other
+  // required facets are answered from the dashboard and gate Publish only.
+  const stepOneCondition = selectedInterview?.questions.find(
+    (question) => question.facet === 'condition',
+  )
+  const canContinueStepOne =
+    !!user &&
+    answers.orientation != null &&
+    (!stepOneCondition || answers[stepOneCondition.id] != null)
+
+  // Step 1 actions: "Next >" continues to the wizard's edit step.
+  const stepOneActions = (
     <div className="action-row">
       <div className="action-buttons">
         {!user && (
@@ -1802,13 +2028,8 @@ function KioskApp({ initialData = null, initialTheme }) {
           type="button"
           className="btn primary"
           onClick={openEditStage}
-          disabled={
-            !canPublish ||
-            publishing ||
-            savingQuestionId != null ||
-            creatingDraft
-          }
-          title={missingRequired.length > 0 ? t('interview.requiredMissing') : undefined}
+          disabled={!canContinueStepOne || publishing || creatingDraft}
+          title={!canContinueStepOne ? t('interview.requiredMissing') : undefined}
         >
           {creatingDraft ? t('interview.creatingDraft') : t('interview.next')}
         </button>
@@ -1996,34 +2217,6 @@ function KioskApp({ initialData = null, initialTheme }) {
             />
           ) : selectedChat ? (
             <ChatView chat={selectedChat} onSend={sendMessage} liveStatus={liveStatus} />
-          ) : selectedInterview && wizardStage === 'edit' ? (
-            <EditListingView
-              interview={selectedInterview}
-              language={language}
-              title={wizardTitle}
-              titlePlaceholder={wizardTitlePlaceholder}
-              savingTitle={savingTitle}
-              onSaveTitle={(text) =>
-                saveListingTitle(wizardListingId, language, text)
-              }
-              onOpenTranslate={() => setTranslationsOpen(true)}
-              images={wizardImages}
-              onAddImages={addImages}
-              onRemoveImage={removeImage}
-              onSetPrimary={setPrimaryImage}
-              uploading={uploadingImages}
-              actions={editActions}
-            />
-          ) : selectedInterview && wizardStage === 'preview' ? (
-            <PreviewListingView
-              interview={selectedInterview}
-              title={wizardTitle || wizardTitlePlaceholder}
-              answers={answers}
-              images={wizardImages}
-              actions={previewActions}
-            />
-          ) : selectedInterview ? (
-            <InterviewView interview={selectedInterview} answers={answers} onAnswer={(questionId, optionId) => answerQuestion(selectedInterview, questionId, optionId)} actions={interviewActions} />
           ) : showsSellerOverview ? (
             <PublishSuccessView
               variant={featuredIsJustPublished ? 'published' : 'dashboard'}
@@ -2034,11 +2227,8 @@ function KioskApp({ initialData = null, initialTheme }) {
               priceStats={featuredPriceStats}
               checklist={featuredChecklist}
               onPublishAnother={browseNewListing}
-              onImproveQuestions={() => openInterviewForListing(featuredListing)}
-              onEditListing={() => {
-                openInterviewForListing(featuredListing)
-                setWizardStage('edit')
-              }}
+              onImproveQuestions={() => openAnswerQuestions(featuredListing)}
+              onEditListing={() => openWizardForListing(featuredListing, 'edit')}
             />
           ) : myListings.length > 0 ? (
             <SelectListingPlaceholder onOpenDrawer={() => setDrawerOpen(true)} />
@@ -2066,6 +2256,136 @@ function KioskApp({ initialData = null, initialTheme }) {
           }
           onClose={() => setTranslationsOpen(false)}
         />
+      )}
+
+      {wizardOpen && selectedInterview && (
+        <div className="modal-overlay">
+          <div
+            className="modal-card wizard-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={wizardModalTitle}
+          >
+            <header className="modal-head">
+              <h2>{wizardModalTitle}</h2>
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={t('common.close')}
+                onClick={closeWizard}
+              >
+                <XIcon />
+              </button>
+            </header>
+
+            <div className="wizard-modal-body">
+              {wizardStage === 'edit' ? (
+                <EditListingView
+                  interview={selectedInterview}
+                  language={language}
+                  title={wizardTitle}
+                  titlePlaceholder={wizardTitlePlaceholder}
+                  savingTitle={savingTitle}
+                  onSaveTitle={(text) =>
+                    saveListingTitle(wizardListingId, language, text)
+                  }
+                  onOpenTranslate={() => setTranslationsOpen(true)}
+                  images={wizardImages}
+                  onAddImages={addImages}
+                  onRemoveImage={removeImage}
+                  onSetPrimary={setPrimaryImage}
+                  uploading={uploadingImages}
+                  actions={editActions}
+                />
+              ) : wizardStage === 'preview' ? (
+                <PreviewListingView
+                  interview={selectedInterview}
+                  title={wizardTitle || wizardTitlePlaceholder}
+                  answers={answers}
+                  images={wizardImages}
+                  actions={previewActions}
+                />
+              ) : (
+                <WizardQuestionsStep
+                  interview={selectedInterview}
+                  answers={answers}
+                  onAnswer={(questionId, value) =>
+                    answerQuestion(selectedInterview, questionId, value)
+                  }
+                  actions={stepOneActions}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {answerModal && (
+        <div
+          className="modal-overlay"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeAnswerQuestions()
+          }}
+        >
+          <div
+            className="modal-card wizard-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('questions.title')}
+          >
+            <header className="modal-head">
+              <h2>{t('questions.title')}</h2>
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={t('common.close')}
+                onClick={closeAnswerQuestions}
+              >
+                <XIcon />
+              </button>
+            </header>
+
+            <div className="wizard-modal-body">
+              <InterviewView
+                interview={answerModal.interview}
+                answers={answerModal.draft}
+                onAnswer={(questionId, value) =>
+                  setAnswerModal((prev) => {
+                    if (!prev) return prev
+                    const draft = { ...prev.draft }
+                    if (value == null) delete draft[questionId]
+                    else draft[questionId] = value
+                    return { ...prev, draft }
+                  })
+                }
+                actions={
+                  <div className="action-row">
+                    <div className="action-buttons">
+                      <button
+                        type="button"
+                        className="btn secondary"
+                        onClick={closeAnswerQuestions}
+                        disabled={savingAnswers}
+                      >
+                        {t('common.cancel')}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn primary"
+                        onClick={applyAnswerChanges}
+                        disabled={savingAnswers || answerChanges.length === 0}
+                      >
+                        {savingAnswers
+                          ? t('questions.saving')
+                          : t('questions.apply')}
+                      </button>
+                    </div>
+                  </div>
+                }
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {modal === 'browse' && (
@@ -2135,14 +2455,112 @@ function KioskApp({ initialData = null, initialTheme }) {
           confirmLabel={t('delete.confirm')}
           busyLabel={t('delete.busy')}
           busy={deleting}
+          wide={deleteDetailsOpen}
+          detailsExpanded={deleteDetailsOpen}
+          detailsLabel={t('delete.details')}
+          onDetails={() => setDeleteDetailsOpen(true)}
           onConfirm={confirmDeleteListing}
-          onClose={() => {
-            if (!deleting) setPendingDelete(null)
-          }}
-        />
+          onClose={closeDeleteDialog}
+        >
+          {deleteDetailsOpen && (
+            <div className="delete-details">
+              <p className="field-label">{t('delete.outcome')}</p>
+              <div className="chips">
+                {(DELETE_OUTCOMES[pendingDelete.orientation] ?? []).map(
+                  (outcome) => (
+                    <button
+                      key={outcome}
+                      type="button"
+                      className={
+                        deleteOutcome === outcome ? 'chip selected' : 'chip'
+                      }
+                      aria-pressed={deleteOutcome === outcome}
+                      onClick={() => {
+                        setDeleteOutcome(outcome)
+                        if (!PRICED_OUTCOMES.has(outcome)) setDeleteFinalPrice('')
+                      }}
+                    >
+                      {t(DELETE_OUTCOME_LABELS[outcome])}
+                    </button>
+                  ),
+                )}
+              </div>
+
+              {PRICED_OUTCOMES.has(deleteOutcome) && (
+                <label className="delete-sold-price">
+                  <span className="field-label">
+                    {t(
+                      deleteOutcome === 'purchased'
+                        ? 'delete.purchasePrice'
+                        : 'delete.soldPrice',
+                    )}
+                  </span>
+                  <span className="delete-sold-price-row">
+                    <input
+                      className="q-number-input"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      value={deleteFinalPrice}
+                      placeholder={
+                        pendingDelete.price != null ? String(pendingDelete.price) : ''
+                      }
+                      onChange={(event) => setDeleteFinalPrice(event.target.value)}
+                    />
+                    <span className="q-number-unit">€</span>
+                  </span>
+                </label>
+              )}
+            </div>
+          )}
+        </ConfirmModal>
       )}
 
     </div>
+  )
+}
+
+function WizardQuestionsStep({ interview, answers, onAnswer, actions }) {
+  const { t } = useI18n()
+  const orientation = interview.questions.find((q) => q.facet === 'orientation')
+  const condition = interview.questions.find((q) => q.facet === 'condition')
+  const questions = [
+    orientation && { question: orientation, label: t('wizard.sellOrBuy') },
+    condition && { question: condition, label: t('wizard.condition') },
+  ].filter(Boolean)
+
+  return (
+    <section className="wizard-view" aria-label={t('wizard.questionsAria')}>
+      <div className="wizard-scroll wizard-questions">
+        {questions.map(({ question, label }) => (
+          <div className="wizard-question" key={question.id}>
+            <h3 className="wizard-question-text">{label}</h3>
+            <div className="chips">
+              {question.options.map((option) => {
+                const chosen = answers[question.id] === option.id
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={chosen ? 'chip selected' : 'chip'}
+                    aria-pressed={chosen}
+                    onClick={() => onAnswer(question.id, option.id)}
+                  >
+                    {option.text}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      {actions ? (
+        <footer className="wizard-footer">{actions}</footer>
+      ) : (
+        <footer className="wizard-footer" aria-hidden="true" />
+      )}
+    </section>
   )
 }
 

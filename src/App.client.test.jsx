@@ -1,7 +1,7 @@
 // Client boot path: no server payload, so the provider loads the dictionaries
 // and `KioskApp` fetches the catalog after mount. This guards the refactor that
 // lets a server payload seed the same state.
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TEST_DESCRIPTIONS } from './test/strings.js'
@@ -204,9 +204,16 @@ describe('client rendering', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add listing' }))
 
     // The category comes from the search, so the Browse modal is skipped and
-    // the interview shows the chosen condition as an answer.
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(await screen.findByRole('heading', { name: 'Cars' })).toBeInTheDocument()
+    // step 1 of the wizard opens with the chosen condition already answered.
+    expect(
+      await screen.findByRole('dialog', { name: 'Wizard - step 1 of 3' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Are you buying or selling?' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'What is the condition of the item?' }),
+    ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'New' })).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -226,8 +233,12 @@ describe('client rendering', () => {
     await screen.findByRole('button', { name: 'Search all regions' })
     fireEvent.click(screen.getByRole('button', { name: 'Add listing' }))
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(await screen.findByRole('heading', { name: 'Cars' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('dialog', { name: 'Wizard - step 1 of 3' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Are you buying or selling?' }),
+    ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'New' })).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -396,6 +407,187 @@ describe('client rendering', () => {
     expect(screen.queryByRole('heading', { name: 'Cars' })).not.toBeInTheDocument()
   })
 
+  it('edits answers in a modal with Apply disabled until a change is made', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+    fetchKioskData.mockResolvedValue(rawWithCondition)
+
+    render(
+      <MemoryRouter initialEntries={['/app']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'My listings' }))
+    const drawer = document.querySelector('.drawer')
+    fireEvent.click(await within(drawer).findByText('Trek bike'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Answer questions' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Answer questions' })
+    const apply = within(dialog).getByRole('button', { name: 'Apply' })
+    expect(apply).toBeDisabled()
+
+    // Changing a numeric answer makes the draft dirty.
+    const priceForm = within(dialog).getByRole('form', { name: 'Price' })
+    fireEvent.change(within(priceForm).getByRole('spinbutton', { name: 'Price' }), {
+      target: { value: '320' },
+    })
+    fireEvent.click(within(priceForm).getByRole('button', { name: 'Save' }))
+    expect(apply).toBeEnabled()
+
+    // Cancel always closes and writes nothing.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    expect(
+      screen.queryByRole('dialog', { name: 'Answer questions' }),
+    ).not.toBeInTheDocument()
+    expect(apiMock.update).not.toHaveBeenCalled()
+  })
+
+  it('applies the changed answers to the listing', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+    fetchKioskData.mockResolvedValue(rawWithCondition)
+    apiMock.update.mockImplementation(async (_resource, id, body) => ({
+      id,
+      ...body,
+    }))
+
+    render(
+      <MemoryRouter initialEntries={['/app']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'My listings' }))
+    const drawer = document.querySelector('.drawer')
+    fireEvent.click(await within(drawer).findByText('Trek bike'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Answer questions' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Answer questions' })
+    const priceForm = within(dialog).getByRole('form', { name: 'Price' })
+    fireEvent.change(within(priceForm).getByRole('spinbutton', { name: 'Price' }), {
+      target: { value: '320' },
+    })
+    fireEvent.click(within(priceForm).getByRole('button', { name: 'Save' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Apply' }))
+
+    await waitFor(() =>
+      expect(apiMock.update).toHaveBeenCalledWith(
+        'listings',
+        10,
+        { price: 320 },
+        1,
+      ),
+    )
+    expect(
+      screen.queryByRole('dialog', { name: 'Answer questions' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('records the outcome details before deleting a listing', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+    fetchKioskData.mockResolvedValue(raw)
+
+    render(
+      <MemoryRouter initialEntries={['/app']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'My listings' }))
+    const drawer = document.querySelector('.drawer')
+    fireEvent.click(await within(drawer).findByText('Trek bike'))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Trek bike' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Delete listing' })
+    expect(
+      within(dialog).queryByText('What was the outcome?'),
+    ).not.toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Details' }))
+    expect(within(dialog).getByText('What was the outcome?')).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Sold' }))
+    fireEvent.change(within(dialog).getByRole('spinbutton', { name: /Sold for/ }), {
+      target: { value: '240' },
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes' }))
+
+    await waitFor(() =>
+      expect(apiMock.create).toHaveBeenCalledWith(
+        'listing-outcomes',
+        { listingId: 10, outcome: 'sold', finalPrice: 240 },
+        1,
+      ),
+    )
+    await waitFor(() =>
+      expect(apiMock.remove).toHaveBeenCalledWith('listings', 10, 1),
+    )
+    expect(
+      screen.queryByRole('dialog', { name: 'Delete listing' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('offers purchase outcomes for a wanted listing', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+    fetchKioskData.mockResolvedValue({
+      ...raw,
+      listings: [
+        {
+          id: 10,
+          categoryId: 1,
+          orientation: 'buy',
+          userId: 1,
+          isActive: true,
+          price: 250,
+        },
+      ],
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/app']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'My listings' }))
+    const drawer = document.querySelector('.drawer')
+    fireEvent.click(await within(drawer).findByText('Trek bike'))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Trek bike' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Delete listing' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Details' }))
+
+    // Wanted ads do not offer sale outcomes.
+    expect(within(dialog).getByRole('button', { name: 'Purchased' })).toBeInTheDocument()
+    expect(
+      within(dialog).getByRole('button', { name: 'Purchase fell through' }),
+    ).toBeInTheDocument()
+    expect(
+      within(dialog).getByRole('button', { name: 'No longer needed' }),
+    ).toBeInTheDocument()
+    expect(
+      within(dialog).getByRole('button', { name: 'Bought elsewhere' }),
+    ).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Sold' })).not.toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Purchased' }))
+    expect(
+      within(dialog).getByRole('spinbutton', { name: /Purchased for/ }),
+    ).toBeInTheDocument()
+    fireEvent.change(
+      within(dialog).getByRole('spinbutton', { name: /Purchased for/ }),
+      { target: { value: '300' } },
+    )
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Yes' }))
+
+    await waitFor(() =>
+      expect(apiMock.create).toHaveBeenCalledWith(
+        'listing-outcomes',
+        { listingId: 10, outcome: 'purchased', finalPrice: 300 },
+        1,
+      ),
+    )
+  })
+
   it('shows the post-publish screen after the wizard publishes', async () => {
     apiMock.me.mockResolvedValueOnce(signedIn)
     apiMock.update.mockImplementation(async (_resource, id, body) => ({
@@ -425,19 +617,21 @@ describe('client rendering', () => {
       screen.queryByRole('heading', { name: 'Cars' }),
     ).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Answer questions' }))
+    // Edit from the checklist opens the wizard modal at step 2.
+    fireEvent.click(screen.getAllByRole('button', { name: 'Finish' })[0])
     expect(
-      await screen.findByRole('heading', { name: 'Cars' }),
+      await screen.findByRole('dialog', { name: 'Wizard - step 2 of 3' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('region', { name: 'Edit listing' }),
     ).toBeInTheDocument()
 
-    // Interview → edit → preview → publish.
     fireEvent.click(screen.getByRole('button', { name: 'Next >' }))
     expect(
-      await screen.findByRole('region', { name: 'Edit listing' }),
+      await screen.findByRole('dialog', { name: 'Wizard - step 3 of 3' }),
     ).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Next >' }))
     expect(
-      await screen.findByRole('region', { name: 'Preview listing' }),
+      screen.getByRole('region', { name: 'Preview listing' }),
     ).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Publish' }))
 

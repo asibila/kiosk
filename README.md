@@ -348,7 +348,17 @@ removal is a real button with an aria-label, and result counts are announced via
   Selecting a listing expands its chat threads from `listing-chat-threads` underneath it
   (thread id plus last-message preview); clicking one opens that conversation on the main
   screen. Each row has a delete button that asks "Are you sure?" before calling
-  `DELETE /listings/:id`. The bottom of the drawer holds four full-width actions —
+  `DELETE /listings/:id`. The dialog's **Details** button widens it and asks what
+  happened, with different answers per orientation:
+  - **For Sale** ads: **Sold**, **Sale fell through**, **Decided to keep the
+    item**, **Gave it away**.
+  - **Wanted** ads: **Purchased**, **Purchase fell through**, **No longer
+    needed**, **Bought elsewhere**.
+
+  Choosing **Sold** or **Purchased** shows a numeric price field (**Sold for**
+  / **Purchased for**). The answers are posted to `POST /listing-outcomes`
+  just before the delete (best-effort) and survive the deleted listing.
+  The bottom of the drawer holds four full-width actions —
   **New listing** (+), **Messages** (envelope/message icon, with the unread badge),
   **Settings** (gear) and **Sign out** (exit icon). Sign out calls
   `POST /auth/logout` (revoking the HTTP-only session cookie), closes the
@@ -356,9 +366,12 @@ removal is a real button with an aria-label, and result counts are announced via
   kept. The **Profile** modal also has a **Sign out** footer button. When nobody
   is signed in, the drawer shows a **Sign in** button (linking to `/login`)
   instead of the listings and these actions.
-- **Interview view** - per-interview progress bar, priority-sorted product questions,
-  wrapping chips (replace-only answers), green answered accents, and an action bar
-  with a "Next >" button into the listing wizard. The
+- **Interview view** - the dashboard's **Answer questions** opens the full
+  interview in a modal (per-interview progress bar, priority-sorted product
+  questions, wrapping chips, green answered accents). Edits stay in a local
+  draft: **Apply** is enabled only when an answer changed and **Cancel** always
+  closes without writing; Apply saves the changed answers and reloads the
+  catalog. The
   first four shared questions are **For Sale / Wanted**, **Condition**, **Price**
   and **Year**; orientation, condition, price and year questions come from the
   generic (ALL PRODUCTS) section, followed by the category's own facets and its
@@ -374,8 +387,12 @@ removal is a real button with an aria-label, and result counts are announced via
   Search results show an envelope action per listing; clicking it creates a new
   `chat-threads` row linked through `listing-chat-threads` and an `inbox-items` row in the
   signed-in user's inbox. The envelope is grayed out and disabled on the user's own listings.
-- **Listing wizard** - after the interview: **Edit** (per-language title with
-  **Translate**, image grid with upload, remove and "make primary"), **Preview**
+- **Listing wizard** - opened in a modal titled **Wizard - step X of 3**.
+  Step 1 asks exactly two centred questions with chips underneath (buying or
+  selling, item condition); **Next >** continues. Step 2 is **Edit**
+  (per-language title with
+  **Translate**, image grid with upload, remove and "make primary"), step 3 is
+  **Preview**
   (answered facets, title, images) with **Publish**, then the post-publish screen
   (see **Post-publish** below).
   "< Previous" moves back a step at every stage.
@@ -387,6 +404,8 @@ removal is a real button with an aria-label, and result counts are announced via
   `languages` table. Missing translations fall back to the UI language, English,
   any saved title, then the generated label. Editing a saved listing uploads
   images immediately; a draft keeps earlier picks local until Publish.
+  The modal's X closes the wizard; a draft created by **Next >** stays in the
+  drawer.
   Search results show the listing's primary image as a small
   thumbnail (the glyph remains when a listing has no image).
 - **Post-publish** (`/app`, right after Publish) - replaces the old starting
