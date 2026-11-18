@@ -977,6 +977,15 @@ button {
   line-height: 1.5;
 }
 
+/* Owner-only view/contact counters; fetched after hydration, never in the SSR HTML. */
+.listing-owner-stats {
+  margin: 0;
+  color: var(--muted-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 .listing-actions {
   display: flex;
   flex-wrap: wrap;

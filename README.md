@@ -285,6 +285,10 @@ removal is a real button with an aria-label, and result counts are announced via
   that returns to the same listing after login. Opened from results, the back
   link restores that exact `/results?…` query; a direct or bookmarked visit falls
   back to "Back to search". A deleted or unknown id shows a not-found state.
+  After hydration the page sends one `POST /listings/:id/view` beacon (skipped
+  for the owner), which the API dedupes per visitor and day and filters for bots.
+  Owners in turn see that listing's counters — `12 views · 2 contacts` — fetched
+  from `GET /listings/:id/stats`; the server-rendered HTML never contains them.
 - **New listing** - the topbar **+** button (and the drawer's **New listing**
   action) start a listing. On `/search` and `/results` the query already
   describes it: when the search has a category (`category>0`), that category's
@@ -352,8 +356,8 @@ removal is a real button with an aria-label, and result counts are announced via
   screen and its "Listing created" dialog. It shows the newly published card
   (primary image, title, category, price, completeness score) with **View
   listing** (the bookmarkable `/listing/:id`) and **Publish another** (back to
-  category Browse), then the seller's own numbers derived from data that is
-  already loaded — no click tracking exists yet: **Active ads**, **Contacts**
+  category Browse), then the seller's own numbers: **Views** (last 14 days, from
+  `GET /listings/:id/stats`), **Active ads**, **Contacts**
   (chat threads on the user's listings) and **Unread**, a 14-day contacts bar
   chart from `ChatThread.createdAt` (falling back to a "no contacts yet" hint),
   a price-position track that places the listing's price between the cheapest

@@ -5,6 +5,19 @@ import { LanguageProvider } from '../i18n.jsx'
 import { TEST_STRINGS } from '../test/strings.js'
 import PublishSuccessView from './PublishSuccessView.jsx'
 
+vi.mock('../api.js', () => ({
+  mediaUrl: (path) => path ?? '',
+  fetchListingStats: vi.fn(async () => ({
+    listingId: 42,
+    days: [
+      { date: '2026-11-17', views: 1 },
+      { date: '2026-11-18', views: 3 },
+    ],
+    totals: { views: 12, viewsInWindow: 4, contacts: 2 },
+    contactRate: 0.167,
+  })),
+}))
+
 const listing = {
   listingId: 42,
   title: 'Novi mobitel',
@@ -63,7 +76,7 @@ describe('PublishSuccessView', () => {
     )
   })
 
-  it('shows seller totals and the 14-day contact chart', () => {
+  it('shows seller totals and the 14-day contact chart', async () => {
     const stats = {
       active: 2,
       drafts: 1,
@@ -80,10 +93,14 @@ describe('PublishSuccessView', () => {
     }
     renderView({ stats })
 
+    // Views are fetched from the API for the published listing.
+    expect(await screen.findByText('Views')).toBeInTheDocument()
+
     const tiles = within(screen.getByRole('region', { name: 'Your statistics' }))
     expect(tiles.getByText('Active ads')).toBeInTheDocument()
     expect(tiles.getByText('Contacts')).toBeInTheDocument()
     expect(tiles.getByText('Unread')).toBeInTheDocument()
+    expect(tiles.getByText('4')).toBeInTheDocument()
     expect(tiles.getByText('3')).toBeInTheDocument()
 
     expect(

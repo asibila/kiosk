@@ -1,11 +1,11 @@
 // /listing/:id: a bookmarkable listing detail page. It reads from the same
 // already-loaded catalog data as the results page; a full reload of the URL
 // loads the data and resolves the id again.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router'
-import { mediaUrl } from '../api.js'
+import { fetchListingStats, mediaUrl, trackListingView } from '../api.js'
 import { localeFor } from '../facetTypes.js'
-import { useI18n } from '../i18n.jsx'
+import { pluralKey, useI18n } from '../i18n.jsx'
 import { ChevronLeftIcon, EnvelopeIcon, ThumbGlyph } from '../icons.jsx'
 import { buildOptionIndex } from '../searchQuery.js'
 import CompletenessScore from './CompletenessScore.jsx'
@@ -86,6 +86,40 @@ export default function ListingPage({
     isLoggedIn &&
     currentUserId != null &&
     Number(listing.userId) === Number(currentUserId)
+
+  // Views are counted once per listing; the API dedupes per visitor and day and
+  // ignores the owner. Effects never run during the server render, so the SSR
+  // markup stays identical for everyone.
+  const fromResults = typeof from === 'string' && from.startsWith('/results')
+  useEffect(() => {
+    if (!listing || owned) return
+    trackListingView(listing.id, {
+      source: fromResults ? 'search' : 'direct',
+      language,
+    })
+  }, [listing?.id, owned, language, fromResults])
+
+  // Owners see this listing's views and contacts; guests never fetch them.
+  const [stats, setStats] = useState(null)
+  useEffect(() => {
+    if (!listing || !owned) {
+      setStats(null)
+      return undefined
+    }
+
+    let cancelled = false
+    fetchListingStats(listing.id)
+      .then((data) => {
+        if (!cancelled) setStats(data)
+      })
+      .catch(() => {
+        if (!cancelled) setStats(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [listing?.id, owned])
 
   // Drafts are private: only their owner can open the bookmarkable page.
   if (!listing || (listing.isActive === false && !owned)) {
@@ -187,6 +221,18 @@ export default function ListingPage({
               />
             </div>
             <p className="listing-desc">{listing.desc}</p>
+
+            {owned && stats && (
+              <p className="listing-owner-stats" aria-label={t('listing.statsAria')}>
+                {t(pluralKey(stats.totals.views, 'listing.views'), {
+                  count: stats.totals.views,
+                })}
+                {' · '}
+                {t(pluralKey(stats.totals.contacts, 'listing.contacts'), {
+                  count: stats.totals.contacts,
+                })}
+              </p>
+            )}
 
             <div className="listing-actions">
               {owned ? (

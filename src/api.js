@@ -71,6 +71,30 @@ export const CHAT_EVENTS_URL = `${API_BASE}/chat-events/stream`
  */
 export const mediaUrl = (path) => (path ? `${API_BASE}${path}` : '')
 
+/**
+ * Record one listing page view. Fire-and-forget: a failure must never affect the
+ * page, and `keepalive` lets the request finish when the visitor navigates away.
+ * The API dedupes per visitor and day and ignores the owner's own visits.
+ */
+export function trackListingView(listingId, { source = null, language = null } = {}) {
+  const body = {}
+  if (source) body.source = source
+  if (language) body.language = language
+
+  return fetch(`${API_BASE}/listings/${listingId}/view`, {
+    method: 'POST',
+    credentials: 'include',
+    keepalive: true,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  }).catch(() => null)
+}
+
+/** Views and contacts for one listing (owner, or admin). */
+export function fetchListingStats(listingId, { days = 14 } = {}) {
+  return request(`/listings/${listingId}/stats?days=${days}`)
+}
+
 export const api = {
   list: (resource) => request(`/${resource}`),
   login: (email, password) =>

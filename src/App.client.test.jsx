@@ -23,6 +23,13 @@ vi.mock('./api.js', () => ({
   fetchKioskData: vi.fn(),
   loadDescriptions: vi.fn(),
   mediaUrl: (path) => path ?? '',
+  trackListingView: vi.fn(async () => null),
+  fetchListingStats: vi.fn(async (listingId) => ({
+    listingId,
+    days: [],
+    totals: { views: 0, viewsInWindow: 0, contacts: 0 },
+    contactRate: 0,
+  })),
 }))
 
 const { fetchKioskData, loadDescriptions } = await import('./api.js')

@@ -1,8 +1,9 @@
 // Post-publish screen (shown on /app after Publish): the listing that was just
 // published, seller statistics derived from existing data, and the next steps
 // that make the ad more attractive.
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { mediaUrl } from '../api.js'
+import { fetchListingStats, mediaUrl } from '../api.js'
 import { localeFor } from '../facetTypes.js'
 import { CheckIcon, ThumbGlyph } from '../icons.jsx'
 import { pluralKey, useI18n } from '../i18n.jsx'
@@ -30,6 +31,28 @@ export default function PublishSuccessView({
   onEditListing,
 }) {
   const { language, t } = useI18n()
+
+  // Views come from the API (they are not in the catalog snapshot); the owner is
+  // signed in on this screen, so the request carries the session.
+  const [views, setViews] = useState(null)
+  useEffect(() => {
+    const listingId = listing?.listingId
+    setViews(null)
+    if (!listingId) return undefined
+
+    let cancelled = false
+    fetchListingStats(listingId)
+      .then((data) => {
+        if (!cancelled) setViews(data)
+      })
+      .catch(() => {
+        if (!cancelled) setViews(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [listing?.listingId])
 
   function checkLabel(item) {
     if (item.id === 'photos') {
@@ -104,6 +127,15 @@ export default function PublishSuccessView({
 
         {stats && (
           <section className="publish-stats" aria-label={t('stats.aria')}>
+            {views && (
+              <div
+                className="stat-tile"
+                title={t('stats.viewsWindow', { days: views.days.length })}
+              >
+                <span className="stat-value">{views.totals.viewsInWindow}</span>
+                <span className="stat-label">{t('stats.viewsShort')}</span>
+              </div>
+            )}
             <div className="stat-tile">
               <span className="stat-value">{stats.active}</span>
               <span className="stat-label">{t('stats.activeAds')}</span>

@@ -5,6 +5,19 @@ import { LanguageProvider } from '../i18n.jsx'
 import { TEST_STRINGS } from '../test/strings.js'
 import ListingPage from './ListingPage.jsx'
 
+const { trackListingView, fetchListingStats } = await import('../api.js')
+
+vi.mock('../api.js', () => ({
+  mediaUrl: (path) => path ?? '',
+  trackListingView: vi.fn(async () => null),
+  fetchListingStats: vi.fn(async () => ({
+    listingId: 28,
+    days: [],
+    totals: { views: 12, viewsInWindow: 5, contacts: 2 },
+    contactRate: 0.167,
+  })),
+}))
+
 const listing = {
   id: '28',
   userId: 3,
@@ -92,6 +105,31 @@ beforeEach(() => {
 })
 
 describe('ListingPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('counts the view for a visitor who is not the owner', async () => {
+    renderPage()
+
+    await vi.waitFor(() =>
+      expect(trackListingView).toHaveBeenCalledWith('28', {
+        source: 'direct',
+        language: 'en',
+      }),
+    )
+    expect(fetchListingStats).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText('Listing statistics')).not.toBeInTheDocument()
+  })
+
+  it('does not count the owner and shows the listing counters', async () => {
+    renderPage({ currentUserId: 3 })
+
+    expect(await screen.findByText('12 views · 2 contacts')).toBeInTheDocument()
+    expect(fetchListingStats).toHaveBeenCalledWith('28')
+    expect(trackListingView).not.toHaveBeenCalled()
+  })
+
   it('renders the listing, facets and seller', () => {
     renderPage()
 
