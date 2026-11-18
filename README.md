@@ -104,6 +104,7 @@ overrides the defaults in the backend's `src/main.ts` (the defaults include both
 | Listing title translations | `src/components/TranslateTitlesModal.jsx` |
 | STATE (drawer, selection, answers, messages, modals) | `src/App.jsx` |
 | ICONS (inline SVG string → components) | `src/icons.jsx` |
+| Category icons (stored SVG + fallback glyph) | `src/icons.jsx` (`CategoryIcon`), `src/viewModel.js` |
 | RENDER functions (components) | `src/components/*.jsx` |
 | INIT (mount) | `src/main.jsx` (hydrates when the server supplied `window.__KIOSK_BOOT__`) |
 | Legacy static seed (no longer rendered) | `src/data.js` |
@@ -279,6 +280,11 @@ removal is a real button with an aria-label, and result counts are announced via
   magnifier button inside it submits the search. The category button opens the
   shared **Browse** modal (reopening at the current category); choosing "Home"
   and OK resets it to "All categories".
+  Each category draws its `iconSvg` from `GET /categories` through
+  `CategoryIcon` (inline SVG, sized by a wrapper); when a category has no icon
+  the old title-based glyph is used, read from the **English** description so a
+  translated UI keeps the same icon. The same icon is the fallback thumbnail for
+  listings without a photo and the row icon in the drawer's listing list.
   The **Filter** button shows the active chip count (values and ranges). The
   topbar's usual actions keep working, and choosing a listing from the drawer
   navigates back to `/app`. The form also mirrors its query into `/search`'s URL

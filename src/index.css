@@ -3529,6 +3529,22 @@ a.btn {
   display: block;
 }
 
+/* Inline SVG stored on a category: the wrapper owns the size, so the stored
+   markup can keep whatever width/height or viewBox its author used. */
+.category-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.category-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 .browse-item-main {
   flex: 1;
   min-width: 0;

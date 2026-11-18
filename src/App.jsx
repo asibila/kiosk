@@ -991,6 +991,7 @@ function KioskApp({ initialData = null, initialTheme }) {
         facetsCountMax: selectedInterview.facetsCountMax,
         facetsCountMaxAnswerable: selectedInterview.facetsCountMaxAnswerable,
         title: publishTitle || generatedTitle(selectedInterview, listingId),
+        iconSvg: selectedInterview.iconSvg ?? null,
         titles: {
           ...titlesForListing(listingId),
           ...(publishTitle ? { [language]: publishTitle } : {}),
@@ -1414,6 +1415,7 @@ function KioskApp({ initialData = null, initialTheme }) {
             facetsCountMax: selectedInterview.facetsCountMax,
             facetsCountMaxAnswerable: selectedInterview.facetsCountMaxAnswerable,
             title: titleRow?.title ?? titleText,
+            iconSvg: selectedInterview.iconSvg ?? null,
             titles,
             desc: [
               t(orientation === 'buy' ? 'direction.buy' : 'direction.sell'),

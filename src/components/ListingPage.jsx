@@ -171,7 +171,11 @@ export default function ListingPage({
               />
             ) : (
               <div className="listing-hero listing-hero-empty">
-                <ThumbGlyph kind={listing.thumb || 'tag'} size={64} />
+                <ThumbGlyph
+                  kind={listing.thumb || 'tag'}
+                  svg={listing.iconSvg}
+                  size={64}
+                />
                 <span>{t('listing.noImages')}</span>
               </div>
             )}

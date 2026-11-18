@@ -207,7 +207,11 @@ export default function ResultsView({
                         loading="lazy"
                       />
                     ) : (
-                      <ThumbGlyph kind={listing.thumb || 'tag'} size={42} />
+                      <ThumbGlyph
+                        kind={listing.thumb || 'tag'}
+                        svg={listing.iconSvg}
+                        size={42}
+                      />
                     )}
                     <span
                       className={

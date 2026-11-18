@@ -98,6 +98,28 @@ export function buildViewModel(
     const category = categoriesById.get(categoryId)
     return category ? descriptionText(category.descriptionId, `Category ${category.id}`) : `Category ${categoryId}`
   }
+  // The title heuristic that used to pick every icon reads English text, so a
+  // translated category keeps the same fallback glyph as before.
+  const englishCategoryTitle = (categoryId) => {
+    const category = categoriesById.get(categoryId)
+    if (!category) return ''
+    return descriptionTextFor(descriptionsById.get(category.descriptionId), 'en')
+  }
+  // Category icons are inline SVG rows written through the API (sanitized there).
+  const categoryIconSvg = (categoryId) => {
+    const svg = categoriesById.get(categoryId)?.iconSvg
+    return typeof svg === 'string' && svg.trim() !== '' ? svg : null
+  }
+  /** Database icon, or the title heuristic when the category has none. */
+  const categoryIcon = (categoryId) => ({
+    iconSvg: categoryIconSvg(categoryId),
+    iconKind: iconForCategory(
+      englishCategoryTitle(categoryId) || categoryTitle(categoryId),
+    ),
+    thumbKind: thumbForCategory(
+      englishCategoryTitle(categoryId) || categoryTitle(categoryId),
+    ),
+  })
   const optionText = (option) => (option ? descriptionText(option.descriptionId, `Option ${option.id}`) : '')
 
   // Regions are id-ordered; id 0 is the global "All regions" row.
@@ -226,6 +248,7 @@ export function buildViewModel(
 
   const interviews = categories.map((category) => {
     const title = categoryTitle(category.id)
+    const glyph = categoryIcon(category.id)
     const ancestorIds = new Set()
     let current = category
     while (current && !ancestorIds.has(current.id)) {
@@ -341,7 +364,8 @@ export function buildViewModel(
       categoryId: category.id,
       parentCategoryId: category.parentCategoryId ?? null,
       title,
-      icon: iconForCategory(title),
+      icon: glyph.iconKind,
+      iconSvg: glyph.iconSvg,
       listingId: listingsByCategory.get(category.id)?.id ?? null,
       questions,
       // The questions are the source of truth for the progress UI. Backend
@@ -402,6 +426,7 @@ export function buildViewModel(
         year: listing.year ?? null,
         title: listingTitle(listing),
         titles: listingTitles(listing),
+        iconSvg: categoryIconSvg(listing.categoryId),
         desc: listingDescription(listing),
         answers: listingAnswers,
         facetsCount:
@@ -424,6 +449,7 @@ export function buildViewModel(
   const categoryItem = (category) => {
     const childCount = browseCategories.filter((child) => child.parentCategoryId === category.id).length
     const listingCount = listings.filter((listing) => listing.categoryId === category.id).length
+    const glyph = categoryIcon(category.id)
     const parts = []
     if (childCount) {
       parts.push(t(pluralKey(childCount, 'browse.subcategory'), { count: childCount }))
@@ -436,7 +462,8 @@ export function buildViewModel(
       id: String(category.id),
       title: categoryTitle(category.id),
       desc: parts.join(' · ') || t('browse.category'),
-      thumb: thumbForCategory(categoryTitle(category.id)),
+      thumb: glyph.thumbKind,
+      iconSvg: glyph.iconSvg,
     }
   }
 
@@ -448,7 +475,10 @@ export function buildViewModel(
     title: listingTitle(listing),
     titles: listingTitles(listing),
     desc: listingDescription(listing),
-    thumb: 'box',
+    thumb: thumbForCategory(
+      englishCategoryTitle(listing.categoryId) || categoryTitle(listing.categoryId),
+    ),
+    iconSvg: categoryIconSvg(listing.categoryId),
     imageUrl: primaryImageByListing.get(listing.id)?.url ?? null,
     categoryId: String(listing.categoryId),
     regionId: listing.regionId ?? 0,

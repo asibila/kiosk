@@ -4,7 +4,7 @@
 // clicking one opens that conversation on the main screen.
 import { Fragment } from 'react'
 import { Link } from 'react-router'
-import { ChatIcon, GearIcon, LogOutIcon, MessageIcon, PlusIcon, TagIcon, TrashIcon, UserIcon } from '../icons.jsx'
+import { ChatIcon, GearIcon, LogOutIcon, MessageIcon, PlusIcon, ThumbGlyph, TrashIcon, UserIcon } from '../icons.jsx'
 import { useI18n } from '../i18n.jsx'
 import CompletenessScore from './CompletenessScore.jsx'
 
@@ -92,7 +92,7 @@ export default function Drawer({
                 }}
               >
                 <span className="drawer-row-icon">
-                  <TagIcon size={18} />
+                  <ThumbGlyph kind="tag" svg={listing.iconSvg} size={18} />
                 </span>
                 <span className="drawer-row-title">
                   <span className="listing-row-heading">

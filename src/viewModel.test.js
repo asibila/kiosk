@@ -149,6 +149,68 @@ describe('buildViewModel category and listing counts', () => {
   })
 })
 
+describe('buildViewModel category icons', () => {
+  const iconSvg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24" /></svg>'
+  const descriptions = [
+    { id: 1, translations: { en: 'Bikes', hr: 'Bicikli' } },
+  ]
+
+  function build(category, options = {}) {
+    return buildViewModel(
+      {
+        users,
+        descriptions,
+        categories: [category],
+        listings,
+      },
+      { userId: 1, language: options.language ?? 'en', strings: TEST_STRINGS },
+    )
+  }
+
+  it('passes the stored SVG to interviews and browse items', () => {
+    const view = build({ ...categories[0], iconSvg })
+
+    expect(view.interviews[0].iconSvg).toBe(iconSvg)
+    expect(view.browseData.root.items[0].iconSvg).toBe(iconSvg)
+    expect(view.browseData['1'].items[0].iconSvg).toBe(iconSvg)
+  })
+
+  it('gives photo-less listings their category icon and kind', () => {
+    const view = build({ ...categories[0], iconSvg })
+
+    expect(view.browseData['1'].items[0]).toMatchObject({
+      iconSvg,
+      thumb: 'bike',
+    })
+    expect(view.myListings[0].iconSvg).toBe(iconSvg)
+  })
+
+  it('keeps the title heuristic when the category has no icon', () => {
+    const view = build(categories[0])
+
+    expect(view.interviews[0].iconSvg).toBeNull()
+    expect(view.browseData.root.items[0].iconSvg).toBeNull()
+    expect(view.interviews[0].icon).toBe('bike')
+    expect(view.browseData.root.items[0].thumb).toBe('bike')
+  })
+
+  it('reads the heuristic from English, so translations do not change the glyph', () => {
+    const view = build(categories[0], { language: 'hr' })
+
+    expect(view.interviews[0].title).toBe('Bicikli')
+    expect(view.interviews[0].icon).toBe('bike')
+    expect(view.browseData.root.items[0].thumb).toBe('bike')
+  })
+
+  it('falls back to the generic glyph for an unknown category', () => {
+    const view = build({ ...categories[0], descriptionId: 999, iconSvg: null })
+
+    expect(view.interviews[0].icon).toBe('layers')
+    expect(view.browseData.root.items[0].thumb).toBe('tag')
+  })
+})
+
 describe('buildViewModel category tree', () => {
   it('terminates when stored categories form a cycle', () => {
     const view = buildViewModel(

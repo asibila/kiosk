@@ -47,7 +47,7 @@ export default function BrowseModal({ data, onClose, onPick, startId = 'root' })
         }}
       >
         <span className="thumb">
-          <ThumbGlyph kind={item.thumb} />
+          <ThumbGlyph kind={item.thumb} svg={item.iconSvg} />
         </span>
         <div className="browse-item-main">
           <span className="browse-item-title">{item.title}</span>

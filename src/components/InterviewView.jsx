@@ -70,7 +70,7 @@ export default function InterviewView({ interview, answers, onAnswer, actions })
       <header className="interview-head">
         <div className="interview-title-row">
           <span className="drawer-row-icon">
-            <InterviewGlyph kind={interview.icon} />
+            <InterviewGlyph kind={interview.icon} svg={interview.iconSvg} />
           </span>
           <h2 className="interview-title">{interview.title}</h2>
         </div>

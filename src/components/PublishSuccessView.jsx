@@ -117,7 +117,7 @@ export default function PublishSuccessView({
             {imageUrl ? (
               <img src={mediaUrl(imageUrl)} alt="" />
             ) : (
-              <ThumbGlyph kind="box" size={40} />
+              <ThumbGlyph kind="box" svg={listing.iconSvg} size={40} />
             )}
           </div>
           <div className="publish-card-main">

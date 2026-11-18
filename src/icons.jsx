@@ -243,7 +243,9 @@ export const TagIcon = (p) => (
 )
 
 /** Icon for a browse-listing thumbnail kind. */
-export function ThumbGlyph({ kind = 'box', size = 20 }) {
+export function ThumbGlyph({ kind = 'box', svg = null, size = 20 }) {
+  if (svg) return <CategoryIcon svg={svg} size={size} />
+
   switch (kind) {
     case 'bike':
       return <BikeIcon size={size} />
@@ -259,7 +261,9 @@ export function ThumbGlyph({ kind = 'box', size = 20 }) {
 }
 
 /** Icon for an interview kind (drawer rows + interview view header). */
-export function InterviewGlyph({ kind = 'bike', size = 20 }) {
+export function InterviewGlyph({ kind = 'bike', svg = null, size = 20 }) {
+  if (svg) return <CategoryIcon svg={svg} size={size} />
+
   switch (kind) {
     case 'bike':
       return <BikeIcon size={size} />
@@ -270,4 +274,32 @@ export function InterviewGlyph({ kind = 'bike', size = 20 }) {
     default:
       return <LayersIcon size={size} />
   }
+}
+
+/**
+ * Inline SVG stored on a category (`Category.iconSvg`).
+ *
+ * The API validates and re-serializes that markup on write; this component adds
+ * a second, cheap guard so a row edited directly in the database still cannot
+ * inject a script, an event handler or an external reference.
+ */
+const UNSAFE_MARKUP =
+  /<\s*\/?\s*(?:script|style|foreignObject|iframe|object|embed|link|meta|use|image|a)\b|on[a-z]+\s*=|javascript:|data:/i
+
+export function CategoryIcon({ svg, size = 24, className }) {
+  const markup =
+    typeof svg === 'string' && svg.trim() !== '' && !UNSAFE_MARKUP.test(svg)
+      ? svg
+      : null
+
+  if (!markup) return <LayersIcon size={size} />
+
+  return (
+    <span
+      className={className ? `category-icon ${className}` : 'category-icon'}
+      style={{ width: size, height: size }}
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{ __html: markup }}
+    />
+  )
 }

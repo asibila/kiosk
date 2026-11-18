@@ -51,7 +51,10 @@ export default function ListingsModal({
                       {listing.imageUrl ? (
                         <img src={mediaUrl(listing.imageUrl)} alt="" loading="lazy" />
                       ) : (
-                        <ThumbGlyph kind={listing.thumb || 'tag'} />
+                        <ThumbGlyph
+                          kind={listing.thumb || 'tag'}
+                          svg={listing.iconSvg}
+                        />
                       )}
                     </span>
                     <div className="browse-item-main">
