@@ -39,7 +39,7 @@ function routeShells(routes) {
 }
 
 // https://vite.dev/config/
-export default defineConfig( ({ mode }) => {
+export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   // The browser always calls `/api` on the Vite origin; this is the backend
@@ -61,7 +61,12 @@ export default defineConfig( ({ mode }) => {
   return {
     plugins: [
       react(),
-      mkcert(), // Generates a locally-trusted certificate on first run
+      // mkcert only exists to give the *local dev server* a trusted HTTPS
+      // certificate: it downloads a CA binary from GitHub while Vite resolves
+      // the config. That must never happen in CI or on Render (rate limits, no
+      // network guarantees), so the plugin is loaded for `vite dev` only and is
+      // absent from `vite build`.
+      ...(command === 'serve' ? [mkcert()] : []),
       VitePWA({
         registerType: 'autoUpdate',
         // The plugin will automatically generate manifest and service worker
