@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { LanguageProvider } from '../i18n.jsx'
 import { TEST_STRINGS } from '../test/strings.js'
 import PublishSuccessView from './PublishSuccessView.jsx'
+import { fetchListingStats } from '../api.js'
 
 vi.mock('../api.js', () => ({
   mediaUrl: (path) => path ?? '',
@@ -96,6 +97,12 @@ describe('PublishSuccessView', () => {
     // Views are fetched from the API for the published listing.
     expect(await screen.findByText('Views')).toBeInTheDocument()
 
+    // …and charted per day in its own panel.
+    expect(
+      screen.getByRole('heading', { name: 'Views, last 2 days' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('4 views in the last 2 days')).toBeInTheDocument()
+
     const tiles = within(screen.getByRole('region', { name: 'Your statistics' }))
     expect(tiles.getByText('Active ads')).toBeInTheDocument()
     expect(tiles.getByText('Contacts')).toBeInTheDocument()
@@ -163,6 +170,33 @@ describe('PublishSuccessView', () => {
 
     fireEvent.click(buttons[1])
     expect(onImproveQuestions).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows a hint when the new listing has no views yet', async () => {
+    fetchListingStats.mockResolvedValueOnce({
+      listingId: 42,
+      days: [
+        { date: '2026-11-17', views: 0 },
+        { date: '2026-11-18', views: 0 },
+      ],
+      totals: { views: 0, viewsInWindow: 0, contacts: 0 },
+      contactRate: 0,
+    })
+
+    renderView({
+      stats: {
+        active: 1,
+        drafts: 0,
+        contacts: 0,
+        unread: 0,
+        activity: { days: [{ key: '2026-11-18', count: 0 }], total: 0, max: 0 },
+      },
+    })
+
+    expect(
+      await screen.findByText('No views in this period yet.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('4 views in the last 2 days')).not.toBeInTheDocument()
   })
 
   it('uses the singular label for one remaining question', () => {

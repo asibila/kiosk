@@ -19,6 +19,26 @@ function formatPrice(value, language) {
   return `${text} €`
 }
 
+/**
+ * One bar per day, scaled to the busiest day of the series. Purely decorative:
+ * the panel note carries the numbers for assistive technology.
+ */
+function DayBars({ days, max }) {
+  return (
+    <div className="chart-bars" aria-hidden="true">
+      {days.map((day) => (
+        <span
+          key={day.key}
+          className={day.count > 0 ? 'chart-bar' : 'chart-bar empty'}
+          style={{
+            height: `${Math.max(4, Math.round((day.count / Math.max(1, max)) * 100))}%`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 export default function PublishSuccessView({
   listing,
   categoryTitle = '',
@@ -152,22 +172,34 @@ export default function PublishSuccessView({
         )}
 
         <div className="publish-panels">
+          {views && (
+            <section className="publish-panel">
+              <h3>{t('stats.viewsWindow', { days: views.days.length })}</h3>
+              {views.totals.viewsInWindow > 0 ? (
+                <>
+                  <DayBars
+                    days={views.days.map((day) => ({ key: day.date, count: day.views }))}
+                    max={Math.max(1, ...views.days.map((day) => day.views))}
+                  />
+                  <p className="publish-panel-note">
+                    {t('stats.viewsChartAria', {
+                      count: views.totals.viewsInWindow,
+                      days: views.days.length,
+                    })}
+                  </p>
+                </>
+              ) : (
+                <p className="publish-panel-note">{t('stats.noViews')}</p>
+              )}
+            </section>
+          )}
+
           {activity && (
             <section className="publish-panel">
               <h3>{t('stats.chartTitle', { days: activity.days.length })}</h3>
               {activity.total > 0 ? (
                 <>
-                  <div className="chart-bars" aria-hidden="true">
-                    {activity.days.map((day) => (
-                      <span
-                        key={day.key}
-                        className={day.count > 0 ? 'chart-bar' : 'chart-bar empty'}
-                        style={{
-                          height: `${Math.max(4, Math.round((day.count / activity.max) * 100))}%`,
-                        }}
-                      />
-                    ))}
-                  </div>
+                  <DayBars days={activity.days} max={activity.max} />
                   <p className="publish-panel-note">
                     {t('stats.chartAria', {
                       count: activity.total,

@@ -127,6 +127,10 @@ describe('client rendering', () => {
     localStorage.clear()
     loadDescriptions.mockResolvedValue(TEST_DESCRIPTIONS)
     fetchKioskData.mockResolvedValue(raw)
+    // Reset the session queue so a signed-in response cannot leak into the next
+    // test (the guest default is `null`).
+    apiMock.me.mockReset()
+    apiMock.me.mockResolvedValue(null)
   })
 
   it('loads the dictionaries and the catalog when there is no server payload', async () => {

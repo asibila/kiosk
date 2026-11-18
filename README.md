@@ -357,9 +357,10 @@ removal is a real button with an aria-label, and result counts are announced via
   (primary image, title, category, price, completeness score) with **View
   listing** (the bookmarkable `/listing/:id`) and **Publish another** (back to
   category Browse), then the seller's own numbers: **Views** (last 14 days, from
-  `GET /listings/:id/stats`), **Active ads**, **Contacts**
-  (chat threads on the user's listings) and **Unread**, a 14-day contacts bar
-  chart from `ChatThread.createdAt` (falling back to a "no contacts yet" hint),
+  `GET /listings/:id/stats`, charted per day in its own panel), **Active ads**,
+  **Contacts** (chat threads on the user's listings) and **Unread**, a 14-day
+  contacts bar chart from `ChatThread.createdAt` (falling back to a "no contacts
+  yet" hint),
   a price-position track that places the listing's price between the cheapest
   and dearest active ad in its category (with the median), and a **Make it stand
   out** checklist for photos, title translations and unanswered questions. The
