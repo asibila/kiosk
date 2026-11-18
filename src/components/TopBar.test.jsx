@@ -33,17 +33,19 @@ describe('TopBar', () => {
     expect(select).toHaveValue('hr')
   })
 
-  it('fires onAddListing from the "+" button left of the language dropdown', () => {
-    const onAddListing = vi.fn()
-    renderTopBar({ onAddListing })
+  it('keeps only the menu, language and theme controls', () => {
+    renderTopBar()
 
-    const addButton = screen.getByRole('button', { name: 'Add listing' })
-    const select = screen.getByRole('combobox', { name: 'Language' })
+    expect(screen.getByRole('button', { name: 'Menu' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Language' })).toBeInTheDocument()
     expect(
-      addButton.compareDocumentPosition(select) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
-
-    fireEvent.click(addButton)
-    expect(onAddListing).toHaveBeenCalledTimes(1)
+      screen.getByRole('button', { name: 'Switch to dark mode' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Add listing' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Open profile' }),
+    ).not.toBeInTheDocument()
   })
 })

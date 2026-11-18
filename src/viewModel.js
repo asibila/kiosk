@@ -180,11 +180,14 @@ export function buildViewModel(
       const listing = link ? listingsById.get(link.listingId) : null
       if (!listing) return null
 
-      // The thread's two participants: the listing owner and the user whose
-      // inbox the conversation sits in. Show whichever one is not signed in.
+      // The thread's two participants: the listing owner and the user who
+      // initiated the contact. `ListingChatThread.userId` records the latter;
+      // older rows fall back to the inbox owner or the thread creator.
       const inboxItem = inboxItemByThreadId.get(thread.id)
+      const contactUserId =
+        link?.userId ?? inboxItem?.userId ?? thread.createdBy ?? null
       const ownerSide = currentUser?.id === listing.userId
-      const partnerId = ownerSide ? inboxItem?.userId : listing.userId
+      const partnerId = ownerSide ? contactUserId : listing.userId
       const partner = partnerId != null ? usersById.get(partnerId) : null
 
       return {
@@ -192,6 +195,7 @@ export function buildViewModel(
         threadId: thread.id,
         listingId: listing.id,
         listingChatThreadId: link?.id ?? null,
+        contactUserId,
         categoryId: String(listing.categoryId),
         // Raw timestamps let the seller statistics bucket contacts per day.
         createdAt: thread.createdAt ?? null,

@@ -21,6 +21,7 @@ import Signup from './components/Signup.jsx'
 import Terms from './components/Terms.jsx'
 import Privacy from './components/Privacy.jsx'
 import SignupsModal from './components/SignupsModal.jsx'
+import ListingChatsModal from './components/ListingChatsModal.jsx'
 import ConnectGoogleRow from './components/ConnectGoogleRow.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
 import EditListingView from './components/EditListingView.jsx'
@@ -30,6 +31,7 @@ import ResultsView from './components/ResultsView.jsx'
 import ListingPage from './components/ListingPage.jsx'
 import TranslateTitlesModal from './components/TranslateTitlesModal.jsx'
 import PublishSuccessView from './components/PublishSuccessView.jsx'
+import MyListingsList from './components/MyListingsList.jsx'
 import {
   answersFromSearchQuery,
   getCategoryIdFromSearch,
@@ -150,6 +152,7 @@ function KioskApp({ initialData = null, initialTheme }) {
   const [selectedInterviewId, setSelectedInterviewId] = useState(null)
   const [selectedChatId, setSelectedChatId] = useState(null)
   const [modal, setModal] = useState(null) // 'browse' | 'messages' | 'settings' | 'profile' | null
+  const [listingChatsModal, setListingChatsModal] = useState(null) // own listing whose chats are open
   const [browseFor, setBrowseFor] = useState('listing') // 'listing' | 'search' | 'new'
   const [theme, setTheme] = useState(() =>
     initialTheme === undefined ? getInitialTheme() : initialTheme,
@@ -248,6 +251,15 @@ function KioskApp({ initialData = null, initialTheme }) {
   const modalChatIdRef = useRef(null)
   modalChatIdRef.current = modalChatId
 
+  // A conversation that should open as soon as it exists in `chats`. "Contact
+  // seller" creates the thread server-side, so the buyer's copy arrives with the
+  // next catalog reload; waiting for it avoids flashing an empty inbox first.
+  const [pendingChatId, setPendingChatId] = useState(null)
+
+  // Listing contact links from the last data load. A user has one conversation
+  // per listing, so "Contact seller" reopens it instead of starting another.
+  const listingLinksRef = useRef([])
+
   // Resolve the session cookie once, then let the data load run with the
   // signed-in identity (or as a guest when `/auth/me` answers 401).
   useEffect(() => {
@@ -337,6 +349,7 @@ function KioskApp({ initialData = null, initialTheme }) {
         setMyListings(view.myListings)
         setBrowseData(view.browseData)
         setListingImages(view.listingImages ?? [])
+        listingLinksRef.current = raw['listing-chat-threads'] ?? []
         listingTranslationsRef.current = view.listingTranslations ?? []
         setListingTranslations(listingTranslationsRef.current)
         if (dataChanged) {
@@ -366,6 +379,17 @@ function KioskApp({ initialData = null, initialTheme }) {
       cancelled = true
     }
   }, [reloadToken, loggedInUserId, language, strings, refreshStrings, authChecked])
+
+  // Open the conversation that a "Contact seller" click just created, once the
+  // reloaded catalog brings its thread in.
+  useEffect(() => {
+    if (!pendingChatId) return
+    if (!chats.some((chat) => chat.id === pendingChatId)) return
+    markChatRead(pendingChatId)
+    setModalChatId(pendingChatId)
+    setModal('messages')
+    setPendingChatId(null)
+  }, [chats, pendingChatId])
 
   // The Google link flow (started from the profile) returns with `?google=…`:
   // show the outcome in the notice banner and drop the parameter so a refresh
@@ -588,18 +612,6 @@ function KioskApp({ initialData = null, initialTheme }) {
     }
     setBrowseFor('new')
     setModal('browse')
-  }
-
-  // Top bar "+": signed-in users start a new listing (the Browse modal only when
-  // the current search has no category); guests get the drawer and a "Please
-  // sign in to publish" prompt.
-  function addListing() {
-    if (isLoggedIn) {
-      browseNewListing()
-      return
-    }
-    setDrawerOpen(true)
-    setModal('signin')
   }
 
   // Start a fresh listing: clear the current category, listing, interview
@@ -839,25 +851,55 @@ function KioskApp({ initialData = null, initialTheme }) {
   }
 
 
-  // Search results: start a conversation about a listing. A new chat thread is
-  // linked to the listing and to the current user's inbox item.
+  // Search results: start a conversation about a listing. A user has one
+  // conversation per listing (the server keys the link on `userId` +
+  // `listingId`), so contacting the same listing again reopens it.
   async function contactListing(listing) {
     const actorId = user?.id
     if (!actorId || contactingListingId) return
+
+    const existing = listingLinksRef.current.find(
+      (link) =>
+        Number(link.userId) === Number(actorId) &&
+        Number(link.listingId) === Number(listing.id),
+    )
+    if (existing) {
+      const chatId = `thread-${existing.chatThreadId}`
+      markChatRead(chatId)
+      setModalChatId(chatId)
+      setModal('messages')
+      setNotice(t('notice.conversationExists', { title: listing.title }))
+      return
+    }
+
     setContactingListingId(listing.id)
     try {
       const thread = await api.create('chat-threads', {}, actorId)
-      await api.create(
+      const link = await api.create(
         'listing-chat-threads',
         { listingId: Number(listing.id), chatThreadId: thread.id },
         actorId,
       )
+
+      if (link.chatThreadId !== thread.id) {
+        // Another tab contacted the listing first and the server returned that
+        // conversation. Drop the thread this attempt created and reopen it.
+        await api.remove('chat-threads', thread.id)
+        setPendingChatId(`thread-${link.chatThreadId}`)
+        setNotice(t('notice.conversationExists', { title: listing.title }))
+        setReloadToken((n) => n + 1)
+        return
+      }
+
       await api.create(
         'inbox-items',
         { userId: actorId, chatThreadId: thread.id },
         actorId,
       )
 
+      // The buyer lands in the conversation itself, inside the main Messages
+      // inbox, instead of having to open Messages and find the new thread.
+      setPendingChatId(`thread-${thread.id}`)
       setNotice(t('notice.conversationStarted', { title: listing.title }))
       setReloadToken((n) => n + 1)
     } catch (err) {
@@ -1068,6 +1110,36 @@ function KioskApp({ initialData = null, initialTheme }) {
     setPublishedListingId(null)
     setWizardOpen(false)
     setAnswerModal(null)
+  }
+
+  function openDrawerSearch() {
+    setDrawerOpen(false)
+    navigate('/search')
+  }
+
+  function openDrawerMyItems() {
+    setDrawerOpen(false)
+    clearListingSelection()
+    navigate('/app')
+  }
+
+  function openListingById(listingId) {
+    const listing = myListings.find(
+      (row) => String(row.id) === String(listingId),
+    )
+    if (listing) openListing(listing)
+  }
+
+  // My items message icon: conversations for one listing, one per user who
+  // initiated contact.
+  function openListingChats(listing) {
+    setModalChatId(null)
+    setListingChatsModal(listing)
+  }
+
+  function closeListingChats() {
+    setModalChatId(null)
+    setListingChatsModal(null)
   }
 
   // Open the wizard modal for an existing listing (edit step by default).
@@ -1945,6 +2017,104 @@ function KioskApp({ initialData = null, initialTheme }) {
     ? (searchListings.find((item) => String(item.id) === String(listingRouteId)) ?? null)
     : null
 
+  // One row per owned listing on the dashboard root: active ads first, then the
+  // newest, with the primary image (or the category glyph) as the thumbnail.
+  const primaryImageByListing = new Map()
+  for (const image of listingImages) {
+    const key = Number(image.listingId)
+    const current = primaryImageByListing.get(key)
+    if (!current || (!current.primaryImage && image.primaryImage)) {
+      primaryImageByListing.set(key, image)
+    }
+  }
+  // Unread conversations split by surface. Conversations under the seller's own
+  // listings badge "My items" and that listing's envelope; everything in the
+  // user's inbox badges Messages. A chat is counted once per surface it appears
+  // on, so a seller-side thread is never added to the Messages badge.
+  const myListingIds = new Set(
+    (myListings ?? []).map((listing) => Number(listing.listingId ?? listing.id)),
+  )
+  const inboxChatIds = new Set((inbox ?? []).map((item) => item.chatId))
+  const unreadByListingId = new Map()
+  let unreadTotal = 0
+  for (const chat of chats) {
+    if (inboxChatIds.has(chat.id)) unreadTotal += chat.unread || 0
+    const listingId = Number(chat.listingId)
+    if (myListingIds.has(listingId) && chat.unread > 0) {
+      unreadByListingId.set(
+        listingId,
+        (unreadByListingId.get(listingId) ?? 0) + chat.unread,
+      )
+    }
+  }
+  const myItemsUnreadTotal = [...unreadByListingId.values()].reduce(
+    (sum, count) => sum + count,
+    0,
+  )
+
+  const myListingItems = [...myListings]
+    .sort(
+      (a, b) =>
+        Number(b.isActive !== false) - Number(a.isActive !== false) ||
+        Number(b.listingId) - Number(a.listingId),
+    )
+    .map((listing) => {
+      const image = primaryImageByListing.get(Number(listing.listingId))
+      const interview = interviews.find(
+        (row) => String(row.categoryId) === String(listing.categoryId),
+      )
+      const answers = listing.answers ?? {}
+      const conditionQuestion = interview?.questions.find(
+        (question) => question.facet === 'condition',
+      )
+      const conditionText = conditionQuestion?.options.find(
+        (option) => String(option.id) === String(answers[conditionQuestion.id]),
+      )?.text
+      const summary = [
+        t(listing.orientation === 'buy' ? 'direction.buy' : 'direction.sell'),
+        conditionText,
+      ]
+        .filter(Boolean)
+        .join(' - ')
+      const details = (interview?.questions ?? [])
+        .filter(
+          (question) =>
+            question.facet !== 'orientation' && question.facet !== 'condition',
+        )
+        .map((question) => {
+          const value = answers[question.id]
+          if (value == null) return null
+          if (question.type === 'numeric') {
+            return {
+              label: question.text,
+              value:
+                question.facet === 'price'
+                  ? `${value} €`
+                  : String(value),
+            }
+          }
+          const option = question.options.find(
+            (row) => String(row.id) === String(value),
+          )
+          return option ? { label: question.text, value: option.text } : null
+        })
+        .filter(Boolean)
+
+      return {
+        id: listing.id,
+        listing,
+        title: listing.title,
+        iconSvg: listing.iconSvg ?? null,
+        imageUrl: image ? mediaUrl(image.url) : null,
+        summary,
+        details,
+        facetsCount: listing.facetsCount,
+        facetsCountMax: listing.facetsCountMax,
+        isActive: listing.isActive !== false,
+        unreadCount: unreadByListingId.get(Number(listing.listingId)) ?? 0,
+      }
+    })
+
   // Breadcrumbs under the topbar: results, a listing page opened from either
   // the dashboard ("View listing" passes `/app?listing=<id>`) or the results
   // list (its link passes the full `/results?...` URL), and the per-listing
@@ -1957,14 +2127,14 @@ function KioskApp({ initialData = null, initialTheme }) {
         ) ?? null)
       : null
   const breadcrumbItems =
-    isAppRoute && crumbsListing
+    isAppRoute && myListings.length > 0
       ? [
           {
-            label: t('breadcrumb.myListings'),
-            to: '/app',
-            onClick: clearListingSelection,
+            label: t('breadcrumb.myItems'),
+            to: crumbsListing ? '/app' : undefined,
+            onClick: crumbsListing ? clearListingSelection : undefined,
           },
-          { label: crumbsListing.title },
+          ...(crumbsListing ? [{ label: crumbsListing.title }] : []),
         ]
       : isResultsRoute
         ? [
@@ -1986,7 +2156,7 @@ function KioskApp({ initialData = null, initialTheme }) {
               listingOrigin.startsWith('/app')
             ? [
                 {
-                  label: t('breadcrumb.myListings'),
+                  label: t('breadcrumb.myItems'),
                   to: '/app',
                   onClick: clearListingSelection,
                 },
@@ -2062,19 +2232,6 @@ function KioskApp({ initialData = null, initialTheme }) {
     !isSearchRoute &&
     !isResultsRoute &&
     !isListingRoute
-
-  // Aggregate unread count for the topbar's message icon. Count conversations
-  // the signed-in user can actually see: their own listings' chat threads and
-  // the threads sitting in their inbox.
-  const myListingIds = new Set((myListings ?? []).map((listing) => Number(listing.id)))
-  const inboxChatIds = new Set((inbox ?? []).map((item) => item.chatId))
-  const unreadTotal = chats.reduce(
-    (sum, chat) =>
-      myListingIds.has(Number(chat.listingId)) || inboxChatIds.has(chat.id)
-        ? sum + (chat.unread || 0)
-        : sum,
-    0,
-  )
 
   const answeredCount = selectedInterview
     ? selectedInterview.questions.filter((q) => answers[q.id] != null).length
@@ -2206,8 +2363,6 @@ function KioskApp({ initialData = null, initialTheme }) {
     <div className="app">
       <TopBar
         onMenu={toggleDrawer}
-        onOpenModal={openModal}
-        onAddListing={addListing}
         theme={theme}
         onToggleTheme={toggleTheme}
         languages={languages}
@@ -2233,19 +2388,15 @@ function KioskApp({ initialData = null, initialTheme }) {
       <div className="app-body">
         <Drawer
           open={drawerOpen}
-          listings={myListings}
-          chats={chats}
-          selectedListingId={selectedListingId}
-          selectedChatId={selectedChatId}
-          onListingClick={openListing}
-          onChatClick={selectChat}
-          onDeleteListing={askDeleteListing}
-          onCreateNew={browseNewListing}
+          onOpenSearch={openDrawerSearch}
+          onOpenMyItems={openDrawerMyItems}
           onOpenMessages={() => openModal('messages')}
           onOpenSettings={() => openModal('settings')}
+          onOpenProfile={() => openModal('profile')}
           onOpenSignups={() => openModal('signups')}
           onSignOut={signOut}
           unreadCount={unreadTotal}
+          myItemsUnreadCount={myItemsUnreadTotal}
           signedIn={isLoggedIn}
           onSignIn={signIn}
           user={user}
@@ -2314,7 +2465,13 @@ function KioskApp({ initialData = null, initialTheme }) {
               onEditListing={() => openWizardForListing(featuredListing, 'edit')}
             />
           ) : myListings.length > 0 ? (
-            <SelectListingPlaceholder onOpenDrawer={() => setDrawerOpen(true)} />
+            <MyListingsList
+              items={myListingItems}
+              onOpen={openListingById}
+              onDelete={askDeleteListing}
+              onCreate={browseNewListing}
+              onMessages={openListingChats}
+            />
           ) : (
             <EmptyPlaceholder
               hasInterviews={interviews.length > 0}
@@ -2484,6 +2641,7 @@ function KioskApp({ initialData = null, initialTheme }) {
         <MessagesModal
           inbox={inbox}
           chats={chats}
+          initialChatId={modalChatId}
           onSend={sendMessage}
           onChatRead={markChatRead}
           onActiveChatChange={setModalChatId}
@@ -2492,6 +2650,17 @@ function KioskApp({ initialData = null, initialTheme }) {
             setModalChatId(null)
             setModal(null)
           }}
+        />
+      )}
+      {listingChatsModal && (
+        <ListingChatsModal
+          listing={listingChatsModal}
+          chats={chats}
+          onSend={sendMessage}
+          onChatRead={markChatRead}
+          onActiveChatChange={setModalChatId}
+          liveStatus={liveStatus}
+          onClose={closeListingChats}
         />
       )}
       {modal === 'signin' && (
@@ -2696,22 +2865,6 @@ function EmptyPlaceholder({ hasInterviews, onBrowse, signedIn = false }) {
       ) : (
         <p>{t('empty.noCategories')}</p>
       )}
-    </div>
-  )
-}
-
-function SelectListingPlaceholder({ onOpenDrawer }) {
-  const { t } = useI18n()
-  return (
-    <div className="placeholder">
-      <span className="placeholder-icon">
-        <LayersIcon size={56} />
-      </span>
-      <h2>{t('dashboard.selectTitle')}</h2>
-      <p>{t('dashboard.selectBody')}</p>
-      <button type="button" className="btn primary" onClick={onOpenDrawer}>
-        {t('dashboard.openListings')}
-      </button>
     </div>
   )
 }

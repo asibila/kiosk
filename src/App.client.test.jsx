@@ -126,6 +126,29 @@ const rawWithCondition = {
 
 const signedIn = { id: 1, name: 'Ana', email: 'ana@example.com' }
 
+// One buyer (Ivo, id 2) started a contact on Ana's listing 10.
+const rawWithChats = {
+  ...raw,
+  users: [
+    { id: 1, name: 'Ana', email: 'ana@example.com', isActive: true },
+    { id: 2, name: 'Ivo', email: 'ivo@example.com', isActive: true },
+  ],
+  'chat-threads': [{ id: 5, createdAt: '2026-11-18T10:00:00.000Z' }],
+  'chat-messages': [
+    {
+      id: 1,
+      threadId: 5,
+      userId: 2,
+      text: 'Is it available?',
+      createdAt: '2026-11-18T10:01:00.000Z',
+    },
+  ],
+  'listing-chat-threads': [
+    { id: 70, listingId: 10, chatThreadId: 5, userId: 2, hasUnread: true },
+  ],
+  'inbox-items': [],
+}
+
 describe('client rendering', () => {
   beforeEach(() => {
     localStorage.clear()
@@ -166,7 +189,7 @@ describe('client rendering', () => {
     expect(apiMock.detectRegion).toHaveBeenCalled()
   })
 
-  it('opens the drawer and asks guests to sign in from the "+" button', async () => {
+  it('opens the drawer for guests from the menu', async () => {
     render(
       <MemoryRouter initialEntries={['/results']}>
         <App />
@@ -176,35 +199,36 @@ describe('client rendering', () => {
     await screen.findByRole('heading', { name: 'Trek bike' })
     expect(document.querySelector('.drawer')).not.toHaveClass('open')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add listing' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
 
-    expect(
-      await screen.findByRole('dialog', { name: 'Please sign in to publish' }),
-    ).toBeInTheDocument()
-    expect(
-      within(screen.getByRole('dialog', { name: 'Please sign in to publish' })).getByRole(
-        'button',
-        { name: 'Sign in' },
-      ),
-    ).toBeInTheDocument()
     expect(document.querySelector('.drawer')).toHaveClass('open')
+    const drawer = document.querySelector('.drawer')
+    expect(
+      await within(drawer).findByRole('button', { name: 'Sign in' }),
+    ).toBeInTheDocument()
+    expect(
+      within(drawer).queryByRole('button', { name: 'My items' }),
+    ).not.toBeInTheDocument()
   })
 
-  it('opens the searched category with its facet answers already filled in', async () => {
+  it('starts a new listing from Add item in My items', async () => {
     apiMock.me.mockResolvedValueOnce(signedIn)
     fetchKioskData.mockResolvedValue(rawWithCondition)
 
     render(
-      <MemoryRouter initialEntries={['/results?category=1&facet=condition:8']}>
+      <MemoryRouter initialEntries={['/app']}>
         <App />
       </MemoryRouter>,
     )
 
-    await screen.findByRole('heading', { name: 'Trek bike' })
-    fireEvent.click(screen.getByRole('button', { name: 'Add listing' }))
+    await screen.findByRole('button', { name: 'Open statistics for Trek bike' })
+    fireEvent.click(screen.getByRole('button', { name: 'Add item' }))
 
-    // The category comes from the search, so the Browse modal is skipped and
-    // step 1 of the wizard opens with the chosen condition already answered.
+    const browse = await screen.findByRole('dialog', { name: 'Browse marketplace' })
+    fireEvent.click(within(browse).getByText('Cars'))
+    fireEvent.click(within(browse).getByRole('button', { name: 'OK' }))
+
+    // Choosing a category opens step 1 of the wizard with its two questions.
     expect(
       await screen.findByRole('dialog', { name: 'Wizard - step 1 of 3' }),
     ).toBeInTheDocument()
@@ -213,52 +237,6 @@ describe('client rendering', () => {
     ).toBeInTheDocument()
     expect(
       screen.getByRole('heading', { name: 'What is the condition of the item?' }),
-    ).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'New' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
-  })
-
-  it('does the same from the search form', async () => {
-    apiMock.me.mockResolvedValueOnce(signedIn)
-    fetchKioskData.mockResolvedValue(rawWithCondition)
-
-    render(
-      <MemoryRouter initialEntries={['/search?category=1&facet=condition:8']}>
-        <App />
-      </MemoryRouter>,
-    )
-
-    await screen.findByRole('button', { name: 'Search all regions' })
-    fireEvent.click(screen.getByRole('button', { name: 'Add listing' }))
-
-    expect(
-      await screen.findByRole('dialog', { name: 'Wizard - step 1 of 3' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('heading', { name: 'Are you buying or selling?' }),
-    ).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'New' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
-  })
-
-  it('asks for a category when the search covers all categories', async () => {
-    apiMock.me.mockResolvedValueOnce(signedIn)
-
-    render(
-      <MemoryRouter initialEntries={['/results?category=0']}>
-        <App />
-      </MemoryRouter>,
-    )
-
-    await screen.findByRole('heading', { name: 'Trek bike' })
-    fireEvent.click(screen.getByRole('button', { name: 'Add listing' }))
-
-    expect(
-      await screen.findByRole('dialog', { name: 'Browse marketplace' }),
     ).toBeInTheDocument()
   })
 
@@ -290,7 +268,7 @@ describe('client rendering', () => {
     ).toBeInTheDocument()
   })
 
-  it('asks the signed-in user to pick a listing on /app', async () => {
+  it('lists the seller’s listings on /app', async () => {
     apiMock.me.mockResolvedValueOnce(signedIn)
 
     render(
@@ -300,16 +278,187 @@ describe('client rendering', () => {
     )
 
     expect(
-      await screen.findByRole('heading', {
-        name: 'Select a listing to show its dashboard',
-      }),
+      await screen.findByRole('button', { name: 'Open statistics for Trek bike' }),
     ).toBeInTheDocument()
     expect(
       screen.queryByRole('heading', { name: 'Your seller overview' }),
     ).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'My listings' }))
-    expect(document.querySelector('.drawer')).toHaveClass('open')
+    const nav = screen.getByRole('navigation', { name: 'Breadcrumb' })
+    expect(within(nav).getByText('My items')).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+  })
+
+  it('summarizes a My items row and expands the remaining facets', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+    fetchKioskData.mockResolvedValue(rawWithCondition)
+
+    render(
+      <MemoryRouter initialEntries={['/app']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('For Sale - New')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Delete Trek bike' }),
+    ).toBeInTheDocument()
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Show details for Trek bike' }),
+    )
+
+    expect(screen.getByText('Price')).toBeInTheDocument()
+    expect(screen.getByText('250 €')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Hide details for Trek bike' }),
+    ).toHaveAttribute('aria-expanded', 'true')
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Hide details for Trek bike' }),
+    )
+    expect(screen.queryByText('Price')).not.toBeInTheDocument()
+  })
+
+  it('opens one conversation per user from a My items message icon', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+    fetchKioskData.mockResolvedValue(rawWithChats)
+
+    render(
+      <MemoryRouter initialEntries={['/app']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Messages for Trek bike/ }),
+    )
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Messages · Trek bike',
+    })
+    expect(within(dialog).getByText('Ivo')).toBeInTheDocument()
+    expect(within(dialog).getByText('Is it available?')).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByText('Ivo'))
+    expect(
+      await within(dialog).findByRole('button', { name: 'Back to inbox' }),
+    ).toBeInTheDocument()
+    expect(within(dialog).getByText('Is it available?')).toBeInTheDocument()
+  })
+
+  it('badges My items, not Messages, for conversations on the user’s listings', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+    fetchKioskData.mockResolvedValue(rawWithChats)
+
+    render(
+      <MemoryRouter initialEntries={['/app']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    await screen.findByRole('button', { name: 'Open statistics for Trek bike' })
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
+
+    const drawer = document.querySelector('.drawer')
+    const myItems = within(drawer).getByRole('button', { name: /My items/ })
+    expect(within(myItems).getByText('1')).toBeInTheDocument()
+
+    const messages = within(drawer).getByRole('button', { name: /Messages/ })
+    expect(messages.querySelector('.badge')).toBeNull()
+  })
+
+  it('reopens the existing conversation instead of contacting a listing twice', async () => {
+    apiMock.me.mockResolvedValueOnce({
+      id: 2,
+      name: 'Ivo',
+      email: 'ivo@example.com',
+    })
+    apiMock.create.mockClear()
+    fetchKioskData.mockResolvedValue({
+      ...rawWithChats,
+      'inbox-items': [{ id: 9, userId: 2, chatThreadId: 5, hasUnread: false }],
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/listing/10']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Contact seller' }),
+    )
+
+    const dialog = await screen.findByRole('dialog', { name: 'Messages' })
+    expect(within(dialog).getByText('Is it available?')).toBeInTheDocument()
+    expect(apiMock.create).not.toHaveBeenCalled()
+  })
+
+  it('opens the new conversation in chat mode after contacting the seller', async () => {
+    apiMock.me.mockResolvedValueOnce({
+      id: 2,
+      name: 'Ivo',
+      email: 'ivo@example.com',
+    })
+    apiMock.create.mockReset()
+    apiMock.create.mockImplementation(async (resource) => {
+      if (resource === 'chat-threads') return { id: 9 }
+      if (resource === 'listing-chat-threads') {
+        return { id: 70, listingId: 10, chatThreadId: 9, userId: 2 }
+      }
+      if (resource === 'inbox-items') return { id: 5 }
+      return {}
+    })
+
+    const rawBuyer = {
+      ...raw,
+      users: [
+        { id: 1, name: 'Ana', email: 'ana@example.com', isActive: true },
+        { id: 2, name: 'Ivo', email: 'ivo@example.com', isActive: true },
+      ],
+      'chat-threads': [],
+      'chat-messages': [],
+      'listing-chat-threads': [],
+      'inbox-items': [],
+    }
+    const rawAfterContact = {
+      ...rawBuyer,
+      'chat-threads': [{ id: 9, createdAt: '2026-11-18T10:00:00.000Z' }],
+      'listing-chat-threads': [
+        { id: 70, listingId: 10, chatThreadId: 9, userId: 2, hasUnread: false },
+      ],
+      'inbox-items': [
+        { id: 5, userId: 2, chatThreadId: 9, hasUnread: false },
+      ],
+    }
+    fetchKioskData.mockImplementation(async () =>
+      apiMock.create.mock.calls.some(([resource]) => resource === 'inbox-items')
+        ? rawAfterContact
+        : rawBuyer,
+    )
+
+    render(
+      <MemoryRouter initialEntries={['/listing/10']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Contact seller' }),
+    )
+
+    const dialog = await screen.findByRole('dialog', { name: 'Messages' })
+    // Chat mode, not the inbox list: the conversation header and its back arrow.
+    expect(
+      await within(dialog).findByRole('button', { name: 'Back to inbox' }),
+    ).toBeInTheDocument()
+    expect(
+      within(dialog).getByText('Chatting with Ana regarding Trek bike'),
+    ).toBeInTheDocument()
+    expect(apiMock.create).toHaveBeenCalledWith('chat-threads', {}, 2)
   })
 
   it('shows a spinner with a plain Loading label while the catalog loads', async () => {
@@ -350,13 +499,45 @@ describe('client rendering', () => {
 
     expect(await screen.findByRole('region', { name: 'Log in' })).toBeInTheDocument()
     expect(
-      screen.queryByRole('heading', {
-        name: 'Select a listing to show its dashboard',
-      }),
+      screen.queryByRole('navigation', { name: 'Breadcrumb' }),
     ).not.toBeInTheDocument()
   })
 
-  it('shows per-listing statistics when a drawer listing is clicked', async () => {
+  it('navigates to Search and My items from the drawer', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+    fetchKioskData.mockResolvedValue(raw)
+
+    render(
+      <MemoryRouter initialEntries={['/app']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    await screen.findByRole('button', { name: 'Open statistics for Trek bike' })
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
+
+    let drawer = document.querySelector('.drawer')
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Search' }))
+    expect(
+      await screen.findByRole('button', { name: 'Search all regions' }),
+    ).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
+    drawer = document.querySelector('.drawer')
+    fireEvent.click(within(drawer).getByRole('button', { name: 'My items' }))
+    expect(
+      await screen.findByRole('button', { name: 'Open statistics for Trek bike' }),
+    ).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }))
+    drawer = document.querySelector('.drawer')
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Profile' }))
+    expect(
+      await screen.findByRole('dialog', { name: 'Profile' }),
+    ).toBeInTheDocument()
+  })
+
+  it('shows per-listing statistics when a My items row is clicked', async () => {
     apiMock.me.mockResolvedValueOnce(signedIn)
     fetchKioskData.mockResolvedValueOnce({
       ...raw,
@@ -390,18 +571,16 @@ describe('client rendering', () => {
       </MemoryRouter>,
     )
 
-    // Nothing is selected yet, so the page asks for a listing.
+    // Nothing is selected yet: the page lists the seller's ads.
     expect(
-      await screen.findByRole('heading', {
-        name: 'Select a listing to show its dashboard',
-      }),
+      await screen.findByRole('button', { name: 'Open statistics for Trek bike' }),
     ).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'My listings' }))
-    const drawer = document.querySelector('.drawer')
-    fireEvent.click(await within(drawer).findByText('Trek bike'))
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Open statistics for Trek bike' }),
+    )
 
-    // The clicked listing's card replaces the placeholder; no interview opens.
+    // The clicked listing's card replaces the list; no interview opens.
     expect(await screen.findByRole('heading', { name: 'Trek bike' })).toBeInTheDocument()
     expect(screen.getByText('Cars · 250 €')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Cars' })).not.toBeInTheDocument()
@@ -417,9 +596,11 @@ describe('client rendering', () => {
       </MemoryRouter>,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'My listings' }))
-    const drawer = document.querySelector('.drawer')
-    fireEvent.click(await within(drawer).findByText('Trek bike'))
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Open statistics for Trek bike',
+      }),
+    )
     fireEvent.click(await screen.findByRole('button', { name: 'Answer questions' }))
 
     const dialog = await screen.findByRole('dialog', { name: 'Answer questions' })
@@ -456,9 +637,11 @@ describe('client rendering', () => {
       </MemoryRouter>,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'My listings' }))
-    const drawer = document.querySelector('.drawer')
-    fireEvent.click(await within(drawer).findByText('Trek bike'))
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Open statistics for Trek bike',
+      }),
+    )
     fireEvent.click(await screen.findByRole('button', { name: 'Answer questions' }))
 
     const dialog = await screen.findByRole('dialog', { name: 'Answer questions' })
@@ -492,10 +675,9 @@ describe('client rendering', () => {
       </MemoryRouter>,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'My listings' }))
-    const drawer = document.querySelector('.drawer')
-    fireEvent.click(await within(drawer).findByText('Trek bike'))
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Trek bike' }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Delete Trek bike' }),
+    )
 
     const dialog = await screen.findByRole('dialog', { name: 'Delete listing' })
     expect(
@@ -548,10 +730,9 @@ describe('client rendering', () => {
       </MemoryRouter>,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'My listings' }))
-    const drawer = document.querySelector('.drawer')
-    fireEvent.click(await within(drawer).findByText('Trek bike'))
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Trek bike' }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Delete Trek bike' }),
+    )
 
     const dialog = await screen.findByRole('dialog', { name: 'Delete listing' })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Details' }))
@@ -634,7 +815,7 @@ describe('client rendering', () => {
     )
   })
 
-  it('shows My Listings › listing name on the dashboard of a drawer item', async () => {
+  it('shows My items › listing name on the dashboard of a drawer item', async () => {
     apiMock.me.mockResolvedValueOnce(signedIn)
     fetchKioskData.mockResolvedValue(raw)
 
@@ -644,12 +825,14 @@ describe('client rendering', () => {
       </MemoryRouter>,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'My listings' }))
-    const drawer = document.querySelector('.drawer')
-    fireEvent.click(await within(drawer).findByText('Trek bike'))
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Open statistics for Trek bike',
+      }),
+    )
 
     const nav = await screen.findByRole('navigation', { name: 'Breadcrumb' })
-    expect(within(nav).getByRole('link', { name: 'My Listings' })).toHaveAttribute(
+    expect(within(nav).getByRole('link', { name: 'My items' })).toHaveAttribute(
       'href',
       '/app',
     )
@@ -658,15 +841,17 @@ describe('client rendering', () => {
       'page',
     )
 
-    fireEvent.click(within(nav).getByRole('link', { name: 'My Listings' }))
+    fireEvent.click(within(nav).getByRole('link', { name: 'My items' }))
     expect(
-      await screen.findByRole('heading', {
-        name: 'Select a listing to show its dashboard',
+      await screen.findByRole('button', {
+        name: 'Open statistics for Trek bike',
       }),
     ).toBeInTheDocument()
     expect(
-      screen.queryByRole('navigation', { name: 'Breadcrumb' }),
-    ).not.toBeInTheDocument()
+      within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByText(
+        'My items',
+      ),
+    ).toHaveAttribute('aria-current', 'page')
   })
 
   it('shows the dashboard breadcrumb on a listing opened from the dashboard', async () => {
@@ -679,14 +864,16 @@ describe('client rendering', () => {
       </MemoryRouter>,
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: 'My listings' }))
-    const drawer = document.querySelector('.drawer')
-    fireEvent.click(await within(drawer).findByText('Trek bike'))
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Open statistics for Trek bike',
+      }),
+    )
     fireEvent.click(await screen.findByRole('link', { name: 'View listing' }))
 
     const nav = await screen.findByRole('navigation', { name: 'Breadcrumb' })
     expect(
-      await within(nav).findByRole('link', { name: 'My Listings' }),
+      await within(nav).findByRole('link', { name: 'My items' }),
     ).toHaveAttribute('href', '/app')
     expect(within(nav).getByRole('link', { name: 'Trek bike' })).toHaveAttribute(
       'href',
@@ -697,11 +884,11 @@ describe('client rendering', () => {
       'page',
     )
 
-    // "My Listings" returns to the empty dashboard root.
-    fireEvent.click(within(nav).getByRole('link', { name: 'My Listings' }))
+    // "My items" returns to the listing list.
+    fireEvent.click(within(nav).getByRole('link', { name: 'My items' }))
     expect(
-      await screen.findByRole('heading', {
-        name: 'Select a listing to show its dashboard',
+      await screen.findByRole('button', {
+        name: 'Open statistics for Trek bike',
       }),
     ).toBeInTheDocument()
   })
@@ -720,14 +907,13 @@ describe('client rendering', () => {
       </MemoryRouter>,
     )
 
-    // Opening the owned listing from the drawer shows its statistics; the
+    // Opening the owned listing from My items shows its statistics; the
     // interview is one click away from there.
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Toggle my listings drawer' }),
+      await screen.findByRole('button', {
+        name: 'Open statistics for Trek bike',
+      }),
     )
-    // Scope to the drawer: the overview behind it also shows the title.
-    const drawer = document.querySelector('.drawer')
-    fireEvent.click(await within(drawer).findByText('Trek bike'))
     expect(
       await screen.findByRole('heading', { name: 'Your seller overview' }),
     ).toBeInTheDocument()

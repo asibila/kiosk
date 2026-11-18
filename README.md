@@ -232,12 +232,12 @@ removal is a real button with an aria-label, and result counts are announced via
   the catalog.
   `/results?...` renders the bookmarkable results page described below and
   `/listing/:id` renders one listing. A breadcrumb bar under the topbar shows
-  **My Listings › listing name** on the dashboard of a listing picked in the
+  **My items › listing name** on the dashboard of a listing picked in the
   drawer (`/app?listing=<id>`);
   **Search › Search Results** on `/results`;
   **Search › Search Results › listing name** on a listing opened from the
   results list (the middle crumb links back to that exact results URL); and
-  **My Listings › listing name › Listing details** when a listing is opened
+  **My items › listing name › Listing details** when a listing is opened
   from the dashboard (the listing page passes `state.from =
   /app?listing=<id>`; the middle crumb links back to that listing's dashboard,
   which is addressable by the query string).
@@ -254,13 +254,10 @@ removal is a real button with an aria-label, and result counts are announced via
   matches the account; `GET /auth/providers` drives the "Connected" badge, and
   the outcome comes back as `?google=connected` (or an error) shown in the
   notice banner.
-- **Top bar** - centered title (a link back to `/search`); hamburger; on the
-  right a **+** button that starts a new listing, then the **EN / HR** language
-  dropdown, profile icon and theme toggle (moon/sun). Signed-in users start a
-  new listing right away when the current search already has a category;
-  otherwise they get the Browse modal to pick one. Guests get the drawer plus a
-  "Please sign in to publish" prompt. Messages and Settings live at the bottom
-  of the drawer.
+- **Top bar** - centered title (a link back to `/search`), hamburger on the
+  left, and the **EN / HR** language dropdown plus theme toggle (moon/sun) on
+  the right. Navigation (Search, My items, Messages, Settings, Profile) and the
+  account actions live in the drawer.
 - **Language** - the topbar dropdown changes the interface and every backend
   description (categories, facet questions and options) between English and
   Croatian. English is the default; the choice is written to the
@@ -320,8 +317,6 @@ removal is a real button with an aria-label, and result counts are announced via
   search** carries the same query back to `/search`. Range chips filter the
   listing's price/year fields; an orientation chip filters `Listing.orientation`
   directly. The legacy `direction` parameter is still read for old bookmarks.
-  The topbar **+** starts a new listing in the searched category with the active
-  filters already answered (see **New listing**).
 - **Listing page** (`/listing/:id`) - bookmarkable detail page for one listing:
   primary image with a thumbnail gallery, orientation/category badges, the
   listing's facet values, category, seller, listed date and the contact action.
@@ -333,33 +328,46 @@ removal is a real button with an aria-label, and result counts are announced via
   for the owner), which the API dedupes per visitor and day and filters for bots.
   Owners in turn see that listing's counters — `12 views · 2 contacts` — fetched
   from `GET /listings/:id/stats`; the server-rendered HTML never contains them.
-- **New listing** - the topbar **+** button (and the drawer's **New listing**
-  action) start a listing. On `/search` and `/results` the query already
-  describes it: when the search has a category (`category>0`), that category's
-  interview opens directly and the selected filters pre-answer its questions
-  (condition, orientation, the category facets, and price/year - a range answers
-  with the middle of the range, or with its one open bound). Options that do not
-  belong to the interview are dropped. Only an "all categories" search
-  (`category=0` or no category) asks for a category in the Browse modal; a
-  category picked there still inherits the generic filter answers. From `/app`
-  the Browse modal is always used. OK clears the selected category/listing and
-  interview answers locally before applying the new ones. Guests who press **+**
-  see the drawer with a "Please sign in to publish" prompt instead. Cancel keeps
-  the current screen unchanged. Pressing **Next >** materialises an inactive
-  draft (`isActive: false`), creates its UI-language title and saves the
-  interview answers on it.
+- **New listing** - **Add item** in the search box on the My items page starts
+  a listing; the Browse modal asks for its category. (Starting from `/search`
+  with the query prefilled is no longer exposed in the UI since the toolbar and
+  drawer entry points were removed.) OK clears the selected category/listing
+  and interview answers locally before applying the new ones. Cancel keeps the
+  current screen unchanged. Pressing **Next >** materialises an inactive draft
+  (`isActive: false`), creates its UI-language title and saves the interview
+  answers on it.
 - **Dark mode** — toggles between light and dark palettes, follows the OS preference on first
   visit, and remembers the choice in `localStorage` (`kiosk-theme`).
-- **Drawer** - overlay slide-in, 340px (full-width ≤600px), a flat list of the signed-in
-  user's listings (from `GET /listings` filtered by `userId`), empty state when none.
-  Clicking a listing opens **that listing's statistics** on `/app` (the featured
-  card, views, contacts, price position and checklist), not the category
-  interview; the interview is reached from **Answer questions** there.
-  Selecting a listing expands its chat threads from `listing-chat-threads` underneath it
-  (thread id plus last-message preview); clicking one opens that conversation on the main
-  screen. Each row has a delete button that asks "Are you sure?" before calling
-  `DELETE /listings/:id`. The dialog's **Details** button widens it and asks what
-  happened, with different answers per orientation:
+- **Drawer** - overlay slide-in, 340px (full-width ≤600px). Fixed navigation at
+  the top, indented so it reads apart from the bottom actions: **Search** (goes
+  to `/search`), and for signed-in users **My items** (returns to the `/app`
+  listing list; it carries a red badge counting unread conversations on the
+  user's own listings), **Messages** (with the unread badge for conversations in
+  the user's inbox), **Settings** and **Profile**. The bottom holds **Signups** (admin) and **Sign out** (exit
+  icon); new listings start from **Add item** on the My items page.
+  Sign out calls `POST /auth/logout` (revoking the HTTP-only session cookie),
+  closes the drawer/modal and returns to `/login`; the language and theme
+  preferences are kept. The **Profile** modal also has a **Sign out** footer
+  button. When nobody is signed in, the drawer shows a **Sign in** button
+  (linking to `/login`) instead of these actions.
+- **My items** - the `/app` dashboard root lists the seller's ads
+  (`GET /listings` filtered by `userId`). A search box shaped like a listing row
+  sits above the list, with an **Add item** button inside it; typing filters the
+  rows by title in real time. Each row shows the picture (or category
+  glyph), title + completeness score, and an **orientation - condition** summary
+  underneath. Row actions, left to right:
+  - **…** expands the remaining answered facets in place (price/year and the
+    other questions);
+  - the **envelope** opens the conversations for that listing — one row per
+    user who contacted it (`ListingChatThread.userId`), with the partner's
+    name, last message and unread badge; opening a row shows the chat in the
+    modal. The icon itself shows a red count when that listing has unread
+    conversations, and the drawer's **My items** sums them across all of the
+    user's listings;
+  - the **trash** icon opens the delete confirmation (same dialog as before);
+  - **›** opens that listing's statistics.
+  The delete dialog's **Details** button widens it and asks what happened, with
+  different answers per orientation:
   - **For Sale** ads: **Sold**, **Sale fell through**, **Decided to keep the
     item**, **Gave it away**.
   - **Wanted** ads: **Purchased**, **Purchase fell through**, **No longer
@@ -368,14 +376,6 @@ removal is a real button with an aria-label, and result counts are announced via
   Choosing **Sold** or **Purchased** shows a numeric price field (**Sold for**
   / **Purchased for**). The answers are posted to `POST /listing-outcomes`
   just before the delete (best-effort) and survive the deleted listing.
-  The bottom of the drawer holds four full-width actions —
-  **New listing** (+), **Messages** (envelope/message icon, with the unread badge),
-  **Settings** (gear) and **Sign out** (exit icon). Sign out calls
-  `POST /auth/logout` (revoking the HTTP-only session cookie), closes the
-  drawer/modal and returns to `/login`; the language and theme preferences are
-  kept. The **Profile** modal also has a **Sign out** footer button. When nobody
-  is signed in, the drawer shows a **Sign in** button (linking to `/login`)
-  instead of the listings and these actions.
 - **Interview view** - the dashboard's **Answer questions** opens the full
   interview in a modal (per-interview progress bar, priority-sorted product
   questions, wrapping chips, green answered accents). Edits stay in a local
@@ -396,7 +396,11 @@ removal is a real button with an aria-label, and result counts are announced via
   immediately. Drafts are shown in the drawer in italic with a **Draft** marker.
   Search results show an envelope action per listing; clicking it creates a new
   `chat-threads` row linked through `listing-chat-threads` and an `inbox-items` row in the
-  signed-in user's inbox. The envelope is grayed out and disabled on the user's own listings.
+  signed-in user's inbox, then opens the main Messages modal **in chat mode** on
+  that conversation, so the buyer can start typing immediately. A user has one
+  conversation per listing, so clicking the envelope again (or in another tab)
+  reopens the existing conversation instead of starting a second one. The
+  envelope is grayed out and disabled on the user's own listings.
 - **Listing wizard** - opened in a modal titled **Wizard - step X of 3**.
   Step 1 asks exactly two centred questions with chips underneath (buying or
   selling, item condition); **Next >** continues. Step 2 is **Edit**
@@ -420,10 +424,11 @@ removal is a real button with an aria-label, and result counts are announced via
   thumbnail (the glyph remains when a listing has no image).
 - **Post-publish** (`/app`, right after Publish) - replaces the old starting
   screen and its "Listing created" dialog. The same view is also the **seller
-  overview** for a signed-in visitor: it shows the listing picked in the drawer
-  (nothing is selected implicitly — `/app` then asks to pick one with a
-  "Select a listing to show its dashboard" placeholder and a **My listings**
-  button that opens the drawer). Right after a publish it shows that ad instead.
+  overview** for a signed-in visitor: with nothing selected, `/app` lists the
+  seller's ads (**My items** breadcrumb), one row per ad with its picture (or
+  category glyph), title, orientation - condition summary, an **…** expansion
+  for the remaining facets, a **trash** delete action and a **›** button that
+  opens that listing's statistics. Right after a publish it shows that ad instead.
   A user without any listings gets the "Publish your first ad" placeholder.
   Guests never see this screen: `/app` redirects to `/login` (server and client).
   It shows the featured listing's card
@@ -445,12 +450,15 @@ removal is a real button with an aria-label, and result counts are announced via
 - **Chat view** - WhatsApp-style bubbles with timestamps, paperclip popover
   (Image / YouTube / GPS placeholders), Enter-to-send. Text messages are POSTed
   to `chat-messages`; attachment placeholders stay local. The conversation header
-  names the other participant and shows a live status dot. New messages arrive
-  over `GET /chat-events/stream` (SSE) and appear without a page reload; unread
-  badges show on the topbar message icon, the Messages dialog rows
-  (`InboxItem.hasUnread`) and the drawer chat threads under a listing
-  (`ListingChatThread.hasUnread`). Opening a conversation clears the flags
-  through `PATCH` on both entities.
+  reads **Chatting with {user} regarding {item}** and shows a live status dot. New messages arrive
+  over `GET /chat-events/stream` (SSE) and appear without a page reload. Unread
+  badges are split by surface: the Messages dialog rows and the drawer's
+  **Messages** entry count `InboxItem.hasUnread` (conversations in the user's
+  inbox), while the drawer's **My items** entry and the per-listing envelope on
+  a My items row count `ListingChatThread.hasUnread` (conversations on the
+  user's own listings). Opening a conversation clears the flags through `PATCH`
+  on `InboxItem` and/or `ListingChatThread`, and both badges update from the
+  live chat state.
 - **Browse modal** — breadcrumbs, categories first with ">" navigation, listings after,
   2-line clamped descriptions, single-select toggle and orientation badges.
 - **Messages modal** — one row per `inbox-items` entry, showing the linked listing's

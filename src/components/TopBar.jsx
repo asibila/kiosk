@@ -1,14 +1,11 @@
-// Top bar: hamburger (left), centered "Kiosk" title, add-listing + language
-// dropdown + profile/theme (right). Create-new-listing, Messages and Settings
-// live at the bottom of the drawer.
+// Top bar: hamburger (left), centered "Kiosk" title, language + theme (right).
+// Navigation and the account actions live in the drawer.
 import { Link } from 'react-router'
-import { MenuIcon, PlusIcon, UserIcon, MoonIcon, SunIcon } from '../icons.jsx'
+import { MenuIcon, MoonIcon, SunIcon } from '../icons.jsx'
 import { LANGUAGES, useI18n } from '../i18n.jsx'
 
 export default function TopBar({
   onMenu,
-  onOpenModal,
-  onAddListing,
   theme = 'light',
   onToggleTheme,
   languages = LANGUAGES,
@@ -22,7 +19,7 @@ export default function TopBar({
         <button
           type="button"
           className="icon-btn"
-          aria-label={t('topbar.menu')}
+          aria-label={t('topbar.openMenu')}
           onClick={onMenu}
         >
           <MenuIcon />
@@ -36,15 +33,6 @@ export default function TopBar({
       </h1>
 
       <nav className="topbar-side right" aria-label={t('topbar.actions')}>
-        <button
-          type="button"
-          className="icon-btn"
-          aria-label={t('topbar.addListing')}
-          title={t('topbar.addListing')}
-          onClick={onAddListing}
-        >
-          <PlusIcon size={20} />
-        </button>
         <select
           className="lang-select"
           aria-label={t('topbar.language')}
@@ -58,14 +46,6 @@ export default function TopBar({
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          className="icon-btn"
-          aria-label={t('topbar.profile')}
-          onClick={() => onOpenModal('profile')}
-        >
-          <UserIcon />
-        </button>
         <button
           type="button"
           className="icon-btn theme-toggle"

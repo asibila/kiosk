@@ -7,6 +7,7 @@ import ChatView from './ChatView.jsx'
 export default function MessagesModal({
   inbox,
   chats,
+  initialChatId = null,
   onSend,
   onChatRead,
   onActiveChatChange,
@@ -14,7 +15,7 @@ export default function MessagesModal({
   onClose,
 }) {
   const { t } = useI18n()
-  const [activeChatId, setActiveChatId] = useState(null)
+  const [activeChatId, setActiveChatId] = useState(initialChatId)
   const activeChat = (chats ?? []).find((c) => c.id === activeChatId) || null
   const chatById = new Map((chats ?? []).map((chat) => [chat.id, chat]))
   const items = inbox ?? []

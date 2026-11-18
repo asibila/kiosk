@@ -89,10 +89,12 @@ export default function ChatView({ chat, onSend, liveStatus = 'connecting' }) {
         </span>
         <div>
           <div className="chat-head-text">
-            {t('chat.with', { name: chat.partnerName || t('chat.otherUser') })}
+            {t('chat.heading', {
+              name: chat.partnerName || t('chat.otherUser'),
+              title: chat.title,
+            })}
           </div>
           <div className="chat-head-sub">
-            {chat.title}
             <span className={`chat-live ${liveStatus}`} role="status">
               <span className="chat-live-dot" aria-hidden="true" />
               {LIVE_LABEL[liveStatus] ? t(LIVE_LABEL[liveStatus]) : liveStatus}
