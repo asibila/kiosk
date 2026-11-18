@@ -1963,12 +1963,9 @@ function KioskApp({ initialData = null, initialTheme }) {
   // guest: the guard effect above is already sending them to the login form.
   if (isAppRoute && (!authChecked || !isLoggedIn)) {
     return (
-      <section className="placeholder auth-gate" aria-busy="true">
-        <span className="placeholder-icon" aria-hidden="true">
-          <LayersIcon size={56} />
-        </span>
-        <p>{t(authChecked ? 'auth.redirecting' : 'auth.checking')}</p>
-      </section>
+      <div className="loading-screen">
+        <LoadingIndicator />
+      </div>
     )
   }
 
@@ -2024,7 +2021,7 @@ function KioskApp({ initialData = null, initialTheme }) {
           {/* A reload after publishing refreshes the catalog in the background;
               the post-publish screen already has everything it needs. */}
           {dataStatus === 'loading' && !showsSellerOverview ? (
-            <LoadingPlaceholder />
+            <LoadingIndicator />
           ) : dataStatus === 'error' ? (
             <ErrorPlaceholder message={loadError} onRetry={() => setReloadToken((n) => n + 1)} />
           ) : isResultsRoute ? (
@@ -2228,15 +2225,12 @@ function KioskApp({ initialData = null, initialTheme }) {
   )
 }
 
-function LoadingPlaceholder() {
+function LoadingIndicator() {
   const { t } = useI18n()
   return (
-    <div className="placeholder" aria-busy="true">
-      <span className="placeholder-icon">
-        <LayersIcon size={56} />
-      </span>
-      <h2>{t('loading.title')}</h2>
-      <p>{t('loading.body')}</p>
+    <div className="loading-indicator" role="status" aria-live="polite" aria-busy="true">
+      <span className="spinner" aria-hidden="true" />
+      <span>{t('common.loading')}</span>
     </div>
   )
 }

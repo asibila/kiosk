@@ -168,7 +168,7 @@ Details worth knowing:
 - **Language** comes from `?lang=` (validated: `en`, `hr`), then the
   `kiosk-language` cookie, then English. `hreflang` links both variants.
 - **Hydration** keeps the server markup while the browser refreshes the catalog
-  in the background (`App` only shows the loading placeholder on a cold start),
+  in the background (`App` only shows the loading spinner on a cold start),
   so a server-rendered page does not flash a spinner.
 - **The boot payload contains the catalog snapshot** the render used (the same
   rows `fetchKioskData` would fetch). It is shared with the client so hydration
@@ -429,6 +429,7 @@ removal is a real button with an aria-label, and result counts are announced via
   the modal, with a "<" back arrow left of the "Messages" title.
 - **Other modals** — Settings placeholder; Profile shows the live backend user; close on X,
   overlay, ESC.
-- **UX** — loading/error placeholders with retry, transient save notices, light/dark themes,
+- **UX** — a spinner with a plain “Loading” label while the session/catalog
+  load, error placeholders with retry, transient save notices, light/dark themes,
   rounded corners, transitions (drawer, modal, chips, caret), thin scrollbars, responsive
   rules, aria-labels and keyboard support.

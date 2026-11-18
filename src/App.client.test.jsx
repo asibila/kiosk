@@ -1,7 +1,7 @@
 // Client boot path: no server payload, so the provider loads the dictionaries
 // and `KioskApp` fetches the catalog after mount. This guards the refactor that
 // lets a server payload seed the same state.
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { TEST_DESCRIPTIONS } from './test/strings.js'
@@ -260,9 +260,9 @@ describe('client rendering', () => {
       </MemoryRouter>,
     )
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'Google is connected to this account.',
-    )
+    expect(
+      await screen.findByText('Google is connected to this account.'),
+    ).toBeInTheDocument()
   })
 
   it('explains a refused Google link', async () => {
@@ -274,9 +274,9 @@ describe('client rendering', () => {
       </MemoryRouter>,
     )
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'That Google account uses a different email.',
-    )
+    expect(
+      await screen.findByText(/That Google account uses a different email\./),
+    ).toBeInTheDocument()
   })
 
   it('asks the signed-in user to pick a listing on /app', async () => {
@@ -299,6 +299,35 @@ describe('client rendering', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'My listings' }))
     expect(document.querySelector('.drawer')).toHaveClass('open')
+  })
+
+  it('shows a spinner with a plain Loading label while the catalog loads', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+
+    let resolveData
+    fetchKioskData.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveData = resolve
+      }),
+    )
+
+    const { container } = render(
+      <MemoryRouter initialEntries={['/results']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    const status = await screen.findByRole('status')
+    expect(status).toHaveTextContent('Loading')
+    expect(status.querySelector('.spinner')).toBeInTheDocument()
+    expect(screen.queryByText('Loading interviews…')).not.toBeInTheDocument()
+
+    await act(async () => {
+      resolveData(raw)
+    })
+    expect(
+      await screen.findByRole('heading', { name: 'Trek bike' }),
+    ).toBeInTheDocument()
   })
 
   it('redirects an anonymous visitor from /app to the login form', async () => {
