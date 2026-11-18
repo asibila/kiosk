@@ -30,6 +30,7 @@ vi.mock('./api.js', () => ({
     totals: { views: 0, viewsInWindow: 0, contacts: 0 },
     contactRate: 0,
   })),
+  fetchAuthProviders: vi.fn(async () => ({ google: false })),
 }))
 
 const { fetchKioskData, loadDescriptions } = await import('./api.js')
@@ -245,6 +246,20 @@ describe('client rendering', () => {
     expect(
       await screen.findByRole('dialog', { name: 'Browse marketplace' }),
     ).toBeInTheDocument()
+  })
+
+  it('reports the Google link result in the notice banner', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+
+    render(
+      <MemoryRouter initialEntries={['/app?google=connected']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Google is connected to this account.',
+    )
   })
 
   it('shows the post-publish screen after the wizard publishes', async () => {

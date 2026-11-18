@@ -20,6 +20,7 @@ import Signup from './components/Signup.jsx'
 import Terms from './components/Terms.jsx'
 import Privacy from './components/Privacy.jsx'
 import SignupsModal from './components/SignupsModal.jsx'
+import ConnectGoogleRow from './components/ConnectGoogleRow.jsx'
 import ListingsModal from './components/ListingsModal.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
 import EditListingView from './components/EditListingView.jsx'
@@ -41,6 +42,16 @@ import {
 } from './sellerStats.js'
 
 const MODAL_TITLES = { settings: 'settings.title', profile: 'profile.title' }
+
+/** `?google=` results from the profile link flow → banner message keys. */
+const GOOGLE_RESULT_KEYS = {
+  connected: 'auth.googleConnected',
+  error_email_mismatch: 'auth.error.emailMismatch',
+  error_google_taken: 'auth.error.googleTaken',
+  error_link_failed: 'auth.error.linkFailed',
+  error_denied: 'auth.error.denied',
+  error_failed: 'auth.error.linkFailed',
+}
 
 const THEME_KEY = 'kiosk-theme'
 const REGION_KEY = 'kiosk-region-id'
@@ -301,6 +312,22 @@ function KioskApp({ initialData = null, initialTheme }) {
       cancelled = true
     }
   }, [reloadToken, loggedInUserId, language, strings, refreshStrings, authChecked])
+
+  // The Google link flow (started from the profile) returns with `?google=…`:
+  // show the outcome in the notice banner and drop the parameter so a refresh
+  // does not repeat it.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const result = params.get('google')
+    if (!result) return
+
+    const key = GOOGLE_RESULT_KEYS[result]
+    if (key) setNotice(t(key))
+
+    params.delete('google')
+    const search = params.toString()
+    navigate(`${location.pathname}${search ? `?${search}` : ''}`, { replace: true })
+  }, [location.pathname, location.search, navigate, t])
 
   // Search region: an explicit choice survives reloads; without one, ask the
   // API which region this IP belongs to (0 when it cannot be resolved).
@@ -1881,6 +1908,7 @@ function KioskApp({ initialData = null, initialTheme }) {
             <dd>{user.id}</dd>
           </div>
         </dl>
+        <ConnectGoogleRow from="/app" />
         <p className="profile-note">{t('profile.note')}</p>
       </div>
     ) : (

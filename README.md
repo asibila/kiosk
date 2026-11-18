@@ -88,6 +88,7 @@ overrides the defaults in the backend's `src/main.ts` (the defaults include both
 | React language provider (strings loaded from `GET /descriptions`) | `src/i18n.jsx` |
 | Sign-in / signup screens | `src/components/Login.jsx`, `src/components/Signup.jsx` |
 | Google sign-in button | `src/components/GoogleAuthButton.jsx` |
+| Profile: connect Google | `src/components/ConnectGoogleRow.jsx` |
 | Terms of service / privacy notice | `src/components/Terms.jsx`, `src/components/Privacy.jsx` |
 | Admin: recent signups | `src/components/SignupsModal.jsx` |
 | Server-side page data (catalog cache, `/results`, `/listing/:id`) | `src/data.server.js` |
@@ -231,6 +232,12 @@ removal is a real button with an aria-label, and result counts are announced via
   back with the session cookie set. If the Google email already belongs to a
   password account the site shows "sign in with your password instead" — it
   never links silently while signup emails are unverified.
+  Existing password accounts can attach Google afterwards: the **Profile** modal
+  has **Connect Google** (`src/components/ConnectGoogleRow.jsx` → `GET
+  /auth/google?link=1`), which links the identity only when the Google email
+  matches the account; `GET /auth/providers` drives the "Connected" badge, and
+  the outcome comes back as `?google=connected` (or an error) shown in the
+  notice banner.
 - **Top bar** - centered title (a link back to `/search`); hamburger; on the
   right a **+** button that starts a new listing, then the **EN / HR** language
   dropdown, profile icon and theme toggle (moon/sun). Signed-in users start a

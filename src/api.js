@@ -104,6 +104,16 @@ export function googleSignInUrl(from = '/search') {
   return `${API_BASE}/auth/google?from=${encodeURIComponent(from)}`
 }
 
+/** Link Google to the signed-in account (profile action). */
+export function googleLinkUrl(from = '/app') {
+  return `${API_BASE}/auth/google?link=1&from=${encodeURIComponent(from)}`
+}
+
+/** Social identities attached to the signed-in account. */
+export function fetchAuthProviders() {
+  return request('/auth/providers')
+}
+
 export const api = {
   list: (resource) => request(`/${resource}`),
   login: (email, password) =>

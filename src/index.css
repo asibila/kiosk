@@ -1421,6 +1421,28 @@ button {
   text-align: center;
 }
 
+/* Profile: linked social account row. */
+.profile-provider {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.profile-provider-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profile-provider-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
 /* Terms checkbox on the signup form. */
 .signup-terms {
   display: flex;
