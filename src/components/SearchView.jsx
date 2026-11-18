@@ -46,18 +46,19 @@ export default function SearchView({
     t('search.allCategories')
 
   // "Search <region>" title and its picker. Id 0 is the global "All regions"
-  // entry and always comes first; the rest follows the catalog order (by id).
+  // entry and always comes first; the rest is sorted by the localized country
+  // name so the picker reads alphabetically in the active language.
   const allRegionsName =
     regions.find((region) => Number(region.id) === 0)?.name ?? t('region.all')
-  const regionOptions = useMemo(
-    () => [
-      { id: 0, name: allRegionsName },
-      ...regions
-        .filter((region) => Number(region.id) !== 0)
-        .map((region) => ({ id: Number(region.id), name: region.name })),
-    ],
-    [allRegionsName, regions],
-  )
+  const regionOptions = useMemo(() => {
+    const collator = new Intl.Collator(language, { sensitivity: 'base' })
+    const countries = regions
+      .filter((region) => Number(region.id) !== 0)
+      .map((region) => ({ id: Number(region.id), name: region.name }))
+      .sort((a, b) => collator.compare(a.name, b.name))
+
+    return [{ id: 0, name: allRegionsName }, ...countries]
+  }, [allRegionsName, regions, language])
   const currentRegion = regions.find(
     (region) => Number(region.id) === Number(regionId),
   )

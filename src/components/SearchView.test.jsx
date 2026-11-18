@@ -70,6 +70,29 @@ describe('SearchView region', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
+  it('sorts countries by their localized name, after All regions', () => {
+    renderSearch({
+      regionId: 0,
+      regions: [
+        { id: 0, code: 'ALL', name: 'All regions' },
+        { id: 11, code: 'DE', name: 'Germany' },
+        { id: 4, code: 'HR', name: 'Croatia' },
+        { id: 12, code: 'AT', name: 'Austria' },
+      ],
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search all regions' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Choose region' })
+    const options = within(within(dialog).getByRole('list')).getAllByRole('button')
+    expect(options.map((option) => option.textContent)).toEqual([
+      'All regions',
+      'Austria',
+      'Croatia',
+      'Germany',
+    ])
+  })
+
   it('localizes the region names and title', () => {
     render(
       <MemoryRouter initialEntries={['/search']}>

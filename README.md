@@ -263,7 +263,8 @@ removal is a real button with an aria-label, and result counts are announced via
   requests with different languages cannot overwrite each other.
 - **Search screen** (`/search`) - the title is a **Search \<region\>** button:
   the region comes from `GET /regions/detect` (IP-based, `0` when unknown) and
-  the dialog lists **All regions** first plus every seeded country; the choice
+  the dialog lists **All regions** first plus every seeded country, sorted by
+  the localized country name; the choice
   is remembered in `localStorage`, limits the search to that region (a country
   excludes global listings, "All regions" searches everything) and tags new
   listings with `regionId`. The input is a structured **facet chip** field,
