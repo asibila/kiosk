@@ -16,6 +16,10 @@ import BrowseModal from './components/BrowseModal.jsx'
 import MessagesModal from './components/MessagesModal.jsx'
 import SimpleModal from './components/SimpleModal.jsx'
 import Login from './components/Login.jsx'
+import Signup from './components/Signup.jsx'
+import Terms from './components/Terms.jsx'
+import Privacy from './components/Privacy.jsx'
+import SignupsModal from './components/SignupsModal.jsx'
 import ListingsModal from './components/ListingsModal.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
 import EditListingView from './components/EditListingView.jsx'
@@ -1922,6 +1926,7 @@ function KioskApp({ initialData = null, initialTheme }) {
           onCreateNew={browseNewListing}
           onOpenMessages={() => openModal('messages')}
           onOpenSettings={() => openModal('settings')}
+          onOpenSignups={() => openModal('signups')}
           onSignOut={signOut}
           unreadCount={unreadTotal}
           signedIn={isLoggedIn}
@@ -2054,6 +2059,7 @@ function KioskApp({ initialData = null, initialTheme }) {
           onPick={handleBrowsePick}
         />
       )}
+      {modal === 'signups' && <SignupsModal onClose={() => setModal(null)} />}
       {modal === 'messages' && (
         <MessagesModal
           inbox={inbox}
@@ -2085,7 +2091,7 @@ function KioskApp({ initialData = null, initialTheme }) {
           onClose={() => setModal(null)}
         />
       )}
-      {modal && !['browse', 'messages', 'signin'].includes(modal) && (
+      {modal && !['browse', 'messages', 'signups', 'signin'].includes(modal) && (
         <SimpleModal
           title={t(MODAL_TITLES[modal])}
           body={modal === 'profile' ? profileBody : t('settings.body')}
@@ -2204,6 +2210,9 @@ export default function App({
         <Routes>
           <Route path="/" element={<Navigate to="/search" replace />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route
             path="/app"
             element={

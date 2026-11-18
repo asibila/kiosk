@@ -104,9 +104,17 @@ describe('GET /listing/:id', () => {
 })
 
 describe('SPA shell routes', () => {
-  it.each(['/', '/search', '/results', '/app', '/login', '/search/'])(
-    'serves the shell for %s',
-    async (route) => {
+  it.each([
+    '/',
+    '/search',
+    '/results',
+    '/app',
+    '/login',
+    '/signup',
+    '/terms',
+    '/privacy',
+    '/search/',
+  ])('serves the shell for %s', async (route) => {
       const app = await createTestApp()
       const res = await request(app).get(route)
 

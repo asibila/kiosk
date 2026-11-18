@@ -3,6 +3,7 @@
 // The selected listing expands to show its chat threads (via listing-chat-threads);
 // clicking one opens that conversation on the main screen.
 import { Fragment } from 'react'
+import { Link } from 'react-router'
 import { ChatIcon, GearIcon, LogOutIcon, MessageIcon, PlusIcon, TagIcon, TrashIcon, UserIcon } from '../icons.jsx'
 import { useI18n } from '../i18n.jsx'
 import CompletenessScore from './CompletenessScore.jsx'
@@ -19,6 +20,7 @@ export default function Drawer({
   onCreateNew,
   onOpenMessages,
   onOpenSettings,
+  onOpenSignups,
   onSignOut,
   unreadCount = 0,
   signedIn = true,
@@ -26,6 +28,7 @@ export default function Drawer({
   user = null,
 }) {
   const { t } = useI18n()
+  const isAdmin = user?.role === 'ADMIN'
   const userInitials = user?.name
     ? String(user.name)
         .split(' ')
@@ -193,6 +196,15 @@ export default function Drawer({
               <span className="drawer-row-title">{t('drawer.settings')}</span>
             </button>
 
+            {isAdmin && (
+              <button type="button" className="drawer-action" onClick={onOpenSignups}>
+                <span className="drawer-row-icon" aria-hidden="true">
+                  <UserIcon size={18} />
+                </span>
+                <span className="drawer-row-title">{t('admin.signups')}</span>
+              </button>
+            )}
+
             <button
               type="button"
               className="drawer-action drawer-signout"
@@ -211,6 +223,9 @@ export default function Drawer({
           <button type="button" className="btn primary drawer-signin" onClick={onSignIn}>
             {t('drawer.signIn')}
           </button>
+          <Link className="drawer-guest-link" to="/signup">
+            {t('login.createAccount')}
+          </Link>
         </div>
       )}
     </aside>

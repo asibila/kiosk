@@ -95,12 +95,27 @@ export function fetchListingStats(listingId, { days = 14 } = {}) {
   return request(`/listings/${listingId}/stats?days=${days}`)
 }
 
+/**
+ * Full-page Google sign-in: the API redirects to Google and back to the site,
+ * so this is a normal link rather than a fetch. `from` is a local path the
+ * callback returns to.
+ */
+export function googleSignInUrl(from = '/search') {
+  return `${API_BASE}/auth/google?from=${encodeURIComponent(from)}`
+}
+
 export const api = {
   list: (resource) => request(`/${resource}`),
   login: (email, password) =>
     request('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+    }),
+  /** Signup: creates the account and signs it in (same session cookie as login). */
+  register: (name, email, password) =>
+    request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ name, email, password, acceptTerms: true }),
     }),
   me: () => request('/auth/me'),
   logout: () => request('/auth/logout', { method: 'POST' }),

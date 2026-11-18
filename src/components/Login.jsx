@@ -1,9 +1,10 @@
 // Login screen: email + password sign-in (full screen). The API answers with an
 // HTTP-only session cookie; the app re-checks `/auth/me` after the navigation.
 import { useState } from 'react'
-import { useLocation, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { useI18n } from '../i18n.jsx'
 import { api } from '../api.js'
+import GoogleAuthButton from './GoogleAuthButton.jsx'
 
 export default function Login({ onLoggedIn }) {
   const [email, setEmail] = useState('')
@@ -14,6 +15,11 @@ export default function Login({ onLoggedIn }) {
   const location = useLocation()
   const { t } = useI18n()
 
+  const params = new URLSearchParams(location.search)
+  const requested = location.state?.from ?? params.get('from')
+  const target =
+    typeof requested === 'string' && requested.startsWith('/') ? requested : '/search'
+
   async function onSubmit(event) {
     event.preventDefault()
     setBusy(true)
@@ -22,12 +28,6 @@ export default function Login({ onLoggedIn }) {
     try {
       const user = await api.login(email, password)
       onLoggedIn?.(user)
-
-      // Return to the page that asked for sign-in (for example a listing detail
-      // page), but never follow an external URL.
-      const requested = location.state?.from
-      const target =
-        typeof requested === 'string' && requested.startsWith('/') ? requested : '/search'
       navigate(target)
     } catch (err) {
       setError(err.message || t('login.failed'))
@@ -66,7 +66,18 @@ export default function Login({ onLoggedIn }) {
         <button type="submit" className="btn primary" disabled={busy}>
           {busy ? t('login.signingIn') : t('login.signin')}
         </button>
+
+        <p className="home-alt">
+          <Link to="/signup" state={location.state}>
+            {t('login.createAccount')}
+          </Link>
+        </p>
       </form>
+
+      <GoogleAuthButton
+        from={target}
+        error={params.get('error')}
+      />
     </section>
   )
 }

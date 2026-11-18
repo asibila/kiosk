@@ -86,6 +86,10 @@ overrides the defaults in the backend's `src/main.ts` (the defaults include both
 | Backend rows → interviews / chats / browse tree | `src/viewModel.js` |
 | Pure translations: dictionaries, `translate()`, language cookie | `src/strings.js` |
 | React language provider (strings loaded from `GET /descriptions`) | `src/i18n.jsx` |
+| Sign-in / signup screens | `src/components/Login.jsx`, `src/components/Signup.jsx` |
+| Google sign-in button | `src/components/GoogleAuthButton.jsx` |
+| Terms of service / privacy notice | `src/components/Terms.jsx`, `src/components/Privacy.jsx` |
+| Admin: recent signups | `src/components/SignupsModal.jsx` |
 | Server-side page data (catalog cache, `/results`, `/listing/:id`) | `src/data.server.js` |
 | HTTP server (SSR routes, static files, robots/sitemap, 404/503) | `server.js` |
 | Server render entry (`renderToString` + `StaticRouter`) | `src/entry-server.jsx` |
@@ -209,13 +213,24 @@ removal is a real button with an aria-label, and result counts are announced via
   share the same shell (`KioskApp`) with the usual topbar, drawer and modals; only
   the main area differs.
 - **Home** - `/` redirects straight to `/search`; `/login` renders the log-in form
-  (`src/components/Login.jsx`). Sign-in sets an HTTP-only `kiosk_session` cookie
-  via `POST /auth/login`; the app then resolves the user with `GET /auth/me` and
-  returns to `/search` (or the page that requested sign-in). No user id is kept
-  in `localStorage`; guests skip the private chat/inbox resources when loading
+  (`src/components/Login.jsx`) and `/signup` the registration form
+  (`src/components/Signup.jsx`). Sign-in sets an HTTP-only `kiosk_session`
+  cookie via `POST /auth/login`; signup does the same through
+  `POST /auth/register`, so the account is signed in immediately. The app then
+  resolves the user with `GET /auth/me` and returns to the page that requested
+  sign-in. `/terms` and `/privacy` render the plain-language terms and privacy
+  notice, linked from the signup checkbox. No user id is kept in
+  `localStorage`; guests skip the private chat/inbox resources when loading
   the catalog.
   `/results?...` renders the bookmarkable results page described below and
   `/listing/:id` renders one listing.
+  Admins (role `ADMIN`) get a **Signups** action in the drawer that lists the
+  most recent accounts (`GET /users` returns full rows to admins).
+  Both screens also offer **Continue with Google** (`src/components/GoogleAuthButton.jsx`),
+  which links to `GET /auth/google`; the API runs the OAuth flow and redirects
+  back with the session cookie set. If the Google email already belongs to a
+  password account the site shows "sign in with your password instead" — it
+  never links silently while signup emails are unverified.
 - **Top bar** - centered title (a link back to `/search`); hamburger; on the
   right a **+** button that starts a new listing, then the **EN / HR** language
   dropdown, profile icon and theme toggle (moon/sun). Signed-in users start a

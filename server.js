@@ -26,7 +26,16 @@ const INDEX_HTML = path.join(ROOT, 'index.html')
 const SSR_ENTRY = path.join(ROOT, '.ssr', 'entry-server.js')
 
 /** Routes the client renders itself (the server only returns the shell). */
-const SPA_ROUTES = new Set(['/', '/search', '/results', '/app', '/login'])
+const SPA_ROUTES = new Set([
+  '/',
+  '/search',
+  '/results',
+  '/app',
+  '/login',
+  '/signup',
+  '/terms',
+  '/privacy',
+])
 const LANGUAGES = new Set(['en', 'hr'])
 const HTML = 'text/html; charset=utf-8'
 const LISTING_CACHE = 'public, max-age=0, s-maxage=60, stale-while-revalidate=300'
@@ -127,6 +136,7 @@ export async function createApp({
           'Allow: /',
           'Disallow: /app',
           'Disallow: /login',
+          'Disallow: /signup',
           'Disallow: /api/',
           '',
           `Sitemap: ${origin}/sitemap.xml`,
