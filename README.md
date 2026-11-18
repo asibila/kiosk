@@ -358,7 +358,7 @@ removal is a real button with an aria-label, and result counts are announced via
   instead of the listings and these actions.
 - **Interview view** - per-interview progress bar, priority-sorted product questions,
   wrapping chips (replace-only answers), green answered accents, and an action bar
-  with right-aligned Search and a "Next >" button into the listing wizard. The
+  with a "Next >" button into the listing wizard. The
   first four shared questions are **For Sale / Wanted**, **Condition**, **Price**
   and **Year**; orientation, condition, price and year questions come from the
   generic (ALL PRODUCTS) section, followed by the category's own facets and its

@@ -21,7 +21,6 @@ import Terms from './components/Terms.jsx'
 import Privacy from './components/Privacy.jsx'
 import SignupsModal from './components/SignupsModal.jsx'
 import ConnectGoogleRow from './components/ConnectGoogleRow.jsx'
-import ListingsModal from './components/ListingsModal.jsx'
 import ConfirmModal from './components/ConfirmModal.jsx'
 import EditListingView from './components/EditListingView.jsx'
 import PreviewListingView from './components/PreviewListingView.jsx'
@@ -169,7 +168,6 @@ function KioskApp({ initialData = null, initialTheme }) {
   ) // category id -> first listing id
   const [savingQuestionId, setSavingQuestionId] = useState(null)
   const [notice, setNotice] = useState('')
-  const [listingsModal, setListingsModal] = useState(null) // { title, listings } | null
   const [contactingListingId, setContactingListingId] = useState(null)
   const [myListings, setMyListings] = useState(initialView?.myListings ?? []) // listings owned by the logged-in user
   const [selectedListingId, setSelectedListingId] = useState(null)
@@ -558,7 +556,6 @@ function KioskApp({ initialData = null, initialTheme }) {
     navigate('/app')
     setDrawerOpen(false)
     setModal(null)
-    setListingsModal(null)
     setPendingDelete(null)
     setSelectedListingId(null)
     setSelectedChatId(null)
@@ -785,61 +782,6 @@ function KioskApp({ initialData = null, initialTheme }) {
     setCategoryDirty(!alreadyCurrent)
   }
 
-  // Listings for an orientation, filtered by the answered questions (facets)
-  // of each listing's own category. No orientation means every orientation.
-  function openListings(direction) {
-    const wanted = direction ? (direction === 'buy' ? 'sell' : 'buy') : null
-    // A question applies to a listing when it is generic or when it is defined
-    // on the listing's category or one of its ancestors.
-    const questionById = {}
-    const interviewByCategoryId = new Map(
-      interviews.map((interview) => [String(interview.categoryId), interview]),
-    )
-    for (const interview of interviews) {
-      for (const question of interview.questions) questionById[question.id] = question
-    }
-    const found = []
-    for (const node of Object.values(browseData)) {
-      for (const item of node?.items ?? []) {
-        if (item.type === 'listing' && (!wanted || item.orientation === wanted)) found.push(item)
-      }
-    }
-    const listings = found.filter((listing) => {
-      const categoryChain = new Set()
-      let current = interviewByCategoryId.get(String(listing.categoryId))
-      while (current && !categoryChain.has(String(current.categoryId))) {
-        categoryChain.add(String(current.categoryId))
-        current =
-          current.parentCategoryId != null
-            ? interviewByCategoryId.get(String(current.parentCategoryId))
-            : undefined
-      }
-
-      const relevant = Object.keys(answers ?? {}).filter((qid) => {
-        const question = questionById[qid]
-        if (!question || question.type === 'numeric' || question.facet === 'orientation') {
-          return false
-        }
-        return question.isGeneric || categoryChain.has(String(question.categoryId))
-      })
-      return relevant.every((qid) => {
-        const optionId = Number(answers[qid])
-        if (!Number.isFinite(optionId)) return true
-        return selections.some(
-          (s) =>
-            s.listingId === Number(listing.id) &&
-            Number(s.facetValueOptionId) === optionId,
-        )
-      })
-    })
-    const title =
-      direction === 'buy'
-        ? t('listings.sellTitle')
-        : direction === 'sell'
-          ? t('listings.buyTitle')
-          : t('listings.searchTitle')
-    setListingsModal({ title, listings })
-  }
 
   // Search results: start a conversation about a listing. A new chat thread is
   // linked to the listing and to the current user's inbox item.
@@ -861,7 +803,6 @@ function KioskApp({ initialData = null, initialTheme }) {
       )
 
       setNotice(t('notice.conversationStarted', { title: listing.title }))
-      setListingsModal(null)
       setReloadToken((n) => n + 1)
     } catch (err) {
       setNotice(t('notice.conversationFailed', { message: err.message }))
@@ -1840,28 +1781,18 @@ function KioskApp({ initialData = null, initialTheme }) {
     ? selectedInterview.questions.filter((q) => answers[q.id] != null).length
     : 0
   const missingRequired = requiredQuestionsMissing(selectedInterview)
-  const orientationAnswer = answers.orientation ?? null
   const canPublish =
     !!user &&
     !!selectedInterview &&
     missingRequired.length === 0 &&
     (categoryDirty || answeredCount > 0)
 
-  // Interview step actions: Search on the left; "Next >" continues to the
-  // wizard's edit step. Orientation is answered by the first facet card, not by
-  // a separate pair of chips.
+  // Interview step actions: "Next >" continues to the wizard's edit step.
+  // Orientation is answered by the first facet card, not by a separate pair of
+  // chips.
   const interviewActions = (
     <div className="action-row">
       <div className="action-buttons">
-        <button
-          type="button"
-          className="btn secondary"
-          onClick={() => openListings(orientationAnswer)}
-          disabled={orientationAnswer == null}
-          title={orientationAnswer == null ? t('interview.chooseDirection') : undefined}
-        >
-          {t('interview.search')}
-        </button>
         {!user && (
           <button type="button" className="btn secondary" onClick={signIn}>
             {t('interview.signInToPublish')}
@@ -2211,16 +2142,6 @@ function KioskApp({ initialData = null, initialTheme }) {
         />
       )}
 
-      {listingsModal && (
-        <ListingsModal
-          title={listingsModal.title}
-          listings={listingsModal.listings}
-          onContact={isLoggedIn ? contactListing : null}
-          contactingId={contactingListingId}
-          currentUserId={isLoggedIn ? user?.id : null}
-          onClose={() => setListingsModal(null)}
-        />
-      )}
     </div>
   )
 }
