@@ -124,6 +124,7 @@ function KioskApp({ initialData = null, initialTheme }) {
   // standalone /search form and the /results page; only the main area differs.
   const isSearchRoute = location.pathname === '/search'
   const isResultsRoute = location.pathname === '/results'
+  const isAppRoute = location.pathname === '/app'
   const isListingRoute = listingRouteId != null
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [selectedInterviewId, setSelectedInterviewId] = useState(null)
@@ -242,6 +243,14 @@ function KioskApp({ initialData = null, initialTheme }) {
       cancelled = true
     }
   }, [])
+
+  // `/app` is private. Direct visits are redirected by the server; this covers
+  // client-side navigation and a session that expired while the tab was open.
+  useEffect(() => {
+    if (!authChecked || !isAppRoute || isLoggedIn) return
+    const from = `${location.pathname}${location.search}`
+    navigate(`/login?from=${encodeURIComponent(from)}`, { replace: true })
+  }, [authChecked, isAppRoute, isLoggedIn, location.pathname, location.search, navigate])
 
   // Load every resource the UI needs, then map it onto the interview/chat model.
   useEffect(() => {
@@ -1037,9 +1046,27 @@ function KioskApp({ initialData = null, initialTheme }) {
     }
   }
 
-  // Drawer listing row: open its category interview and recall the listing's facets.
+  // Drawer listing row: show that listing's statistics on /app. The category
+  // interview is one click away from the stats page (Answer questions) rather
+  // than opening on the listing click itself.
   function openListing(listing) {
-    // Keep the drawer open so its nested chat threads stay visible.
+    navigate('/app')
+    setSelectedChatId(null)
+    // Stats, not the interview: the overview reads the selected own listing.
+    setSelectedInterviewId(null)
+    setSelectedListingId(listing.id)
+    // The clicked listing should win over the one that was just published.
+    setPublishedListingId(null)
+    setWizardStage('interview')
+    setDraftListingId(null)
+    resetDraft()
+  }
+
+  // Open the category interview for a listing, prefilled with that listing's
+  // own answers. Reached from the stats page ("Answer questions", "Finish" on
+  // the checklist) and from its edit action.
+  function openInterviewForListing(listing) {
+    if (!listing) return
     navigate('/app')
     selectInterview(listing.categoryId, { keepDrawerOpen: true })
     setSelectedListingId(listing.id)
@@ -1730,27 +1757,24 @@ function KioskApp({ initialData = null, initialTheme }) {
     ? (searchListings.find((item) => String(item.id) === String(listingRouteId)) ?? null)
     : null
 
-  // Seller overview: the screen shown on /app when nothing else is open. It
-  // prefers the listing that was just published, then the newest active ad (or
-  // the newest draft). Statistics are derived from data the app already has.
-  const newestOwnListing = (() => {
-    if (!user || myListings.length === 0) return null
-    const rows = [...myListings]
-    rows.sort((a, b) => {
-      const activeDelta =
-        Number(b.isActive !== false) - Number(a.isActive !== false)
-      if (activeDelta !== 0) return activeDelta
-      return Number(b.listingId) - Number(a.listingId)
-    })
-    return rows[0]
-  })()
+  // Seller statistics: the screen shown on /app. A listing picked in the drawer
+  // wins; otherwise the post-publish screen shows the listing just published.
+  // With neither, `/app` asks the user to pick one (no implicit "newest" ad).
+  const selectedOwnListing =
+    selectedListingId != null
+      ? (myListings.find(
+          (listing) => String(listing.listingId) === String(selectedListingId),
+        ) ?? null)
+      : null
   const publishedListing =
     publishedListingId != null
       ? (myListings.find(
           (listing) => String(listing.listingId) === String(publishedListingId),
         ) ?? null)
       : null
-  const featuredListing = publishedListing ?? newestOwnListing
+  const featuredListing = selectedOwnListing ?? publishedListing
+  const featuredIsJustPublished =
+    publishedListing != null && featuredListing === publishedListing
   const featuredCategoryTitle = featuredListing
     ? (interviews.find(
         (interview) =>
@@ -1769,7 +1793,13 @@ function KioskApp({ initialData = null, initialTheme }) {
         ) ??
         null)
       : null
-  const sellerStats = featuredListing ? buildSellerStats({ myListings, chats }) : null
+  const sellerStats = featuredListing
+    ? buildSellerStats({
+        myListings,
+        chats,
+        listingId: featuredListing.listingId,
+      })
+    : null
   const featuredPriceStats = featuredListing
     ? pricePosition({ listing: featuredListing, catalog: searchListings })
     : null
@@ -1929,6 +1959,19 @@ function KioskApp({ initialData = null, initialTheme }) {
       <p>{isLoggedIn ? t('profile.noUsers') : t('profile.guest')}</p>
     )
 
+  // Never render the signed-in shell before `/auth/me` answers, and never for a
+  // guest: the guard effect above is already sending them to the login form.
+  if (isAppRoute && (!authChecked || !isLoggedIn)) {
+    return (
+      <section className="placeholder auth-gate" aria-busy="true">
+        <span className="placeholder-icon" aria-hidden="true">
+          <LayersIcon size={56} />
+        </span>
+        <p>{t(authChecked ? 'auth.redirecting' : 'auth.checking')}</p>
+      </section>
+    )
+  }
+
   return (
     <div className="app">
       <TopBar
@@ -2055,7 +2098,7 @@ function KioskApp({ initialData = null, initialTheme }) {
             <InterviewView interview={selectedInterview} answers={answers} onAnswer={(questionId, optionId) => answerQuestion(selectedInterview, questionId, optionId)} actions={interviewActions} />
           ) : showsSellerOverview ? (
             <PublishSuccessView
-              variant={publishedListing ? 'published' : 'dashboard'}
+              variant={featuredIsJustPublished ? 'published' : 'dashboard'}
               listing={featuredListing}
               categoryTitle={featuredCategoryTitle}
               imageUrl={featuredImage?.url ?? null}
@@ -2063,12 +2106,14 @@ function KioskApp({ initialData = null, initialTheme }) {
               priceStats={featuredPriceStats}
               checklist={featuredChecklist}
               onPublishAnother={browseNewListing}
-              onImproveQuestions={() => openListing(featuredListing)}
+              onImproveQuestions={() => openInterviewForListing(featuredListing)}
               onEditListing={() => {
-                openListing(featuredListing)
+                openInterviewForListing(featuredListing)
                 setWizardStage('edit')
               }}
             />
+          ) : myListings.length > 0 ? (
+            <SelectListingPlaceholder onOpenDrawer={() => setDrawerOpen(true)} />
           ) : (
             <EmptyPlaceholder
               hasInterviews={interviews.length > 0}
@@ -2235,6 +2280,22 @@ function EmptyPlaceholder({ hasInterviews, onBrowse, signedIn = false }) {
       ) : (
         <p>{t('empty.noCategories')}</p>
       )}
+    </div>
+  )
+}
+
+function SelectListingPlaceholder({ onOpenDrawer }) {
+  const { t } = useI18n()
+  return (
+    <div className="placeholder">
+      <span className="placeholder-icon">
+        <LayersIcon size={56} />
+      </span>
+      <h2>{t('dashboard.selectTitle')}</h2>
+      <p>{t('dashboard.selectBody')}</p>
+      <button type="button" className="btn primary" onClick={onOpenDrawer}>
+        {t('dashboard.openListings')}
+      </button>
     </div>
   )
 }

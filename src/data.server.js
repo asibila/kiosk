@@ -71,6 +71,34 @@ async function fetchJson(base, path, fetchImpl) {
   return response.json()
 }
 
+/**
+ * Resolve the browser session on the server by forwarding its cookie to
+ * `/auth/me`.
+ *
+ * Returns the user, `null` when the API says the visitor is a guest, and
+ * `undefined` when the check could not be made (the API is unreachable), so a
+ * caller can avoid treating an outage as a sign-out.
+ */
+export async function loadSession({
+  fetchImpl = fetch,
+  base = resolveServerApiBase(),
+  cookie = '',
+} = {}) {
+  if (!cookie) return null
+
+  try {
+    const response = await fetchImpl(`${base}/auth/me`, {
+      headers: { accept: 'application/json', cookie },
+      signal: timeoutSignal(),
+    })
+    if (response.status === 401) return null
+    if (!response.ok) return undefined
+    return await response.json()
+  } catch {
+    return undefined
+  }
+}
+
 // One snapshot per process. The catalog changes only when someone edits it, so
 // a short TTL removes a burst of identical queries without making edits wait
 // for long. In-flight requests are shared so a second render joins the first.

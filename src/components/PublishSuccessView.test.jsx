@@ -172,6 +172,15 @@ describe('PublishSuccessView', () => {
     expect(onImproveQuestions).toHaveBeenCalledTimes(1)
   })
 
+  it('opens the interview from the Answer questions action', () => {
+    const onImproveQuestions = vi.fn()
+    renderView({ onImproveQuestions, variant: 'dashboard' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Answer questions' }))
+
+    expect(onImproveQuestions).toHaveBeenCalledTimes(1)
+  })
+
   it('labels the dashboard variant without claiming a fresh publish', () => {
     renderView({ variant: 'dashboard' })
 

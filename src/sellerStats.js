@@ -20,15 +20,26 @@ function contactsOf(myListings, chats) {
  * Active ads, drafts, contacts and unread contacts for one seller, plus the
  * daily contact series the chart draws.
  *
- * @param {{myListings?: any[], chats?: any[], days?: number, now?: Date}} [input]
+ * `listingId` scopes the contact numbers (and the chart) to one ad, which is
+ * what the stats page shows for the listing picked in the drawer. The active
+ * ads and drafts tiles stay seller-wide on purpose.
+ *
+ * @param {{myListings?: any[], chats?: any[], days?: number, now?: Date, listingId?: number|string|null}} [input]
  */
 export function buildSellerStats({
   myListings = [],
   chats = [],
   days = 14,
   now = new Date(),
+  listingId = null,
 } = {}) {
-  const contacts = contactsOf(myListings, chats)
+  const scoped =
+    listingId != null
+      ? myListings.filter(
+          (listing) => String(listing.listingId) === String(listingId),
+        )
+      : myListings
+  const contacts = contactsOf(scoped, chats)
 
   return {
     active: myListings.filter((listing) => listing.isActive !== false).length,

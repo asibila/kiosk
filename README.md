@@ -44,8 +44,14 @@ built client and server-renders listing pages:
 
 `server.js` renders `/listing/:id`, answers `/robots.txt`, `/sitemap.xml` and
 `/healthz`, serves the client routes (`/`, `/search`, `/results`, `/app`,
-`/login`) as the SPA shell, and returns a real 404 for anything else. See
-**Server-side rendering** below.
+`/login`) as the SPA shell, and returns a real 404 for anything else.
+
+`/app` is the only private route: before sending the shell the server forwards
+the request cookie to `GET /auth/me` (`loadSession` in `src/data.server.js`).
+A guest gets a `302` to `/login?from=%2Fapp`; if the API is unreachable the
+shell is still served and the client guard retries. Everything else
+(`/search`, `/results`, `/listing/:id`, `/login`, `/signup`, `/terms`,
+`/privacy`) stays public. See **Server-side rendering** below.
 
 The legacy static site (`kiosk-9j6p`) still runs from this same repository: it
 uses the plain `vite build` output and the `render.yaml` rewrite rules, and it
@@ -336,6 +342,9 @@ removal is a real button with an aria-label, and result counts are announced via
   visit, and remembers the choice in `localStorage` (`kiosk-theme`).
 - **Drawer** - overlay slide-in, 340px (full-width ≤600px), a flat list of the signed-in
   user's listings (from `GET /listings` filtered by `userId`), empty state when none.
+  Clicking a listing opens **that listing's statistics** on `/app` (the featured
+  card, views, contacts, price position and checklist), not the category
+  interview; the interview is reached from **Answer questions** there.
   Selecting a listing expands its chat threads from `listing-chat-threads` underneath it
   (thread id plus last-message preview); clicking one opens that conversation on the main
   screen. Each row has a delete button that asks "Are you sure?" before calling
@@ -382,22 +391,26 @@ removal is a real button with an aria-label, and result counts are announced via
   thumbnail (the glyph remains when a listing has no image).
 - **Post-publish** (`/app`, right after Publish) - replaces the old starting
   screen and its "Listing created" dialog. The same view is also the **seller
-  overview** for a signed-in visitor: with no ad just published it is titled
-  **Your seller overview** and features the newest active ad (or newest draft);
-  without any listings `/app` shows a "Publish your first ad" placeholder. It
-  shows the featured listing's card
+  overview** for a signed-in visitor: it shows the listing picked in the drawer
+  (nothing is selected implicitly — `/app` then asks to pick one with a
+  "Select a listing to show its dashboard" placeholder and a **My listings**
+  button that opens the drawer). Right after a publish it shows that ad instead.
+  A user without any listings gets the "Publish your first ad" placeholder.
+  Guests never see this screen: `/app` redirects to `/login` (server and client).
+  It shows the featured listing's card
   (primary image, title, category, price, completeness score) with **View
-  listing** (the bookmarkable `/listing/:id`) and **Publish another** (back to
+  listing** (the bookmarkable `/listing/:id`), **Answer questions** (opens that
+  listing's interview) and **Publish another** (back to
   category Browse), then the seller's own numbers: **Views** (last 14 days, from
   `GET /listings/:id/stats`, charted per day in its own panel), **Active ads**,
-  **Contacts** (chat threads on the user's listings) and **Unread**, a 14-day
+  **Contacts** and **Unread** for the shown listing, a 14-day
   contacts bar chart from `ChatThread.createdAt` (falling back to a "no contacts
   yet" hint),
   a price-position track that places the listing's price between the cheapest
   and dearest active ad in its category (with the median), and a **Make it stand
   out** checklist for photos, title translations and unanswered questions. The
   checklist's **Finish** buttons reopen the interview
-  (`App.openListing`) or its **Edit** step for that listing. The publish reload
+  (`App.openInterviewForListing`) or its **Edit** step for that listing. The publish reload
   runs in the background so the screen does not flash a loading placeholder
   (`src/components/PublishSuccessView.jsx`, `src/sellerStats.js`).
 - **Chat view** - WhatsApp-style bubbles with timestamps, paperclip popover

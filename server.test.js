@@ -36,6 +36,9 @@ function createTestApp(overrides = {}) {
     }),
     loadListing: async (id) => (Number(id) === 10 ? { data: catalog, strings: {} } : null),
     loadCatalogData: async () => catalog,
+    // `/app` checks the session; tests that do not care about the guard are
+    // signed in by default.
+    loadSession: async () => ({ id: 1, name: 'Ana' }),
     apiBase: 'https://api.test',
     staticDir: null,
     ...overrides,
@@ -153,6 +156,44 @@ describe('SPA shell routes', () => {
     } finally {
       await rm(staticDir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('GET /app', () => {
+  it('redirects a guest to the login form', async () => {
+    const app = await createTestApp({ loadSession: async () => null })
+    const res = await request(app).get('/app')
+
+    expect(res.status).toBe(302)
+    expect(res.headers.location).toBe('/login?from=%2Fapp')
+    expect(res.headers['cache-control']).toBe('no-store')
+    expect(res.text).not.toContain('<div id="root">')
+  })
+
+  it('keeps the query string in the return target', async () => {
+    const app = await createTestApp({ loadSession: async () => null })
+    const res = await request(app).get('/app?tab=stats')
+
+    expect(res.status).toBe(302)
+    expect(res.headers.location).toBe('/login?from=%2Fapp%3Ftab%3Dstats')
+  })
+
+  it('serves the shell to a signed-in visitor', async () => {
+    const app = await createTestApp()
+    const res = await request(app).get('/app')
+
+    expect(res.status).toBe(200)
+    expect(res.text).toContain('<div id="root"></div>')
+  })
+
+  it('serves the shell when the session check cannot reach the API', async () => {
+    // `undefined` means "unknown"; the client guard retries instead of treating
+    // an outage as a sign-out.
+    const app = await createTestApp({ loadSession: async () => undefined })
+    const res = await request(app).get('/app')
+
+    expect(res.status).toBe(200)
+    expect(res.text).toContain('<div id="root"></div>')
   })
 })
 

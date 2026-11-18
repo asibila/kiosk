@@ -13,7 +13,7 @@ import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { loadCatalog, loadListingPage, resolveServerApiBase } from './src/data.server.js'
+import { loadCatalog, loadListingPage, loadSession as loadSessionFromApi, resolveServerApiBase } from './src/data.server.js'
 import {
   buildListingHead,
   notFoundHead,
@@ -111,6 +111,7 @@ export async function createApp({
   renderApp,
   loadListing = loadListingPage,
   loadCatalogData = loadCatalog,
+  loadSession = loadSessionFromApi,
   apiBase = resolveServerApiBase(),
   staticDir = null,
   extraMiddleware = [],
@@ -262,6 +263,24 @@ export async function createApp({
     }
     try {
       const route = req.path.length > 1 ? req.path.replace(/\/+$/, '') : req.path
+
+      // `/app` is the signed-in dashboard. Answer guests here so a direct visit
+      // never even receives the app shell; an unreachable API (`undefined`)
+      // still gets the shell, where the client guard retries.
+      if (route === '/app') {
+        const session = await loadSession({
+          base: apiBase,
+          cookie: req.headers.cookie ?? '',
+        })
+        if (session === null) {
+          res
+            .status(302)
+            .set('cache-control', 'no-store')
+            .redirect(`/login?from=${encodeURIComponent(req.originalUrl)}`)
+          return
+        }
+      }
+
       const known = SPA_ROUTES.has(route)
       await sendShell(req, res, {
         status: known ? 200 : 404,

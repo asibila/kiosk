@@ -31,6 +31,9 @@ vi.mock('./api.js', () => ({
     contactRate: 0,
   })),
   fetchAuthProviders: vi.fn(async () => ({ google: false })),
+  googleSignInUrl: (from = '/search') => `/api/auth/google?from=${encodeURIComponent(from)}`,
+  googleLinkUrl: (from = '/app') =>
+    `/api/auth/google?link=1&from=${encodeURIComponent(from)}`,
 }))
 
 const { fetchKioskData, loadDescriptions } = await import('./api.js')
@@ -276,7 +279,7 @@ describe('client rendering', () => {
     )
   })
 
-  it('shows the seller overview on /app instead of the empty placeholder', async () => {
+  it('asks the signed-in user to pick a listing on /app', async () => {
     apiMock.me.mockResolvedValueOnce(signedIn)
 
     render(
@@ -286,10 +289,82 @@ describe('client rendering', () => {
     )
 
     expect(
-      await screen.findByRole('heading', { name: 'Your seller overview' }),
+      await screen.findByRole('heading', {
+        name: 'Select a listing to show its dashboard',
+      }),
     ).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Trek bike' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Browse' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: 'Your seller overview' }),
+    ).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'My listings' }))
+    expect(document.querySelector('.drawer')).toHaveClass('open')
+  })
+
+  it('redirects an anonymous visitor from /app to the login form', async () => {
+    render(
+      <MemoryRouter initialEntries={['/app']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByRole('region', { name: 'Log in' })).toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Select a listing to show its dashboard',
+      }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('shows per-listing statistics when a drawer listing is clicked', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+    fetchKioskData.mockResolvedValueOnce({
+      ...raw,
+      listings: [
+        {
+          id: 10,
+          categoryId: 1,
+          orientation: 'sell',
+          userId: 1,
+          isActive: true,
+          price: 250,
+        },
+        {
+          id: 12,
+          categoryId: 1,
+          orientation: 'sell',
+          userId: 1,
+          isActive: true,
+          price: 900,
+        },
+      ],
+      'listing-translations': [
+        { listingId: 10, language: 'en', title: 'Trek bike' },
+        { listingId: 12, language: 'en', title: 'City bike' },
+      ],
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/app']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    // Nothing is selected yet, so the page asks for a listing.
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Select a listing to show its dashboard',
+      }),
+    ).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'My listings' }))
+    const drawer = document.querySelector('.drawer')
+    fireEvent.click(await within(drawer).findByText('Trek bike'))
+
+    // The clicked listing's card replaces the placeholder; no interview opens.
+    expect(await screen.findByRole('heading', { name: 'Trek bike' })).toBeInTheDocument()
+    expect(screen.getByText('Cars · 250 €')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Cars' })).not.toBeInTheDocument()
   })
 
   it('shows the post-publish screen after the wizard publishes', async () => {
@@ -306,13 +381,22 @@ describe('client rendering', () => {
       </MemoryRouter>,
     )
 
-    // Open the owned listing from the drawer: its category interview opens.
+    // Opening the owned listing from the drawer shows its statistics; the
+    // interview is one click away from there.
     fireEvent.click(
       await screen.findByRole('button', { name: 'Toggle my listings drawer' }),
     )
     // Scope to the drawer: the overview behind it also shows the title.
     const drawer = document.querySelector('.drawer')
     fireEvent.click(await within(drawer).findByText('Trek bike'))
+    expect(
+      await screen.findByRole('heading', { name: 'Your seller overview' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: 'Cars' }),
+    ).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Answer questions' }))
     expect(
       await screen.findByRole('heading', { name: 'Cars' }),
     ).toBeInTheDocument()

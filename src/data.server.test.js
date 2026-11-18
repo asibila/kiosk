@@ -5,6 +5,7 @@ import {
   loadCatalog,
   loadListingPage,
   loadResultsPage,
+  loadSession,
   resolveServerApiBase,
 } from './data.server.js'
 
@@ -196,5 +197,60 @@ describe('loadListingPage', () => {
     expect(await loadListingPage('abc')).toBeNull()
     expect(await loadListingPage(0)).toBeNull()
     expect(await loadListingPage(-3)).toBeNull()
+  })
+})
+
+describe('loadSession', () => {
+  const user = { id: 7, name: 'Ana', email: 'ana@example.com' }
+
+  function response(status, body = {}) {
+    return { ok: status >= 200 && status < 300, status, json: async () => body }
+  }
+
+  it('returns null without asking the API when the request has no cookies', async () => {
+    const fetchImpl = vi.fn()
+
+    expect(await loadSession({ fetchImpl, base: 'http://api' })).toBeNull()
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it('forwards the cookie and returns the signed-in user', async () => {
+    const fetchImpl = vi.fn(async () => response(200, user))
+
+    await expect(
+      loadSession({ fetchImpl, base: 'http://api', cookie: 'kiosk_session=abc' }),
+    ).resolves.toEqual(user)
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'http://api/auth/me',
+      expect.objectContaining({
+        headers: { accept: 'application/json', cookie: 'kiosk_session=abc' },
+      }),
+    )
+  })
+
+  it('returns null when the session is not valid', async () => {
+    const fetchImpl = vi.fn(async () => response(401))
+
+    await expect(
+      loadSession({ fetchImpl, base: 'http://api', cookie: 'kiosk_session=expired' }),
+    ).resolves.toBeNull()
+  })
+
+  it('returns undefined when the API cannot be reached', async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new Error('ECONNREFUSED')
+    })
+
+    await expect(
+      loadSession({ fetchImpl, base: 'http://api', cookie: 'kiosk_session=abc' }),
+    ).resolves.toBeUndefined()
+  })
+
+  it('returns undefined for an API error', async () => {
+    const fetchImpl = vi.fn(async () => response(500))
+
+    await expect(
+      loadSession({ fetchImpl, base: 'http://api', cookie: 'kiosk_session=abc' }),
+    ).resolves.toBeUndefined()
   })
 })

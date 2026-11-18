@@ -141,6 +141,9 @@ export default function PublishSuccessView({
             <Link className="btn primary" to={`/listing/${listing.listingId}`}>
               {t('publish.viewListing')}
             </Link>
+            <button type="button" className="btn secondary" onClick={onImproveQuestions}>
+              {t('publish.answerQuestions')}
+            </button>
             <button type="button" className="btn secondary" onClick={onPublishAnother}>
               {t('publish.publishAnother')}
             </button>

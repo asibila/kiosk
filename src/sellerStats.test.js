@@ -33,6 +33,31 @@ describe('buildSellerStats', () => {
     expect(stats.activity.total).toBe(2)
     expect(stats.activity.days).toHaveLength(14)
   })
+
+  it('scopes contacts to one listing while keeping the seller totals', () => {
+    const stats = buildSellerStats({ myListings, chats, now, listingId: 10 })
+
+    // Active ads and drafts describe the seller, not the shown ad.
+    expect(stats.active).toBe(1)
+    expect(stats.drafts).toBe(1)
+    // Three threads belong to listing 10; two of them are inside the window.
+    expect(stats.contacts).toBe(3)
+    expect(stats.unread).toBe(1)
+    expect(stats.activity.total).toBe(2)
+  })
+
+  it('reports no contacts for a listing without conversations', () => {
+    const stats = buildSellerStats({
+      myListings: [...myListings, { listingId: 12, isActive: true }],
+      chats,
+      now,
+      listingId: 12,
+    })
+
+    expect(stats.contacts).toBe(0)
+    expect(stats.unread).toBe(0)
+    expect(stats.activity.total).toBe(0)
+  })
 })
 
 describe('contactsByDay', () => {
