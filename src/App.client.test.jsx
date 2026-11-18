@@ -588,6 +588,124 @@ describe('client rendering', () => {
     )
   })
 
+  it('shows a breadcrumb on the search results page', async () => {
+    render(
+      <MemoryRouter initialEntries={['/results']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    const nav = await screen.findByRole('navigation', { name: 'Breadcrumb' })
+    expect(within(nav).getByRole('link', { name: 'Search' })).toHaveAttribute(
+      'href',
+      '/search',
+    )
+    expect(within(nav).getByText('Search Results')).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+  })
+
+  it('shows the results breadcrumb on a listing opened from search results', async () => {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/listing/10',
+            state: { from: '/results?category=1' },
+          },
+        ]}
+      >
+        <App />
+      </MemoryRouter>,
+    )
+
+    const nav = await screen.findByRole('navigation', { name: 'Breadcrumb' })
+    expect(within(nav).getByRole('link', { name: 'Search' })).toHaveAttribute(
+      'href',
+      '/search',
+    )
+    expect(
+      await within(nav).findByRole('link', { name: 'Search Results' }),
+    ).toHaveAttribute('href', '/results?category=1')
+    expect(within(nav).getByText('Trek bike')).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+  })
+
+  it('shows My Listings › listing name on the dashboard of a drawer item', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+    fetchKioskData.mockResolvedValue(raw)
+
+    render(
+      <MemoryRouter initialEntries={['/app']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'My listings' }))
+    const drawer = document.querySelector('.drawer')
+    fireEvent.click(await within(drawer).findByText('Trek bike'))
+
+    const nav = await screen.findByRole('navigation', { name: 'Breadcrumb' })
+    expect(within(nav).getByRole('link', { name: 'My Listings' })).toHaveAttribute(
+      'href',
+      '/app',
+    )
+    expect(within(nav).getByText('Trek bike')).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+
+    fireEvent.click(within(nav).getByRole('link', { name: 'My Listings' }))
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Select a listing to show its dashboard',
+      }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('navigation', { name: 'Breadcrumb' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('shows the dashboard breadcrumb on a listing opened from the dashboard', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+    fetchKioskData.mockResolvedValue(raw)
+
+    render(
+      <MemoryRouter initialEntries={['/app']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'My listings' }))
+    const drawer = document.querySelector('.drawer')
+    fireEvent.click(await within(drawer).findByText('Trek bike'))
+    fireEvent.click(await screen.findByRole('link', { name: 'View listing' }))
+
+    const nav = await screen.findByRole('navigation', { name: 'Breadcrumb' })
+    expect(
+      await within(nav).findByRole('link', { name: 'My Listings' }),
+    ).toHaveAttribute('href', '/app')
+    expect(within(nav).getByRole('link', { name: 'Trek bike' })).toHaveAttribute(
+      'href',
+      '/app?listing=10',
+    )
+    expect(within(nav).getByText('Listing details')).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+
+    // "My Listings" returns to the empty dashboard root.
+    fireEvent.click(within(nav).getByRole('link', { name: 'My Listings' }))
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Select a listing to show its dashboard',
+      }),
+    ).toBeInTheDocument()
+  })
+
   it('shows the post-publish screen after the wizard publishes', async () => {
     apiMock.me.mockResolvedValueOnce(signedIn)
     apiMock.update.mockImplementation(async (_resource, id, body) => ({

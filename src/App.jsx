@@ -9,6 +9,7 @@ import { buildViewModel, formatTime } from './viewModel.js'
 import { hasStrings, LANGUAGES, LanguageProvider, useI18n } from './i18n.jsx'
 import { AlertIcon, LayersIcon, XIcon } from './icons.jsx'
 import TopBar from './components/TopBar.jsx'
+import Breadcrumbs from './components/Breadcrumbs.jsx'
 import Drawer from './components/Drawer.jsx'
 import InterviewView from './components/InterviewView.jsx'
 import ChatView from './components/ChatView.jsx'
@@ -277,6 +278,24 @@ function KioskApp({ initialData = null, initialTheme }) {
     const from = `${location.pathname}${location.search}`
     navigate(`/login?from=${encodeURIComponent(from)}`, { replace: true })
   }, [authChecked, isAppRoute, isLoggedIn, location.pathname, location.search, navigate])
+
+  // A listing dashboard is addressable as `/app?listing=<id>`; that is what the
+  // breadcrumb from a listing page links back to.
+  useEffect(() => {
+    if (!isAppRoute) return
+    const listingParam = new URLSearchParams(location.search).get('listing')
+    if (!listingParam) return
+    const listing = myListings.find(
+      (row) => String(row.listingId) === String(listingParam),
+    )
+    if (!listing) return
+
+    setSelectedListingId(listing.id)
+    setSelectedInterviewId(null)
+    setSelectedChatId(null)
+    setPublishedListingId(null)
+    setWizardStage('interview')
+  }, [isAppRoute, location.search, myListings])
 
   // Load every resource the UI needs, then map it onto the interview/chat model.
   useEffect(() => {
@@ -1028,7 +1047,7 @@ function KioskApp({ initialData = null, initialTheme }) {
   // interview is one click away from the stats page (Answer questions) rather
   // than opening on the listing click itself.
   function openListing(listing) {
-    navigate('/app')
+    navigate(`/app?listing=${listing.listingId}`)
     setSelectedChatId(null)
     // Stats, not the interview: the overview reads the selected own listing.
     setSelectedInterviewId(null)
@@ -1040,6 +1059,15 @@ function KioskApp({ initialData = null, initialTheme }) {
     setWizardOpen(false)
     setAnswerModal(null)
     resetDraft()
+  }
+
+  /** Breadcrumb "My Listings": back to the empty dashboard root. */
+  function clearListingSelection() {
+    setSelectedListingId(null)
+    setSelectedInterviewId(null)
+    setPublishedListingId(null)
+    setWizardOpen(false)
+    setAnswerModal(null)
   }
 
   // Open the wizard modal for an existing listing (edit step by default).
@@ -1917,6 +1945,59 @@ function KioskApp({ initialData = null, initialTheme }) {
     ? (searchListings.find((item) => String(item.id) === String(listingRouteId)) ?? null)
     : null
 
+  // Breadcrumbs under the topbar: results, a listing page opened from either
+  // the dashboard ("View listing" passes `/app?listing=<id>`) or the results
+  // list (its link passes the full `/results?...` URL), and the per-listing
+  // dashboard reached from the drawer.
+  const listingOrigin = location.state?.from
+  const crumbsListing =
+    selectedListingId != null
+      ? (myListings.find(
+          (listing) => String(listing.listingId) === String(selectedListingId),
+        ) ?? null)
+      : null
+  const breadcrumbItems =
+    isAppRoute && crumbsListing
+      ? [
+          {
+            label: t('breadcrumb.myListings'),
+            to: '/app',
+            onClick: clearListingSelection,
+          },
+          { label: crumbsListing.title },
+        ]
+      : isResultsRoute
+        ? [
+            { label: t('breadcrumb.search'), to: '/search' },
+            { label: t('breadcrumb.results') },
+          ]
+        : isListingRoute &&
+            listingPageItem &&
+            typeof listingOrigin === 'string' &&
+            listingOrigin.startsWith('/results')
+          ? [
+              { label: t('breadcrumb.search'), to: '/search' },
+              { label: t('breadcrumb.results'), to: listingOrigin },
+              { label: listingPageItem.title },
+            ]
+          : isListingRoute &&
+              listingPageItem &&
+              typeof listingOrigin === 'string' &&
+              listingOrigin.startsWith('/app')
+            ? [
+                {
+                  label: t('breadcrumb.myListings'),
+                  to: '/app',
+                  onClick: clearListingSelection,
+                },
+                {
+                  label: listingPageItem.title,
+                  to: `/app?listing=${listingPageItem.id}`,
+                },
+                { label: t('breadcrumb.listingDetails') },
+              ]
+            : []
+
   // Seller statistics: the screen shown on /app. A listing picked in the drawer
   // wins; otherwise the post-publish screen shows the listing just published.
   // With neither, `/app` asks the user to pick one (no implicit "newest" ad).
@@ -2131,6 +2212,8 @@ function KioskApp({ initialData = null, initialTheme }) {
         onToggleTheme={toggleTheme}
         languages={languages}
       />
+
+      <Breadcrumbs items={breadcrumbItems} />
 
       {notice && (
         <div className="app-notice" role="status">

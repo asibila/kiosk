@@ -138,7 +138,11 @@ export default function PublishSuccessView({
             </p>
           </div>
           <div className="publish-card-actions">
-            <Link className="btn primary" to={`/listing/${listing.listingId}`}>
+            <Link
+              className="btn primary"
+              to={`/listing/${listing.listingId}`}
+              state={{ from: `/app?listing=${listing.listingId}` }}
+            >
               {t('publish.viewListing')}
             </Link>
             <button type="button" className="btn secondary" onClick={onImproveQuestions}>

@@ -231,7 +231,16 @@ removal is a real button with an aria-label, and result counts are announced via
   `localStorage`; guests skip the private chat/inbox resources when loading
   the catalog.
   `/results?...` renders the bookmarkable results page described below and
-  `/listing/:id` renders one listing.
+  `/listing/:id` renders one listing. A breadcrumb bar under the topbar shows
+  **My Listings › listing name** on the dashboard of a listing picked in the
+  drawer (`/app?listing=<id>`);
+  **Search › Search Results** on `/results`;
+  **Search › Search Results › listing name** on a listing opened from the
+  results list (the middle crumb links back to that exact results URL); and
+  **My Listings › listing name › Listing details** when a listing is opened
+  from the dashboard (the listing page passes `state.from =
+  /app?listing=<id>`; the middle crumb links back to that listing's dashboard,
+  which is addressable by the query string).
   Admins (role `ADMIN`) get a **Signups** action in the drawer that lists the
   most recent accounts (`GET /users` returns full rows to admins).
   Both screens also offer **Continue with Google** (`src/components/GoogleAuthButton.jsx`),

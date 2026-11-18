@@ -139,6 +139,53 @@ button {
   overflow: hidden;
 }
 
+/* Breadcrumb trail directly below the topbar. */
+.breadcrumbs {
+  flex-shrink: 0;
+  padding: 7px 22px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+
+.breadcrumbs ol {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.breadcrumbs li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.breadcrumbs a {
+  color: var(--primary-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.breadcrumbs a:hover {
+  text-decoration: underline;
+}
+
+.breadcrumbs li:last-child span {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.breadcrumbs svg {
+  flex-shrink: 0;
+  color: var(--muted-3);
+}
+
 /* Transient banner for save failures / unsaved answers. */
 .app-notice {
   display: flex;

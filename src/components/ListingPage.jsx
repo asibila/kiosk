@@ -73,13 +73,19 @@ export default function ListingPage({
     return rows.sort((a, b) => a.priority - b.priority)
   }, [listing, optionIndex, selections, t])
 
-  // A results page passes its exact URL so "back" restores the query; a direct
-  // bookmark falls back to the search form.
+  // A results page passes its exact URL so "back" restores the query; a listing
+  // opened from the dashboard returns there; a direct bookmark falls back to the
+  // search form.
   const from = location.state?.from
-  const backTo =
-    typeof from === 'string' && from.startsWith('/results') ? from : '/search'
+  const fromResults = typeof from === 'string' && from.startsWith('/results')
+  const fromDashboard = typeof from === 'string' && from.startsWith('/app')
+  const backTo = fromResults || fromDashboard ? from : '/search'
   const backLabel =
-    backTo === '/search' ? t('listing.back') : t('listing.backResults')
+    backTo === '/search'
+      ? t('listing.back')
+      : fromDashboard
+        ? t('listing.backDashboard')
+        : t('listing.backResults')
 
   const owned =
     listing != null &&
@@ -90,7 +96,6 @@ export default function ListingPage({
   // Views are counted once per listing; the API dedupes per visitor and day and
   // ignores the owner. Effects never run during the server render, so the SSR
   // markup stays identical for everyone.
-  const fromResults = typeof from === 'string' && from.startsWith('/results')
   useEffect(() => {
     if (!listing || owned) return
     trackListingView(listing.id, {
