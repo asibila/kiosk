@@ -262,6 +262,20 @@ describe('client rendering', () => {
     )
   })
 
+  it('explains a refused Google link', async () => {
+    apiMock.me.mockResolvedValueOnce(signedIn)
+
+    render(
+      <MemoryRouter initialEntries={['/app?google=error_email_mismatch']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'That Google account uses a different email.',
+    )
+  })
+
   it('shows the seller overview on /app instead of the empty placeholder', async () => {
     apiMock.me.mockResolvedValueOnce(signedIn)
 
