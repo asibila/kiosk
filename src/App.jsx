@@ -51,13 +51,16 @@ function withOrientationLabel(desc, orientation, t) {
 }
 
 function getInitialTheme() {
+  // Server render: there is no window. Node 22+ exposes a `localStorage` global
+  // that throws (and warns) unless `--localstorage-file` is set, so check for a
+  // browser before touching it.
+  if (typeof window === 'undefined') return 'light'
   try {
     const stored = localStorage.getItem(THEME_KEY)
     if (stored === 'dark' || stored === 'light') return stored
   } catch {
     // localStorage can be unavailable (private mode, blocked storage).
   }
-  if (typeof window === 'undefined') return 'light'
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches
     ? 'dark'
     : 'light'
@@ -65,6 +68,7 @@ function getInitialTheme() {
 
 /** Region chosen on /search; `null` means "not detected or chosen yet". */
 function getStoredRegionId() {
+  if (typeof window === 'undefined') return null
   try {
     const stored = localStorage.getItem(REGION_KEY)
     if (stored == null) return null
@@ -234,7 +238,10 @@ function KioskApp({ initialData = null, initialTheme }) {
     loadKeyRef.current = loadKey
 
     if (dataChanged) {
-      setDataStatus('loading')
+      // A page rendered on the server already shows real content; keep it while
+      // the browser refreshes the catalog in the background instead of flashing
+      // the loading placeholder over the hydrated markup.
+      if (!initializedRef.current) setDataStatus('loading')
       setLoadError('')
     }
 

@@ -69,6 +69,15 @@ export default defineConfig(({ command, mode }) => {
       ...(command === 'serve' ? [mkcert()] : []),
       VitePWA({
         registerType: 'autoUpdate',
+        // Listing pages are rendered by the Node server; the service worker must
+        // never answer those navigations with the precached app shell.
+        workbox: {
+          navigateFallbackDenylist: [
+            /^\/listing\//,
+            /^\/sitemap\.xml$/,
+            /^\/robots\.txt$/,
+          ],
+        },
         // The plugin will automatically generate manifest and service worker
         manifest: {
           name: 'Kiosk',

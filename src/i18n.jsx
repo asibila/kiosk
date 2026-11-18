@@ -33,6 +33,9 @@ const LANGUAGE_KEY = 'kiosk-language'
 
 /** Resolve the language before the first render in a browser. */
 export function getInitialLanguage() {
+  // Server render: no document/localStorage (Node's experimental `localStorage`
+  // global throws and warns when touched without `--localstorage-file`).
+  if (typeof document === 'undefined') return DEFAULT_LANGUAGE
   try {
     const fromCookie = readLanguageCookie(document.cookie)
     if (fromCookie) return fromCookie

@@ -3,7 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--ssr-head-->
+    <!-- Default head. The server replaces everything between these markers
+         with the per-page tags for server-rendered routes. -->
     <title>Kiosk</title>
+    <meta
+      name="description"
+      content="Kiosk - an interview and chat interface with an overlay drawer: category interviews, WhatsApp-style chats and a marketplace browser."
+    />
+    <!--/ssr-head-->
     <script>
       // Apply the saved (or system) theme before paint to avoid a light flash.
       (function () {
@@ -16,7 +24,6 @@
         } catch (e) {}
       })()
     </script>
-    <meta name="description" content="Kiosk - an interview and chat interface with an overlay drawer: category interviews, WhatsApp-style chats and a marketplace browser." />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#3b82f6" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
@@ -26,7 +33,9 @@
     />
   </head>
   <body>
-    <div id="root"></div>
+    <!-- The server renders listing pages into this outlet; SPA routes leave it
+         empty and the client mounts into it. -->
+    <div id="root"><!--ssr-outlet--></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

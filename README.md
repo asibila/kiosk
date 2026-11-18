@@ -7,8 +7,10 @@ single-file vanilla JS spec into a **React + Vite** application.
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
-npm run build    # production build in dist/
+npm run dev      # SSR server + Vite middleware, https://localhost:5173
+npm run dev:spa  # plain Vite SPA (no server render), for quick UI work
+npm run build    # client build in dist/ + SSR bundle in .ssr/
+npm start        # production server (needs the build above)
 npm test         # Vitest + Testing Library
 ```
 
@@ -30,12 +32,32 @@ VITE_API_PROXY_TARGET=http://localhost:3000
 
 ## Deployment
 
+The production deployment is a **Node web service** (`kiosk-ssr`) that serves the
+built client and server-renders listing pages:
+
+| Setting | Value |
+| --- | --- |
+| Build command | `npm ci && npm run build` (client `dist/` + SSR `.ssr/`) |
+| Start command | `npm start` (`node server.js`) |
+| Runtime env | `API_URL`, `PUBLIC_ORIGIN`, optionally `PUBLIC_API_URL` |
+| Build env | `VITE_API_BASE_URL` (baked into the browser bundle) |
+
+`server.js` renders `/listing/:id`, answers `/robots.txt`, `/sitemap.xml` and
+`/healthz`, serves the client routes (`/`, `/search`, `/results`, `/app`,
+`/login`) as the SPA shell, and returns a real 404 for anything else. See
+**Server-side rendering** below.
+
+The legacy static site (`kiosk-9j6p`) still runs from this same repository: it
+uses the plain `vite build` output and the `render.yaml` rewrite rules, and it
+does not need the Node server. Keep `render.yaml` in sync only if that site is
+still deployed.
+
 In production the frontend and the API run on different origins, so the build
 calls the API directly instead of using the Vite `/api` proxy. The default
 production API is `https://kiosk-api-znxy.onrender.com`; set
 `VITE_API_BASE_URL` at build time to point somewhere else.
 
-The app uses `BrowserRouter`, so the static host should rewrite unknown paths to
+The app uses `BrowserRouter`, so a static host should rewrite unknown paths to
 `index.html`. On Render, add these rules under **Redirects/Rewrites** for the
 static site, **in this order** (or apply `render.yaml`):
 
@@ -53,7 +75,8 @@ also get their own `index.html` shell at build time, so they load on hosts that
 only serve existing files. `/listing/:id` still needs the rewrite.
 
 The API also has to allow the frontend origin through CORS; `FRONTEND_ORIGINS`
-overrides the defaults in the backend's `src/main.ts`.
+overrides the defaults in the backend's `src/main.ts` (the defaults include both
+`kiosk-9j6p` and `kiosk-ssr`).
 
 ## Structure
 
@@ -64,6 +87,10 @@ overrides the defaults in the backend's `src/main.ts`.
 | Pure translations: dictionaries, `translate()`, language cookie | `src/strings.js` |
 | React language provider (strings loaded from `GET /descriptions`) | `src/i18n.jsx` |
 | Server-side page data (catalog cache, `/results`, `/listing/:id`) | `src/data.server.js` |
+| HTTP server (SSR routes, static files, robots/sitemap, 404/503) | `server.js` |
+| Server render entry (`renderToString` + `StaticRouter`) | `src/entry-server.jsx` |
+| Head tags, Open Graph, JSON-LD, HTML document | `src/server-head.js` |
+| Post-publish screen + seller statistics | `src/components/PublishSuccessView.jsx`, `src/sellerStats.js` |
 | Structured search input | `src/components/FacetChipInput.jsx` |
 | Suggestion fetch (debounce/abort/stale discard) | `src/useFacetSuggestions.js` |
 | Chip/suggestion JSDoc types + range formatting | `src/facetTypes.js` |
@@ -95,42 +122,52 @@ overrides the defaults in the backend's `src/main.ts`.
 
 ## Server-side rendering
 
-The app is ready to be rendered on a Node server for `/results` and
-`/listing/:id`; the server entry itself is not written yet. What already works:
+`/listing/:id` is rendered on the server so the page is complete for crawlers
+(title, price, description, facets, seller, image) and hydrates into the normal
+SPA. Everything else stays a client-rendered route.
 
-- `App` accepts `initialData`, `initialStrings`, `initialLanguage` and
-  `initialUserId`. `KioskApp` seeds its state from them during the first render,
-  so the server emits real markup (listing cards, titles, prices) instead of the
-  loading placeholder, and hydration rebuilds the same tree without refetching.
-  `src/App.ssr.test.jsx` renders the app with `renderToString` and asserts this.
-- `src/data.server.js` loads the catalog for a page: it calls the existing
-  resource endpoints in parallel, caches the snapshot for 30 seconds, shares
-  in-flight requests, and exposes `loadResultsPage()` / `loadListingPage(id)`
-  (`null` for an unknown id or an unpublished draft, which the server should
-  turn into a 404).
-- `LanguageProvider` takes its dictionaries as props and `translate()` is pure,
-  so concurrent EN and HR renders cannot leak into each other. The selected
-  language is stored in the `kiosk-language` cookie.
-- `main.jsx` hydrates when `window.__KIOSK_BOOT__` exists and falls back to
-  `createRoot` otherwise.
+| Piece | Where |
+| --- | --- |
+| HTTP server, routes, static files, 404/503, robots + sitemap | `server.js` |
+| Render entry (`renderToString` + `StaticRouter`) | `src/entry-server.jsx` |
+| Head tags, Open Graph, JSON-LD, document assembly | `src/server-head.js` |
+| Page data (catalog cache, `loadListingPage`) | `src/data.server.js` |
+| SSR bundle build | `vite.ssr.config.js` → `.ssr/entry-server.js` |
 
-Page composition lives in `data.server.js`, not in a Nest endpoint: the API
-stays resource-oriented, and a new server-rendered page adds a function here
-rather than a `/pages/...` route to the backend.
+How a request flows:
 
-Still required for SSR:
+1. `server.js` calls `loadListingPage(id)` (`null` → 404, drafts are private).
+2. `renderApp()` renders `<StaticRouter>` + `App` with `initialData`,
+   `initialStrings` and `initialLanguage` — no effects, no fetch.
+3. `buildListingHead()` emits `<title>`, description, canonical, `hreflang`
+   alternates (en/hr), Open Graph/Twitter tags and schema.org `Product` +
+   `BreadcrumbList` JSON-LD.
+4. `renderDocument()` fills the `<!--ssr-head-->` / `<!--ssr-outlet-->` markers in
+   `index.html` and injects `window.__KIOSK_BOOT__`; `main.jsx` hydrates when the
+   payload exists and boots with `createRoot` otherwise.
 
-1. `src/entry-server.jsx` with `renderToString` + `StaticRouter`, and a
-   `server.js` that serves `dist/client` and calls it (Vite `ssrLoadModule` in
-   dev).
-2. A Node deployment instead of the static site, with `API_URL` pointing at the
-   backend's internal URL.
-3. `navigateFallbackDenylist` in the PWA config for `/results` and `/listing/`,
-   so a cached `index.html` cannot bypass the server render.
-4. Render the guest version on the server (`initialUserId: null`,
-   `initialTheme: null`); the signed-in id and the theme are resolved from
-   storage after hydration, so those widgets appear after the first paint
-   without a hydration mismatch.
+Details worth knowing:
+
+- **Guest render only.** The server never forwards the visitor's cookies to the
+  API, so the HTML is identical for everyone and safe to cache
+  (`s-maxage=60`). Signed-in content (own drafts, chats) is fetched after
+  hydration, which is why an unknown or draft id returns 404 *and* still boots
+  the SPA — the owner's browser can recover.
+- **Language** comes from `?lang=` (validated: `en`, `hr`), then the
+  `kiosk-language` cookie, then English. `hreflang` links both variants.
+- **Hydration** keeps the server markup while the browser refreshes the catalog
+  in the background (`App` only shows the loading placeholder on a cold start),
+  so a server-rendered page does not flash a spinner.
+- **The boot payload contains the catalog snapshot** the render used (the same
+  rows `fetchKioskData` would fetch). It is shared with the client so hydration
+  matches; pruning it to the listing's own rows is a future size optimisation.
+- **The service worker** denylists `/listing/*`, `/sitemap.xml` and
+  `/robots.txt`, so a cached app shell can never replace a server-rendered page.
+- `server.js` runs Vite in middleware mode with `npm run dev` (HMR for the SSR
+  entry) and serves `dist/` + `.ssr/` with `npm start`.
+
+Tests: `src/server-head.test.js` (head/JSON-LD/escaping), `src/entry-server.test.jsx`
+(render output), `server.test.js` (routes, 404/503, robots/sitemap via supertest).
 
 ## Facet chip input
 
