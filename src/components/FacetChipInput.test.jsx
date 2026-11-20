@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FacetChipInput from './FacetChipInput.jsx'
 import { useFacetSuggestions } from '../useFacetSuggestions.js'
@@ -87,6 +87,20 @@ beforeEach(() => {
 })
 
 describe('FacetChipInput', () => {
+  it('shows the matching item count in parentheses next to the label', async () => {
+    useFacetSuggestions.mockReturnValue({
+      suggestions: [samsungSuggestion],
+      loading: false,
+      error: null,
+    })
+    render(<Harness />)
+
+    type('sam')
+
+    const option = await screen.findByRole('option', { name: 'Samsung (12)' })
+    expect(within(option).getByText('(12)')).toBeInTheDocument()
+  })
+
   it('selects a suggestion, adds a chip, clears text and focuses the input', async () => {
     useFacetSuggestions.mockReturnValue({
       suggestions: [samsungSuggestion],

@@ -136,6 +136,25 @@ export function buildViewModel(
     if (!listingsByCategory.has(listing.categoryId)) listingsByCategory.set(listing.categoryId, listing)
   }
 
+  // Listings are stored on the most specific category, so a parent row shows
+  // the total the results page returns for that category (its subtree).
+  const listingsBySubtree = new Map()
+  for (const listing of listings) {
+    const seen = new Set()
+    let current = categoriesById.get(listing.categoryId)
+    while (current && !seen.has(current.id)) {
+      seen.add(current.id)
+      listingsBySubtree.set(
+        current.id,
+        (listingsBySubtree.get(current.id) ?? 0) + 1,
+      )
+      current =
+        current.parentCategoryId != null
+          ? categoriesById.get(current.parentCategoryId)
+          : null
+    }
+  }
+
   // Titles come from ListingTranslation. Missing languages fall back to the UI
   // language, then English, then any available title, then the generated label.
   const titlesByListing = new Map()
@@ -452,7 +471,7 @@ export function buildViewModel(
   // Category tree for the browse modal.
   const categoryItem = (category) => {
     const childCount = browseCategories.filter((child) => child.parentCategoryId === category.id).length
-    const listingCount = listings.filter((listing) => listing.categoryId === category.id).length
+    const listingCount = listingsBySubtree.get(category.id) ?? 0
     const glyph = categoryIcon(category.id)
     const parts = []
     if (childCount) {

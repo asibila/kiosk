@@ -543,7 +543,7 @@ button {
   width: 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   padding: 8px 10px;
   border-radius: 8px;
@@ -560,6 +560,13 @@ button {
 }
 
 .facet-option-label {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+
+.facet-option-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -568,11 +575,9 @@ button {
 
 .facet-option-count {
   flex: 0 0 auto;
-  min-width: 28px;
   color: var(--muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-  text-align: right;
 }
 
 .facet-message {

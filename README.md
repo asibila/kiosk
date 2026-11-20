@@ -125,7 +125,7 @@ overrides the defaults in the backend's `src/main.ts` (the defaults include both
 | `regions` + `/regions/detect` | Search region title/picker; detection is resolved by the API from the visitor's IP |
 | `facet-schemas` + `facet-value-options` | Interview questions and answer chips |
 | `facet-value-selections` | Saved answers (on the category's first listing) |
-| `/suggest` (`GET /api/suggest`) | Facet-value autocomplete + counts for the search chip input |
+| `/suggest` (`GET /api/suggest`) | Facet-value autocomplete + counts for the search chip input; a parent category's counts include listings stored on its descendants |
 | `chat-threads` + `chat-messages` | Chat view and the Messages modal |
 | `inbox-items` | Which chat threads appear in the signed-in user's Messages |
 | `listing-chat-threads` | Maps each chat thread to its listing/category |

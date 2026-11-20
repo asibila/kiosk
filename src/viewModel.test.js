@@ -229,6 +229,30 @@ describe('buildViewModel category tree', () => {
     expect(view.interviews.map((interview) => interview.id)).toEqual(['1', '2', '3'])
     expect(view.browseData['2'].path).toEqual(['Home', 'Category 3', 'Category 2'])
   })
+
+  it('counts descendant listings on a parent category row', () => {
+    const view = buildViewModel(
+      {
+        users,
+        descriptions: [{ id: 1, translations: { en: 'Cycling', hr: 'Biciklizam' } }],
+        categories: [
+          { id: 1, descriptionId: 1, parentCategoryId: null },
+          { id: 2, descriptionId: 1, parentCategoryId: 1 },
+        ],
+        listings: [
+          { id: 10, categoryId: 2, orientation: 'sell', userId: 1, isActive: true },
+        ],
+      },
+      { userId: null, language: 'en', strings: TEST_STRINGS },
+    )
+
+    // The parent row advertises the listing stored in its child, matching the
+    // results page for that category.
+    expect(view.browseData.root.items[0].desc).toContain('1 listing')
+    expect(
+      view.browseData['1'].items.find((item) => item.id === '2').desc,
+    ).toContain('1 listing')
+  })
 })
 
 describe('buildViewModel regions', () => {

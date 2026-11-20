@@ -434,31 +434,37 @@ export default function FacetChipInput({
                       <TagIcon size={13} />
                       <span>{group.facetLabel}</span>
                     </div>
-                    {group.items.map(({ suggestion, index }) => (
-                      <button
-                        key={`${suggestion.facet}:${suggestion.valueId}`}
-                        type="button"
-                        id={`${listboxId}-option-${index}`}
-                        className={
-                          highlightedIndex === index
-                            ? 'facet-option highlighted'
-                            : 'facet-option'
-                        }
-                        role="option"
-                        aria-selected={highlightedIndex === index}
-                        title={suggestion.label}
-                        onMouseDown={(event) => event.preventDefault()}
-                        onMouseEnter={() => setHighlightedIndex(index)}
-                        onClick={() => selectSuggestion(suggestion)}
-                      >
-                        <span className="facet-option-label">
-                          {highlightMatch(suggestion.label, currentText)}
-                        </span>
-                        <span className="facet-option-count">
-                          {new Intl.NumberFormat(localeFor(lang)).format(suggestion.count)}
-                        </span>
-                      </button>
-                    ))}
+                    {group.items.map(({ suggestion, index }) => {
+                      const count = new Intl.NumberFormat(localeFor(lang)).format(
+                        suggestion.count,
+                      )
+                      return (
+                        <button
+                          key={`${suggestion.facet}:${suggestion.valueId}`}
+                          type="button"
+                          id={`${listboxId}-option-${index}`}
+                          className={
+                            highlightedIndex === index
+                              ? 'facet-option highlighted'
+                              : 'facet-option'
+                          }
+                          role="option"
+                          aria-selected={highlightedIndex === index}
+                          aria-label={`${suggestion.label} (${count})`}
+                          title={suggestion.label}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onMouseEnter={() => setHighlightedIndex(index)}
+                          onClick={() => selectSuggestion(suggestion)}
+                        >
+                          <span className="facet-option-label">
+                            <span className="facet-option-text">
+                              {highlightMatch(suggestion.label, currentText)}
+                            </span>
+                            <span className="facet-option-count">({count})</span>
+                          </span>
+                        </button>
+                      )
+                    })}
                   </div>
                 ))
               )}
